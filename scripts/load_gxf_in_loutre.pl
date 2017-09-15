@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 #This script inserts new transcripts into loutre
-#Usage: perl main_script.pl -file my_gene_data.gtf -dataset human_test [-write]
+#Usage: perl load_gxf_in_loutre.pl -file my_gene_data.gtf -dataset human_test [-write]
 
 
 use strict;
@@ -36,7 +36,7 @@ my $usage =  <<_USAGE_;
 
 This script stores the gene annotation from a gtf/gff3 file into an Otter (loutre) database.
 
-perl main_script.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -dataset DATASET_NAME -author AUTHOR_NAME -remark REMARK_STRING [-comp_pipe] [-write]
+perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -dataset DATASET_NAME -author AUTHOR_NAME -remark REMARK_STRING [-comp_pipe] [-write]
  -file      annotation file in GTF or GFF3 format - it can only contain exon lines - it will ignore anything but gene, transcript and exon lines
  -dataset   dataset name (species) already known by the Otter system, ie. present in the species.dat file on the live server
  -source    tsv file with transcript id and transcript sources, ie. RNA-seq read names supporting the model or tissues where it was found

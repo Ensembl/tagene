@@ -1,12 +1,12 @@
 
 #Summary
-Given a gene annotation file in gtf or gff3 format, main_script.pl will store the annotation in a loutre database.
+Given a gene annotation file in gtf or gff3 format, load_gxf_in_loutre.pl will store the annotation in a loutre database.
 
 Usage:
-perl main_script.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -dataset DATASET_NAME -author AUTHOR_NAME -remark REMARK_STRING [-comp_pipe] [-write]
+perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -dataset DATASET_NAME -author AUTHOR_NAME -remark REMARK_STRING [-comp_pipe] [-write]
 
 Example:
-perl main_script.pl -file hsAll_Cap1_all_stranded.exons.all.gtag.HiSS.anchor.compmerge.cage+polyASupported.gtf.gz -source pooled_source_info.txt -dataset human_test_2 -author jmg -comp_pipe -remark "Assembled from PacBio CLS reads (GEO:GSE93848) using compmerge" -write
+perl load_gxf_in_loutre.pl -file hsAll_Cap1_all_stranded.exons.all.gtag.HiSS.anchor.compmerge.cage+polyASupported.gtf.gz -source pooled_source_info.txt -dataset human_test_2 -author jmg -comp_pipe -remark "Assembled from PacBio CLS reads (GEO:GSE93848) using compmerge" -write
 
 
 #Parameters
