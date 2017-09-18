@@ -11,7 +11,7 @@ This pipeline takes one or more bam files with long reads (from SLRseq or PacBio
 ## Pipeline
 
 ### 1. Filter reads and print gff3 files individually
-  The script *convert_bam_to_gff3_for_pasa.pl* reads the bam file, filter the reads by (mapping quality, exon size, ...) and writes the gff3 output file. The format of this file is tweaked so that it mimicks the output of the alignment step of the PASA pipeline. 
+  The script *convert_bam_to_gff3_for_pasa.pl* reads the bam file, filters the reads (by mapping quality, exon size, ...) and writes the gff3 output file. The format of this file is tweaked so that it mimicks the output of the alignment step of the PASA pipeline. 
  
     bsub -M12000 -R"select[mem>12000] rusage[mem=12000]" -oo f.file.out \
     perl convert_bam_to_gff3_for_pasa.pl \
@@ -22,11 +22,11 @@ This pipeline takes one or more bam files with long reads (from SLRseq or PacBio
       -fasta /path/to/genome.fa \
       -out file.gff3
  
-  NOTE: the script was coded to deal with the output of the gmap and STAR aligners, but in its current status there is no option to switch from one to another. It worked by commenting in and out certain lines. THIS HAS TO BE FIXED.
+  NOTE: the script was coded to deal with the slightly different outputs of the GMAP and STAR aligners, but in its current status there is no option to switch between them. It worked by commenting certain lines in and out. THIS HAS TO BE FIXED.
 
 
 ### 2. Merge gff3 files
-  If several bam files were input, the same number of gff3 files will have to be merged into a single one.
+  If several bam files are processed in step 1, all the output gff3 files must be merged into a single one.
 
     for file in *.gff3; do cat $file >> merged.gff3; done
 
@@ -89,12 +89,12 @@ This pipeline takes one or more bam files with long reads (from SLRseq or PacBio
     cut -f2 intron_qc.failed | sort | uniq -c | sort -nr -k1,1 | head
 
 
-##For more information...
-~/long_read_pipeline/README
-~/long_read_pipeline/README_SLRseq
-/nfs/th_group/jmg/long_read_pipeline/using_pasa/SLRseq/README\*
-/nfs/th_group/jmg/long_read_pipeline/using_pasa/Capture_seq/README\*
-/nfs/th_group/jmg/long_read_pipeline/using_pasa/mouse_Capture_seq/README\*
+## For more information...
+* ~/long_read_pipeline/README
+* ~/long_read_pipeline/README_SLRseq
+* /nfs/th_group/jmg/long_read_pipeline/using_pasa/SLRseq/README\*
+* /nfs/th_group/jmg/long_read_pipeline/using_pasa/Capture_seq/README\*
+* /nfs/th_group/jmg/long_read_pipeline/using_pasa/mouse_Capture_seq/README\*
 
 
 
