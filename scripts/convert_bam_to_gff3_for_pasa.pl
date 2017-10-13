@@ -13,7 +13,7 @@
 
 use strict;
 use Getopt::Long;
-use Bio::DB::Sam;
+use Bio::DB::HTS;
 
 
 my $quality_threshold = 10;
@@ -98,7 +98,7 @@ close (LOG);
 
 sub read_bam_file {
   my ($bam_file, $fasta_file) = @_;
-  my $sam = Bio::DB::Sam->new (-bam           => $bam_file,
+  my $sam = Bio::DB::HTS->new (-bam           => $bam_file,
                                -fasta         => $fasta_file,
 			       -autoindex     => 1,
 			       -split_splices => 1,
