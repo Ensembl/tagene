@@ -42,9 +42,20 @@ This pipeline takes one or more bam files with long reads (from SLRseq or PacBio
 
 ### 4. Make or edit the PASA config file (alignAssembly.config)
   Indicate the PASA database name (MYSQLDB variable) and set the PASA alignment filtering paramaters.
+  NOTE: General configuration, including database connection details, can be found in $PASAHOME/pasa_conf/conf.txt.
 
   For example:
-  
+
+    ## templated variables to be replaced exist as <__var_name__>
+
+    # MySQL settings
+    MYSQLDB=gencode_pasa_Captureseq_2
+
+    #######################################################
+    # Parameters to specify to specific scripts in pipeline
+    # create a key = "script_name" + ":" + "parameter" 
+    # assign a value as done above.
+
     #script validate_alignments_in_db.dbi
     validate_alignments_in_db.dbi:--MIN_PERCENT_ALIGNED=75
     validate_alignments_in_db.dbi:--MIN_AVG_PER_ID=95
@@ -83,7 +94,7 @@ This pipeline takes one or more bam files with long reads (from SLRseq or PacBio
 
     perl check_gff3_introns.pl \
       -i failed_custom_alignments.gff3 \
-     -out intron_qc.failed \
+      -out intron_qc.failed \
       -asv GRCh37
 
     cut -f2 intron_qc.failed | sort | uniq -c | sort -nr -k1,1 | head
@@ -95,9 +106,6 @@ This pipeline takes one or more bam files with long reads (from SLRseq or PacBio
 * /nfs/th_group/jmg/long_read_pipeline/using_pasa/SLRseq/README\*
 * /nfs/th_group/jmg/long_read_pipeline/using_pasa/Capture_seq/README\*
 * /nfs/th_group/jmg/long_read_pipeline/using_pasa/mouse_Capture_seq/README\*
-
-
-
 
 
 
