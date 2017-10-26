@@ -45,7 +45,7 @@ sub parse_gxf_file {
         next if /^#/;
         chomp;
         my ($chr, $source, $type, $start, $end, $score, $strand, $phase, $attributes) = split(/\t/);
-        next if $chr =~ /_/;
+		next if (!$chr or $chr =~ /_/);
         my %attribs;
         foreach my $att (split(/;/, $attributes)){
             my ($name, $value);
@@ -76,7 +76,7 @@ sub parse_gxf_file {
                                                             };
         }
         elsif ($type eq "exon"){
-            my $exon_id = $attribs{'exon_id'};
+            my $exon_id = $attribs{'exon_id'} || $.; #gtf line number as default exon id
             $data{$gene_id}{transcripts}{$transcript_id}{exons}{$exon_id} = { 
                                                                                 'chr'    => $chr,
                                                                                 'start'  => $start,
