@@ -37,6 +37,9 @@ foreach my $lib_file (@lib_files){
 		$lib_name = "SLR-seq_".$1;
 		$lib_name =~ s/-DNA_A01-LRAAD-01//;
 	}
+	else{
+	  ($lib_name) = $lib_file =~ /\/(\w+)\.gff3(\.gz)?/;
+	}
 	
 	if ($lib_file =~ /\.gz/){
 		open (LIB, "zcat $lib_file | ") or die "Can't open file $lib_file: $!";
