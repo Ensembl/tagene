@@ -90,7 +90,12 @@ open (OUT, ">$outfile") or die "Can't open file $outfile: $!";
 
 #Read GTF file - extract transcript ids
 my %seen;
-open (GTF, $gtf_file) or die "Can't open file $gtf_file: $!";
+if ($gtf_file =~ /\.gz/){
+	open (GTF, "zcat $gtf_file | ") or die "Can't open file $gtf_file: $!";
+}
+else{
+	open (GTF, $gtf_file) or die "Can't open file $gtf_file: $!";
+}
 while (<GTF>){
 	#19      pacbio  transcript      3216669 3218031 .       -       .       gene_id "PASA_cluster_10799"; transcript_id "align_id:1326054|asmbl_45957"; gene_type "missing_biotype"; gene_status "UNKNOWN"; gene_name "PASA_cluster_10799"; transcript_type "missing_biotype"; transcript_status "UNKNOWN"; transcript_name "align_id:1326054|asmbl_45957"; level 2;
 	next if /^#/;
