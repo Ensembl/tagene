@@ -37,7 +37,7 @@ The script connects to the loutre database using the Otter logic. It creates a D
     my $dataset = Bio::Otter::Server::Config->SpeciesDat->dataset($dataset_name);
     my $otter_dba = $dataset->otter_dba or die "can't get db adaptor\n";
 
-The script parses the annotation file into simple data structures [**parse_gxf_file**] and makes Bio::Vega gene objects [make_vega_objects]. A further step removes transcripts with long introns spanning multiple genes (likely produced by misalignments) [**check_artifact_transcripts, recluster_transcripts**]. *THIS STEP HAS TO BE REFINED*. If removing these transcripts leaves gaps in their genes, these loci are split accordingly.
+The script parses the annotation file into simple data structures [**parse_gxf_file**] and makes Bio::Vega gene objects [**make_vega_objects**]. A further step removes transcripts with long introns spanning multiple genes (likely produced by misalignments) [**check_artifact_transcripts, recluster_transcripts**]. *THIS STEP HAS TO BE REFINED*. If removing these transcripts leaves gaps in their genes, these loci are split accordingly.
 
 The transcript sources are added now [**add_sources**]. *WHY NOT AS THE VEGA OBJECTS ARE BEING CREATED?* The transcript source file can be generated using the script extract_pasa_assembly_info.pl if the reads were assembled into transcript models using PASA. 
 
