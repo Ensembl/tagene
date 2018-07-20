@@ -19,6 +19,7 @@ my $dataset_name;
 my $author_name;
 my $remark;
 my $use_comp_pipe_biotype;
+my $no_artifact_check;
 
 &GetOptions(
             'file=s'      => \$file,
@@ -27,6 +28,7 @@ my $use_comp_pipe_biotype;
             'source=s'    => \$source_info, #file with otter columns and read names supporting each transcript model
             'remark=s'    => \$remark, #remark to be added to every transcript model
             'comp_pipe!'  => \$use_comp_pipe_biotype,
+            'no_check!'   => \$no_artifact_check,
             'write!'      => \$write,            
             );
 
@@ -43,6 +45,7 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -author    author name in the corresponding loutre database
  -remark    annotation remark to be added to all transcripts, usually the ENA/GEO accession for the experiment that generated the models
  -comp_pipe override the given biotypes and use "comp_pipe"
+ -no_check  do no check for transcripts spanning a large number of genes
  -write     store the gene annotation in the loutre database
 
 
@@ -68,11 +71,13 @@ my $genes = LoutreWrite::Default->parse_gxf_file($file);
 my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype);
 
 #Long artifact transcripts, spanning multiple real loci, make long artificial genes
-#Generate a kill list of "artifact" transcripts (those with long introns spanning multiple genes, likely caused by misalignments)
-my $kill_list = LoutreWrite::Default->check_artifact_transcripts($gene_objects);
+unless ($no_artifact_check){
+  #Generate a kill list of "artifact" transcripts (those with long introns spanning multiple genes, likely caused by misalignments)
+  my $kill_list = LoutreWrite::Default->check_artifact_transcripts($gene_objects);
 
-#Remove artifacts and split genes left with genomic gaps
-$gene_objects = LoutreWrite::Default->recluster_transcripts($gene_objects, $kill_list);
+  #Remove artifacts and split genes left with genomic gaps
+  $gene_objects = LoutreWrite::Default->recluster_transcripts($gene_objects, $kill_list);
+}
 
 #Add source info
 if ($source_info){
