@@ -317,9 +317,16 @@ sub process_gene {
                 }
                 #Compare each new transcript with existing transcripts in database
                 foreach my $tr (@{$gene->get_all_Transcripts}){
+                    my $already_in_annot = 0;
                     my $intron_str = join('+', map {$_->start."-".$_->end} @{$tr->get_all_Introns});
-                    #Add transcript to database gene if novel intron structure
-                    unless ($db_gene_intr_str{$intron_str}){
+                    #Add transcript to database gene if intron structure is novel and not included in any transcript already
+                    foreach my $db_intron_str (keys %db_gene_intr_str){
+                      if ($db_intron_str eq $intron_str or $db_intron_str =~ /$intron_str/){
+                        $already_in_annot = 1;
+                        last;
+                      }
+                    }
+                    unless ($already_in_annot == 1){
                         #Create a name for the new transcript
                         my $new_tr_name = $self->get_new_transcript_name($db_gene, $dba);
                         my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
