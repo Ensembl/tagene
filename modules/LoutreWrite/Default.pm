@@ -826,7 +826,12 @@ sub add_sources {
     
     #Read source info
     my %sources;
-    open (IN, $source_file) or die "Can't open file $source_file: $!";
+    if ($source_file =~ /\.gz$/){
+        open (IN, "gunzip -dc $source_file |") or die "Can't open file $source_file\n";
+    }
+    else{
+        open (IN, $source_file) or die "Can't open file $source_file\n";
+    }
     while (<IN>){
         chomp;
         my ($transc_id, $source_info) = split(/\t/);
