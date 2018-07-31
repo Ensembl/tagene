@@ -312,13 +312,13 @@ sub process_gene {
                 #Fetch all intron structures in the gene
                 my %db_gene_intr_str;
                 foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
-                    my $db_intron_str = join('+', map {$_->start."-".$_->end} @{$db_tr->get_all_Introns});
+                    my $db_intron_str = join(':', map {$_->start."-".$_->end} @{$db_tr->get_all_Introns});
                     $db_gene_intr_str{$db_intron_str} ++;
                 }
                 #Compare each new transcript with existing transcripts in database
                 foreach my $tr (@{$gene->get_all_Transcripts}){
                     my $already_in_annot = 0;
-                    my $intron_str = join('+', map {$_->start."-".$_->end} @{$tr->get_all_Introns});
+                    my $intron_str = join(':', map {$_->start."-".$_->end} @{$tr->get_all_Introns});
                     #Add transcript to database gene if intron structure is novel and not included in any transcript already
                     foreach my $db_intron_str (keys %db_gene_intr_str){
                       if ($db_intron_str eq $intron_str or $db_intron_str =~ /$intron_str/){
