@@ -3,11 +3,12 @@
 Given a gene annotation file in gtf or gff3 format, load_gxf_in_loutre.pl will store the annotation in a loutre database.
 
 #### Usage:
-perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -dataset DATASET_NAME -author AUTHOR_NAME -remark REMARK_STRING [-comp_pipe] [-write]
+perl [-I path/to/ensembl_89] load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -dataset DATASET_NAME -author AUTHOR_NAME -remark REMARK_STRING [-comp_pipe] [-write]
 
 #### Example:
 
-    perl load_gxf_in_loutre.pl \
+    perl -I ~/software/ensembl_89/modules \
+      load_gxf_in_loutre.pl \
       -file hsAll_Cap1_all_stranded.exons.all.gtag.HiSS.anchor.compmerge.cage+polyASupported.gtf.gz \
       -source pooled_source_info.txt \
       -dataset human_test_2 \
@@ -29,6 +30,7 @@ And optionally:
 - a remark that will be added as an attribute to each transcript (usually containing the ENA/GEO accession, as this can't be currently stored as an evidence)
 - the "comp_pipe" flag must be set in order to enforce the use of the "comp_pipe" biotype, which will allow the models to be editable in Otter. Otherwise, the script will use the biotype provided in the annotation file. *THERE IS NO DEFAULT BIOTYPE - FIX THIS*
 
+Note that the script requires the Ensembl API v89 or older, as newer versions do not support the gene and transcript status attributes and thus are not compatible with the ensembl-otter code.
 
 ## How it works
 
