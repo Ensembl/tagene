@@ -326,26 +326,25 @@ sub process_gene {
                     my $intron_chain_in_annot = 0;
                     my @introns = @{$tr->get_all_Introns};
                     my $intron_str = ":".join(':', map {$_->start."-".$_->end} @introns).":";
-                    foreach my $db_intron_str (keys %db_gene_intr_str){
+                    DBIS:foreach my $db_intron_str (keys %db_gene_intr_str){
                       ###TEST
                         if ($db_intron_str =~ /$intron_str/ and $db_intron_str ne $intron_str){
                             print "INTRON_CHAIN: $db_intron_str  vs  $intron_str\n";
                         }
                       ###
                         if ($db_intron_str eq $intron_str or $db_intron_str =~ /$intron_str/){
-                            $intron_chain_in_annot = 1;
-                            last;
+                            $intron_chain_in_annot = 1; print "GOT IT\n";
+                            last DBIS;
                         }
                     }
                     #If intron chain in annotation, check for terminal exon extensions that may make this model unique
                     if ($intron_chain_in_annot){
-                        my $novel_transcript;
                         #Look at first and last introns only
                         my @t_introns = ($introns[0], $introns[-1]);
                         #Loop through ALL database transcripts 
                         foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
                             my @db_introns = @{$db_tr->get_all_Introns};
-                            my $db_intron_str = ":".join(':', map {$_->start."-".$_->end} @introns).":";
+                            my $db_intron_str = ":".join(':', map {$_->start."-".$_->end} @db_introns).":";
                             #Only look at cases where the intron chain is included in a longer one in the database
                             #If the chains are identical, the 5' and 3' ends must be compared (LATER, IN TO-DO LIST)
                             if ($db_intron_str =~ /$intron_str/ and $db_intron_str ne $intron_str){
@@ -357,20 +356,20 @@ sub process_gene {
                                     my $prev_db_exon = $db_intron->prev_Exon;
                                     my $next_exon = $intron->next_Exon;
                                     my $next_db_exon = $db_intron->next_Exon;
-                                    my $mee = 3; #minimum exon extension into the db intron to be considered as novel
+                                    my $mee = 3; #minimum exon extension into the db intron to be considered for novelty
                                     
                                     #Do not compare 5' and 3' transcript ends now (LATER, IN TO-DO LIST)
                                     if ($tr->seq_region_strand == 1){
                                         #db: 5'#####----####-----######3'
                                         #tr:        5'######-----####3'
-                                        if ($prev_exon->start < $prev_db_exon->start - $mee){
+                                        if ($prev_exon->start <= $prev_db_exon->start - $mee){
                                             unless ($prev_db_exon->start == $db_tr->start){
                                                 $exon_extension = 1;
                                             }
                                         }
                                         #db: 5'#####----####-----######3'
                                         #tr:  5'####----######3'
-                                        if ($next_exon->end > $next_db_exon->end + $mee){
+                                        if ($next_exon->end >= $next_db_exon->end + $mee){
                                             unless ($next_db_exon->end == $db_tr->end){
                                                 $exon_extension = 1;
                                             }
@@ -379,14 +378,14 @@ sub process_gene {
                                     elsif ($tr->seq_region_strand == -1){
                                         #db: 3'#####----####-----######5'
                                         #tr:  3'####----######5'
-                                        if ($prev_exon->end > $prev_db_exon->end + $mee){
+                                        if ($prev_exon->end >= $prev_db_exon->end + $mee){
                                             unless ($prev_db_exon->end == $db_tr->end){
                                                 $exon_extension = 1;
                                             }
                                         }
                                         #db: 3'#####----####-----######5'
                                         #tr:        3'######-----####5'
-                                        if ($next_exon->start < $next_db_exon->start - $mee){
+                                        if ($next_exon->start <= $next_db_exon->start - $mee){
                                             unless ($next_db_exon->start == $db_tr->start){
                                                 $exon_extension = 1;
                                             }
@@ -526,6 +525,9 @@ sub write_gene_region {
     $region_action->server->set_params( locknums => $lock->{locknums} );
     $region_action->unlock_region;
     push @msg, 'unlock ok';
+    if (scalar($new_region->genes)){
+      push @msg, "gene ".join(",", map {$_->stable_id} $new_region->genes);
+    }
   }
 
   return join(',', @msg);
