@@ -296,6 +296,8 @@ sub process_gene {
             my $new_tr_name = $self->get_new_transcript_name($gene, $dba);
             my $tr_name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
             $tr->add_Attributes($tr_name_att);
+            my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+            print "TR: $id: Added transcript $new_tr_name to novel gene $new_gene_name\n";
         }
         #Add new gene to region
         $region->add_genes($gene);
@@ -317,23 +319,110 @@ sub process_gene {
                 }
                 #Compare each new transcript with existing transcripts in database
                 foreach my $tr (@{$gene->get_all_Transcripts}){
-                    my $already_in_annot = 0;
-                    my $intron_str = ":".join(':', map {$_->start."-".$_->end} @{$tr->get_all_Introns}).":";
-                    #Add transcript to database gene if intron structure is novel and not included in any transcript already
+                    my $add_transcript = 0;
+                    #Quick intron structure check
+                    #Add transcript to database gene if intron structure is novel and not included in any database transcript
+                    my $intron_chain_in_annot = 0;
+                    my @introns = @{$tr->get_all_Introns};
+                    my $intron_str = ":".join(':', map {$_->start."-".$_->end} @introns).":";
                     foreach my $db_intron_str (keys %db_gene_intr_str){
-                      if ($db_intron_str eq $intron_str or $db_intron_str =~ /$intron_str/){
-                        $already_in_annot = 1;
-                        last;
-                      }
+                      ###TEST
+                        if ($db_intron_str =~ /$intron_str/ and $db_intron_str ne $intron_str){
+                            print "INTRON_CHAIN: $db_intron_str  vs  $intron_str\n";
+                        }
+                      ###
+                        if ($db_intron_str eq $intron_str or $db_intron_str =~ /$intron_str/){
+                            $intron_chain_in_annot = 1;
+                            last;
+                        }
                     }
-                    if ($already_in_annot == 0){
+                    #If intron chain in annotation, check for terminal exon extensions that may make this model unique
+                    if ($intron_chain_in_annot){
+                        my $novel_transcript;
+                        #Look at first and last introns only
+                        my @t_introns = ($introns[0], $introns[-1]);
+                        #Loop through ALL database transcripts 
+                        foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
+                            my @db_introns = @{$db_tr->get_all_Introns};
+                            my $db_intron_str = ":".join(':', map {$_->start."-".$_->end} @introns).":";
+                            #Only look at cases where the intron chain is included in a longer one in the database
+                            #If the chains are identical, the 5' and 3' ends must be compared (LATER, IN TO-DO LIST)
+                            if ($db_intron_str =~ /$intron_str/ and $db_intron_str ne $intron_str){
+                                my $exon_extension = 0;
+                                #Find shared introns, compare flanking exons
+                                foreach my $intron (@t_introns){
+                                    my ($db_intron) = grep {$_->start == $intron->start and $_->end == $intron->end} @db_introns;
+                                    my $prev_exon = $intron->prev_Exon;
+                                    my $prev_db_exon = $db_intron->prev_Exon;
+                                    my $next_exon = $intron->next_Exon;
+                                    my $next_db_exon = $db_intron->next_Exon;
+                                    my $mee = 3; #minimum exon extension into the db intron to be considered as novel
+                                    
+                                    #Do not compare 5' and 3' transcript ends now (LATER, IN TO-DO LIST)
+                                    if ($tr->seq_region_strand == 1){
+                                        #db: 5'#####----####-----######3'
+                                        #tr:        5'######-----####3'
+                                        if ($prev_exon->start < $prev_db_exon->start - $mee){
+                                            unless ($prev_db_exon->start == $db_tr->start){
+                                                $exon_extension = 1;
+                                            }
+                                        }
+                                        #db: 5'#####----####-----######3'
+                                        #tr:  5'####----######3'
+                                        if ($next_exon->end > $next_db_exon->end + $mee){
+                                            unless ($next_db_exon->end == $db_tr->end){
+                                                $exon_extension = 1;
+                                            }
+                                        }
+                                    }
+                                    elsif ($tr->seq_region_strand == -1){
+                                        #db: 3'#####----####-----######5'
+                                        #tr:  3'####----######5'
+                                        if ($prev_exon->end > $prev_db_exon->end + $mee){
+                                            unless ($prev_db_exon->end == $db_tr->end){
+                                                $exon_extension = 1;
+                                            }
+                                        }
+                                        #db: 3'#####----####-----######5'
+                                        #tr:        3'######-----####5'
+                                        if ($next_exon->start < $next_db_exon->start - $mee){
+                                            unless ($next_db_exon->start == $db_tr->start){
+                                                $exon_extension = 1;
+                                            }
+                                        }
+                                    }
+                                }
+                                if ($exon_extension){
+                                  $add_transcript = 1; #Provisionally, not final until all db transcripts checked
+                                }
+                                else{
+                                  #Nothing unique in the model w.r.t. the database transcript: discard
+                                  $add_transcript = 0;
+                                  last;
+                                }
+                            }
+                        }
+                    }
+                    #If intron chain not in annotation, annotate transcript
+                    else{
+                        #Set flag to indicate that the transcript must be annotated
+                        $add_transcript = 1;
+                    }
+                    
+                    my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+                    if ($add_transcript == 1){
                         #Create a name for the new transcript
                         my $new_tr_name = $self->get_new_transcript_name($db_gene, $dba);
                         my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
                         $tr->add_Attributes($name_att);
                         $tr->slice($region->slice);
                         $db_gene->add_Transcript($tr);
-                        print "Added transcript $new_tr_name to gene ".$db_gene->stable_id."\n";
+                        print "TR: $id: Added transcript $new_tr_name to gene ".$db_gene->stable_id."\n";
+                    }
+                    else{
+                        if ($intron_chain_in_annot){
+                          print "TR: $id: Rejected transcript in host gene ".$db_gene->stable_id." as intron chain exists\n";
+                        }
                     }
                 }
             }
