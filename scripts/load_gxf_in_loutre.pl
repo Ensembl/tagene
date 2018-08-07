@@ -20,6 +20,8 @@ my $author_name;
 my $remark;
 my $use_comp_pipe_biotype;
 my $no_artifact_check;
+my $analysis_name;
+my $source;
 
 &GetOptions(
             'file=s'      => \$file,
@@ -28,6 +30,8 @@ my $no_artifact_check;
             'source=s'    => \$source_info, #file with otter columns and read names supporting each transcript model
             'remark=s'    => \$remark, #remark to be added to every transcript model
             'comp_pipe!'  => \$use_comp_pipe_biotype,
+            'analysis=s'  => \$analysis_name,
+            'source=s'    => \$source,
             'no_check!'   => \$no_artifact_check,
             'write!'      => \$write,            
             );
@@ -45,6 +49,8 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -author    author name in the corresponding loutre database
  -remark    annotation remark to be added to all transcripts, usually the ENA/GEO accession for the experiment that generated the models
  -comp_pipe override the given biotypes and use "comp_pipe"
+ -analysis  analysis logic name (default is "Otter")
+ -source    transcript source (default is "havana")
  -no_check  do no check for transcripts spanning a large number of genes
  -write     store the gene annotation in the loutre database
 
@@ -68,7 +74,7 @@ my $ta = $otter_dba->get_TranscriptAdaptor();
 my $genes = LoutreWrite::Default->parse_gxf_file($file);
 
 #Make gene objects
-my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype);
+my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $source);
 
 #Long artifact transcripts, spanning multiple real loci, make long artificial genes
 unless ($no_artifact_check){

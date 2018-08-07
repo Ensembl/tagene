@@ -130,11 +130,12 @@ sub parse_gxf_file {
 =cut
 
 sub make_vega_objects {
-    my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype) = @_;
+    my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype, $analysis_name, $source) = @_;
     
     #Some common features
-    my $source = "havana";
-    my $analysis = Bio::EnsEMBL::Analysis->new( -logic_name => 'Otter' );
+    $source ||= "havana";
+    $analysis_name ||= "Otter";
+    my $analysis = Bio::EnsEMBL::Analysis->new( -logic_name => $analysis_name );
     
     my $nfv_remark = Bio::EnsEMBL::Attribute->new(
                                 -code => 'remark',
