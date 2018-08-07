@@ -50,7 +50,7 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -remark    annotation remark to be added to all transcripts, usually the ENA/GEO accession for the experiment that generated the models
  -comp_pipe override the given biotypes and use "comp_pipe"
  -analysis  analysis logic name (default is "Otter")
- -source    transcript source (default is "havana")
+ -tsource    transcript source (default is "havana")
  -no_check  do no check for transcripts spanning a large number of genes
  -write     store the gene annotation in the loutre database
 
