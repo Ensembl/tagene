@@ -21,7 +21,7 @@ my $remark;
 my $use_comp_pipe_biotype;
 my $no_artifact_check;
 my $analysis_name;
-my $source;
+my $tsource;
 
 &GetOptions(
             'file=s'      => \$file,
@@ -31,7 +31,7 @@ my $source;
             'remark=s'    => \$remark, #remark to be added to every transcript model
             'comp_pipe!'  => \$use_comp_pipe_biotype,
             'analysis=s'  => \$analysis_name,
-            'source=s'    => \$source,
+            'tsource=s'   => \$tsource,
             'no_check!'   => \$no_artifact_check,
             'write!'      => \$write,            
             );
@@ -74,7 +74,7 @@ my $ta = $otter_dba->get_TranscriptAdaptor();
 my $genes = LoutreWrite::Default->parse_gxf_file($file);
 
 #Make gene objects
-my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $source);
+my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $tsource);
 
 #Long artifact transcripts, spanning multiple real loci, make long artificial genes
 unless ($no_artifact_check){
