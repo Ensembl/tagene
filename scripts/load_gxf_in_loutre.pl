@@ -127,11 +127,16 @@ foreach my $gene_obj (@$gene_objects){
         
             print "\nMODE: $mode\n";
             my $msg = LoutreWrite::Default->process_gene($new_gene_obj, $mode, $dataset_name, $otter_dba);
-            if ($msg =~ /lock ok,write ok,unlock ok/){
-                print "\nRESULT: Gene ".$new_gene_obj->stable_id." written\n";
+            if ($msg =~ /lock ok,write ok,unlock ok(,(.+))?/){
+                if ($2){
+                    print "\nRESULT: ".$2." was modified\n";
+                }
+                else{
+                    print "\nRESULT: gene ".$new_gene_obj->stable_id." checked but not modified\n";
+                }
             }
             else{
-                print "\nRESULT: Gene ".$new_gene_obj->stable_id." failed\n";
+                print "\nRESULT: gene ".$new_gene_obj->stable_id." could not be unlocked\n";
             }
         }
     }
