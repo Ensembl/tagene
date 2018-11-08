@@ -45,7 +45,7 @@ sub parse_gxf_file {
         next if /^#/;
         chomp;
         my ($chr, $source, $type, $start, $end, $score, $strand, $phase, $attributes) = split(/\t/);
-		next if (!$chr or $chr =~ /_/);
+        next if (!$chr or $chr =~ /_/ or $chr eq "chrM");
         my %attribs;
         foreach my $att (split(/;/, $attributes)){
             my ($name, $value);
@@ -110,6 +110,16 @@ sub parse_gxf_file {
             #$data{$gene_id}{transcripts}{$transcript_id}{'transcript_name'} ||= $attribs{'transcript_name'};
             #$data{$gene_id}{transcripts}{$transcript_id}{'transcript_status'} ||= $attribs{'transcript_status'};
         }
+        elsif ($type eq "CDS"){
+            my $exon_id = $attribs{'exon_id'} || $.; #gtf line number as default exon id
+            $data{$gene_id}{transcripts}{$transcript_id}{cds}{$exon_id} = { 
+                                                                                'chr'    => $chr,
+                                                                                'start'  => $start,
+                                                                                'end'    => $end,
+                                                                                'strand' => $strand,
+                                                                                   #'rank'   => $attribs{'exon_number'}
+                                                                            };
+        }
     }
     close (IN);
 
@@ -162,7 +172,7 @@ sub make_vega_objects {
     my $author = Bio::Vega::Author->new(
                                 -name   => $author_name,
                                 -email  => $author_name."\@sanger.ac.uk"
-                );
+                 );
 
     my $sa = $dba->get_SliceAdaptor();
     my %slices;
@@ -217,11 +227,61 @@ sub make_vega_objects {
                 $exon->end_phase(-1);
                 $transcript->add_Exon($exon);
             }
-
+            
+            #Make translation object
+            my $cds_start;
+            my $cds_end;
+            foreach my $exid (keys %{$genes{$gid}{transcripts}{$tid}{cds}}){
+                if (!($cds_start) or $cds_start > $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'}){
+                    $cds_start = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'};
+                }
+                if (!($cds_end) or $cds_end < $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'}){
+                    $cds_end = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'};
+                }
+            }
+            if ($cds_start and $cds_end){
+                my $start_exon;
+                my $end_exon;
+                my $seq_start;
+                my $seq_end;
+                foreach my $exon (@{$transcript->get_all_Exons}){
+                  if ($exon->start <= $cds_start and $exon->end >= $cds_start){
+                    if ($transcript->strand==1){
+                      $start_exon = $exon;
+                      $seq_start = $cds_start - $start_exon->start + 1;
+                    }
+                    else{
+                      $end_exon = $exon;
+                      $seq_end = $end_exon->end - $cds_start + 1;
+                    }
+                  }
+                  if ($exon->start <= $cds_end and $exon->end >= $cds_end){
+                    if ($transcript->strand==1){
+                      $end_exon = $exon;
+                      $seq_end = $cds_end - $end_exon->start + 1;
+                    }
+                    else{
+                      $start_exon = $exon;
+                      $seq_start = $start_exon->end - $cds_end + 1;
+                    }
+                  }
+                }
+               
+                my $translation = Bio::Vega::Translation->new(
+                                                              -start_exon => $start_exon,
+                                                              -end_exon   => $end_exon,
+                                                              -seq_start  => $seq_start,
+                                                              -seq_end    => $seq_end
+                                                              );
+               $transcript->translation($translation);
+            }
+  
             #Add transcript to gene
             $gene->add_Transcript($transcript);
         }
         
+        
+
         #Update gene and transcript biotypes
         if (!($gene->biotype) or $gene->biotype eq "missing_biotype"){
             $gene = $self->assign_biotypes($gene); #This also updates description if appropriate 
@@ -323,22 +383,27 @@ sub process_gene {
                     my $add_transcript = 0;
                     #Quick intron structure check
                     #Add transcript to database gene if intron structure is novel and not included in any database transcript
-                    my $intron_chain_in_annot = 0;
+                    my $full_intron_chain_in_annot = 0;
+                    my $partial_intron_chain_in_annot = 0;
                     my @introns = @{$tr->get_all_Introns};
                     my $intron_str = ":".join(':', map {$_->start."-".$_->end} @introns).":";
-                    DBIS:foreach my $db_intron_str (keys %db_gene_intr_str){
-                      ###TEST
-                        if ($db_intron_str =~ /$intron_str/ and $db_intron_str ne $intron_str){
-                            print "INTRON_CHAIN: $db_intron_str  vs  $intron_str\n";
+                    foreach my $db_intron_str (keys %db_gene_intr_str){
+                        if ($db_intron_str eq $intron_str){
+                            $full_intron_chain_in_annot = 1;
+                            print "FULL_INTRON_CHAIN: $db_intron_str  vs  $intron_str\n";
                         }
-                      ###
-                        if ($db_intron_str eq $intron_str or $db_intron_str =~ /$intron_str/){
-                            $intron_chain_in_annot = 1; print "GOT IT\n";
-                            last DBIS;
+                        elsif ($db_intron_str =~ /$intron_str/){
+                            $partial_intron_chain_in_annot = 1;
+                            print "PARTIAL_INTRON_CHAIN: $db_intron_str  vs  $intron_str\n";
                         }
                     }
-                    #If intron chain in annotation, check for terminal exon extensions that may make this model unique
-                    if ($intron_chain_in_annot){
+                    
+                    if ($full_intron_chain_in_annot){
+                      $add_transcript = 0;
+                    }
+                    #If intron chain found as part of longer intron chain in annotation, 
+                    #check for terminal exon extensions that may make this model unique
+                    elsif ($partial_intron_chain_in_annot){
                         #Look at first and last introns only
                         my @t_introns = ($introns[0], $introns[-1]);
                         #Loop through ALL database transcripts 
@@ -420,7 +485,7 @@ sub process_gene {
                         print "TR: $id: Added transcript $new_tr_name to gene ".$db_gene->stable_id."\n";
                     }
                     else{
-                        if ($intron_chain_in_annot){
+                        if ($full_intron_chain_in_annot or $partial_intron_chain_in_annot){
                           print "TR: $id: Rejected transcript in host gene ".$db_gene->stable_id." as intron chain exists\n";
                         }
                     }
@@ -432,7 +497,7 @@ sub process_gene {
                 #      JUST WANT TO KEEP A RECORD OF THE CODE THAT UPDATES EXON COORDINATES WHILE PRESERVING ATTRIBUTES AND EVIDENCE
             elsif ($submode eq "db"){
                 foreach my $tr (@{$gene->get_all_Transcripts}){
-                    #If a transcript with the same stable id exists, update it if there are any changes to exon coordinates or biotype
+                    #If a transcript with the same stable id exists, update it if there are any changes to exon coordinates, CDS or biotype
                     my ($db_tr) = grep {$_->stable_id eq $tr->stable_id} @{$db_gene->get_all_Transcripts};
                     if ($db_tr){
                         #Compare exon coordinates between transcripts
@@ -444,6 +509,25 @@ sub process_gene {
                                 $db_tr->add_Exon($exon);
                             }
                         }
+                        
+                        #Compare CDS
+                        if (($tr->translation and !($db_tr->translation)) or
+                            ($tr->translation and $db_tr->translation and $tr->coding_region_start ne $db_tr->coding_region_start) or 
+                            ($tr->translation and $db_tr->translation and $tr->coding_region_end ne $db_tr->coding_region_end)){
+                            foreach my $db_exon (@{$db_tr->get_all_Exons}){
+                                #set translation start exon
+                                if ($db_exon->start == $tr->translation->start_Exon->start){
+                                    $db_exon->translation->start_Exon($db_exon);
+                                    $db_tr->translation->start($tr->translation->start); #position within the start exon
+                                }
+                                #set translation end exon
+                                if ($db_exon->start == $tr->translation->end_Exon->start){
+                                    $db_exon->translation->end_Exon($db_exon);
+                                    $db_tr->translation->end($tr->translation->end); #position within the end exon
+                                }
+                            }
+                        }
+                        
                         #Update transcript biotype
                         if ($tr->biotype ne $db_tr->biotype){
                             $db_tr->biotype($tr->biotype);
