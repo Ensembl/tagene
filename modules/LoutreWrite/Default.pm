@@ -133,14 +133,18 @@ sub parse_gxf_file {
  Arg[1]    : hash-ref of gene annotation (as provided by the parse_gxf_file method)
  Arg[2]    : Bio::Vega::DBSQL::DBAdaptor
  Arg[3]    : author name
- Arg[4]    : force 'computationally_generated' biotype
+ Arg[4]    : remark to be added to all transcripts
+ Arg[5]    : force 'computationally_generated' biotype
+ Arg[6]    : gene and transcript analysis logic name
+ Arg[7]    : gene and transcript source
+ Arg[8]    : Boolean - true if the default transcript attributes used in the comp_pipe models must be ignored
  Function  : convert gene annotation into Vega gene, transcript and exon objects
  Returntype: list of Bio::Vega::Gene objects
 
 =cut
 
 sub make_vega_objects {
-    my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype, $analysis_name, $source) = @_;
+    my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype, $analysis_name, $source, $no_comp_pipe) = @_;
     
     #Some common features
     $source ||= "havana";
@@ -189,7 +193,9 @@ sub make_vega_objects {
                                         );
         #$gene->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'name', -value => $genes{$gid}{'gene_name'})); #Let the script generate a name if needed
         $gene->gene_author($author);
-        $gene->add_Attributes($nfv_remark, $source_remark);
+        unless ($no_comp_pipe){
+          $gene->add_Attributes($nfv_remark, $source_remark);
+        }
         $gene->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => $genes{$gid}{'gene_name'}));
         
         #Add biotype-status combination sanity check!!!
@@ -205,9 +211,15 @@ sub make_vega_objects {
                                                         );
             #$transcript->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'name', -value => $genes{$gid}{transcripts}{$tid}{'transcript_name'})); #Let the script generate a name if needed
             $transcript->transcript_author($author);
-            $transcript->add_Attributes($nfv_remark, $source_remark);
+            unless ($no_comp_pipe){
+              $transcript->add_Attributes($nfv_remark, $source_remark);
+            }
             $transcript->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', 
-                                                                    -value => "ID: ".$genes{$gid}{transcripts}{$tid}{'transcript_name'}));
+                                                                     -value => "ID: ".$genes{$gid}{transcripts}{$tid}{'transcript_name'}));
+            
+            if ($source_remark){
+              $transcript->add_Attributes($source_remark);
+            }
 
             #Make exon objects
             foreach my $exid (keys %{$genes{$gid}{transcripts}{$tid}{exons}}){
@@ -304,13 +316,14 @@ sub make_vega_objects {
  Arg[2]    : mode - either 'add' or 'update'
  Arg[3]    : Otter dataset name ('human', 'mouse', 'human_test', etc)
  Arg[4]    : Bio::Vega::DBSQL::DBAdaptor
+ Arg[5]    : Boolean - if true, do not check for completely or partially identical intron chains in the annotation
  Function  : get region with the gene coordinates; 'add' the gene to the region or 'update' pre-existing gene annotation; store changes in the database 
  Returntype: String (message with the outcome)
 
 =cut
 
 sub process_gene {
-    my ($self, $gene, $mode, $dataset_name, $dba) = @_;
+    my ($self, $gene, $mode, $dataset_name, $dba, $no_intron_check) = @_;
 
     #If in "update" mode, the region has to span the whole host gene to stop this from being "spliced out" as an incomplete gene. 
     #This would prevent the new annotation from being added to the host gene.
@@ -472,6 +485,11 @@ sub process_gene {
                     else{
                         #Set flag to indicate that the transcript must be annotated
                         $add_transcript = 1;
+                    }
+                    
+                    #If 'no_intron_check' set, override intron check results
+                    if ($no_intron_check){
+                      $add_transcript = 1;
                     }
                     
                     my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;

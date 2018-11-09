@@ -22,18 +22,22 @@ my $use_comp_pipe_biotype;
 my $no_artifact_check;
 my $analysis_name;
 my $tsource;
+my $no_comp_pipe;
+my $no_intron_check;
 
 &GetOptions(
-            'file=s'      => \$file,
-            'dataset=s'   => \$dataset_name,
-            'author=s'    => \$author_name,
-            'source=s'    => \$source_info, #file with otter columns and read names supporting each transcript model
-            'remark=s'    => \$remark, #remark to be added to every transcript model
-            'comp_pipe!'  => \$use_comp_pipe_biotype,
-            'analysis=s'  => \$analysis_name,
-            'tsource=s'   => \$tsource,
-            'no_check!'   => \$no_artifact_check,
-            'write!'      => \$write,            
+            'file=s'        => \$file,
+            'dataset=s'     => \$dataset_name,
+            'author=s'      => \$author_name,
+            'source=s'      => \$source_info, #file with otter columns and read names supporting each transcript model
+            'remark=s'      => \$remark, #remark to be added to every transcript model
+            'comp_pipe!'    => \$use_comp_pipe_biotype,
+            'analysis=s'    => \$analysis_name,
+            'tsource=s'     => \$tsource,
+            'no_check!'     => \$no_artifact_check,
+            'no_comp_pipe!' => \$no_comp_pipe,
+            'no_intron_check!' => \$no_intron_check,
+            'write!'        => \$write,
             );
 
 die unless $dataset_name && $dataset_name =~ /test/;
@@ -43,16 +47,18 @@ my $usage =  <<_USAGE_;
 This script stores the gene annotation from a gtf/gff3 file into an Otter (loutre) database.
 
 perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -dataset DATASET_NAME -author AUTHOR_NAME -remark REMARK_STRING [-comp_pipe] [-write]
- -file      annotation file in GTF or GFF3 format - it can only contain exon lines - it will ignore anything but gene, transcript and exon lines
- -dataset   dataset name (species) already known by the Otter system, ie. present in the species.dat file on the live server
- -source    tsv file with transcript id and transcript sources, ie. RNA-seq read names supporting the model or tissues where it was found
- -author    author name in the corresponding loutre database
- -remark    annotation remark to be added to all transcripts, usually the ENA/GEO accession for the experiment that generated the models
- -comp_pipe override the given biotypes and use "comp_pipe"
- -analysis  analysis logic name (default is "Otter")
- -tsource    transcript source (default is "havana")
- -no_check  do no check for transcripts spanning a large number of genes
- -write     store the gene annotation in the loutre database
+ -file           annotation file in GTF or GFF3 format - it can only contain exon lines - it will ignore anything but gene, transcript and exon lines
+ -dataset        dataset name (species) already known by the Otter system, ie. present in the species.dat file on the live server
+ -source         tsv file with transcript id and transcript sources, ie. RNA-seq read names supporting the model or tissues where it was found
+ -author         author name in the corresponding loutre database
+ -remark         annotation remark to be added to all transcripts, usually the ENA/GEO accession for the experiment that generated the models
+ -comp_pipe      override the given biotypes and use "comp_pipe"
+ -analysis       analysis logic name (default is "Otter")
+ -tsource        transcript source (default is "havana")
+ -no_check       do no check for transcripts spanning a large number of genes
+ -no_comp_pipe   do not add the comp_pipe attributes by default ('not_for_VEGA', 'Assembled from ... reads', 'ID: ...' remarks)
+ -no_intron_check  allow transcripts with intron chains fully or partially identical to others in the database
+ -write          store the gene annotation in the loutre database
 
 
 _USAGE_
@@ -74,7 +80,7 @@ my $ta = $otter_dba->get_TranscriptAdaptor();
 my $genes = LoutreWrite::Default->parse_gxf_file($file);
 
 #Make gene objects
-my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $tsource);
+my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $tsource, $no_comp_pipe);
 
 #Long artifact transcripts, spanning multiple real loci, make long artificial genes
 unless ($no_artifact_check){
@@ -134,7 +140,7 @@ foreach my $gene_obj (@$gene_objects){
             }        
         
             print "\nMODE: $mode\n";
-            my $msg = LoutreWrite::Default->process_gene($new_gene_obj, $mode, $dataset_name, $otter_dba);
+            my $msg = LoutreWrite::Default->process_gene($new_gene_obj, $mode, $dataset_name, $otter_dba, $no_intron_check);
             if ($msg =~ /lock ok,write ok,unlock ok(,(.+))?/){
                 if ($2){
                     print "\nRESULT: ".$2." was modified\n";
