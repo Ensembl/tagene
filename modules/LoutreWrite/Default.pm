@@ -1150,6 +1150,7 @@ sub find_host_gene {
 =head2 assign_host_gene
 
  Arg[1]    : Bio::Vega::Gene object
+ Arg[2]    : preserve host gene biotype, eg. ignore non-coding host gene if transcript is coding
  Function  : Find the most suitable existing gene(s) to host the transcripts of the given gene, 
              split the input gene into as many genes as host genes were found and set the new gene stable id(s);
              return the transformed input gene
@@ -1158,7 +1159,7 @@ sub find_host_gene {
 =cut
 
 sub assign_host_gene {
-    my ($self, $gene) = @_;
+    my ($self, $gene, $preserve_biotype) = @_;
 
     #Fetch database genes overlapping our gene
     my $gene_slice = $gene->slice->adaptor->fetch_by_region("toplevel", $gene->seq_region_name, $gene->start, $gene->end);
@@ -1172,6 +1173,11 @@ sub assign_host_gene {
         my @candidates;
         my $max_n_introns = 0;
         foreach my $db_gene (@db_genes){
+            if ($preserve_biotype){
+                if ($transcript->translation and $db_gene->biotype ne "protein_coding"){
+                    next;
+                }
+            }
             my $n_introns = 0; #Number of matching introns
             foreach my $db_intron (sort {$a->start <=> $b->start} @{$db_gene->get_all_Introns}){
 #print $db_gene->stable_id.".".$db_gene->version.": ".$db_intron->seq_region_start."-".$db_intron->seq_region_end."\n";            

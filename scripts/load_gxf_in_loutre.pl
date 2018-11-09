@@ -104,9 +104,17 @@ foreach my $gene_obj (@$gene_objects){
    #IT HAS TO BE DONE BY SPLITTING GENES    
     #Readthrough genes -> should be split and assign host genes independently by transcript
     #Why not replace "find_host_gene" with "assign_host_gene" which would return an array of gene objects, each one with their new stable id if they have a host gene?
-    my $gene_objects = LoutreWrite::Default->assign_host_gene($gene_obj);
+    my $gene_objects = LoutreWrite::Default->assign_host_gene($gene_obj, 1);
     foreach my $new_gene_obj (@$gene_objects){
         print "HOST: ".$new_gene_obj->stable_id."\n";
+        
+        #Find biotype of host gene
+        if ($new_gene_obj->stable_id =~ /^OTT/){
+          my $host_gene = $ga->fetch_by_stable_id($new_gene_obj->stable_id);
+          if ($host_gene->biotype eq "protein_coding"){
+            #$new_gene_obj = LoutreWrite::Default->assign_cds_to_transcripts($new_gene_obj, $host_gene);
+          }
+        }
 
         #Store gene
         if ($write){
