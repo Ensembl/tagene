@@ -120,6 +120,15 @@ sub parse_gxf_file {
                                                                                    #'rank'   => $attribs{'exon_number'}
                                                                             };
         }
+        elsif ($type eq "stop_codon"){ #Relevant for GENCODE gtf type files, where stop codon is not included in CDS
+            my $exon_id = $attribs{'exon_id'} || $.; #gtf line number as default exon id
+            $data{$gene_id}{transcripts}{$transcript_id}{stop_codon}{$exon_id} = { 
+                                                                                'chr'    => $chr,
+                                                                                'start'  => $start,
+                                                                                'end'    => $end,
+                                                                                'strand' => $strand,
+                                                                            };
+        }
     }
     close (IN);
 
@@ -251,6 +260,18 @@ sub make_vega_objects {
                     $cds_end = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'};
                 }
             }
+            foreach my $exid (keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+                if ($cds_end and $transcript->strand==1){
+                  if ($cds_end < $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'}){
+                    $cds_end = $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'};
+                  }
+                }
+                elsif ($cds_start and $transcript->strand==-1){
+                  if ($cds_start > $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'}){
+                    $cds_start = $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'};
+                  }
+                }
+            }
             if ($cds_start and $cds_end){
                 my $start_exon;
                 my $end_exon;
@@ -287,7 +308,7 @@ sub make_vega_objects {
                                                               );
                $transcript->translation($translation);
             }
-  
+
             #Add transcript to gene
             $gene->add_Transcript($transcript);
         }
