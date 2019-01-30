@@ -40,7 +40,7 @@ my $no_intron_check;
             'write!'        => \$write,
             );
 
-die unless $dataset_name && $dataset_name =~ /test/;
+#die unless $dataset_name && $dataset_name =~ /test/;
 
 my $usage =  <<_USAGE_;
 
