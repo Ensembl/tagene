@@ -39,7 +39,7 @@ sub parse_gxf_file {
         open (IN, "gunzip -dc $file |") or die "Can't open file $file\n";
     }
     else{
-          open (IN, $file) or die "Can't open file $file\n";
+        open (IN, $file) or die "Can't open file $file\n";
     }
     while (<IN>){
         next if /^#/;
@@ -117,7 +117,7 @@ sub parse_gxf_file {
                                                                                 'start'  => $start,
                                                                                 'end'    => $end,
                                                                                 'strand' => $strand,
-                                                                                   #'rank'   => $attribs{'exon_number'}
+                                                                                'phase'  => "p".$phase,
                                                                             };
         }
         elsif ($type eq "stop_codon"){ #Relevant for GENCODE gtf type files, where stop codon is not included in CDS
@@ -127,6 +127,7 @@ sub parse_gxf_file {
                                                                                 'start'  => $start,
                                                                                 'end'    => $end,
                                                                                 'strand' => $strand,
+                                                                                'phase'  => "p".$phase,
                                                                             };
         }
     }
@@ -246,6 +247,36 @@ sub make_vega_objects {
                 $exon->slice($slices{$chr});
                 $exon->phase(-1);
                 $exon->end_phase(-1);
+                
+                #Assign exon phases from gxf file if exon starts within CDS
+                #Compare also with stop_codon coordinates as stop codon is not included in CDS in GENCODE gtf files
+                my $gtf_phase = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'phase'} || $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'phase'};
+                print "\n$gtf_phase \n";
+                if ($gtf_phase and ($gtf_phase eq "p0" or $gtf_phase eq "p1" or $gtf_phase eq "p2")){
+                #if ($gtf_phase){
+                  print "\nA\n";
+                  if ((($exon->start == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} or $exon->start == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'}) and $exon->strand == 1) or 
+                      (($exon->end == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} or $exon->end == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'}) and $exon->strand == -1)
+                     ){
+                    $exon->phase(0) if $gtf_phase eq "p0";
+                    $exon->phase(1) if $gtf_phase eq "p2";
+                    $exon->phase(2) if $gtf_phase eq "p1"; print "\nB".$exon->phase."\n";
+                    if ((($exon->end == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} or $exon->end == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'}) and $exon->strand == 1) or 
+                        (($exon->start == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} or $exon->start == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'}) and $exon->strand == -1)
+                       ){
+                       $exon->end_phase(($exon->phase + $exon->length) % 3); print "\nC".$exon->end_phase."\n";
+                    }
+                  }
+                  else{
+                    #Half-coding start codon: no phase but end_phase
+                    if ($exon->end == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} and $exon->strand == 1){
+                      $exon->end_phase(($exon->end - $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} + 1) % 3); print "\nD".$exon->end_phase."\n";
+                    }
+                    elsif ($exon->start == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} and $exon->strand == -1){
+                      $exon->end_phase(($genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} - $exon->start + 1) % 3); print "\nE".$exon->end_phase."\n";
+                    }
+                  }
+                }
                 $transcript->add_Exon($exon);
             }
             
@@ -306,7 +337,11 @@ sub make_vega_objects {
                                                               -seq_start  => $seq_start,
                                                               -seq_end    => $seq_end
                                                               );
-               $transcript->translation($translation);
+                $transcript->translation($translation);
+                
+                #Re-check exon phases
+                my $check_message = $self->check_exon_phases($transcript);
+                print $check_message."\n";
             }
 
             #Add transcript to gene
@@ -1212,6 +1247,12 @@ sub assign_host_gene {
         my @candidates;
         my $max_n_introns = 0;
         foreach my $db_gene (@db_genes){
+            #Exclude undesired host genes
+            if ($db_gene->biotype eq "artifact" or
+                scalar (grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) == 1
+            ){
+              next;
+            }
             if ($preserve_biotype){
                 if ($transcript->translation and $db_gene->biotype ne "protein_coding"){
                     next;
@@ -1462,6 +1503,59 @@ sub check_artifact_transcripts {
     return \%list;
 }
 
+
+sub check_exon_phases {
+    my ($self, $transcript) = @_;
+    my $message = " ";
+    if ($transcript->translation and 
+        scalar(grep {$_->value == 1} @{$transcript->get_all_Attributes('CDS_start_NF')}) == 0){
+        foreach my $exon (@{$transcript->get_all_Exons}){
+            my ($phase, $end_phase);
+            #Calculate phase
+            #5' UTR
+            if (($exon->strand == 1 and $exon->start < $transcript->coding_region_start) or
+                ($exon->strand == -1 and $exon->end > $transcript->coding_region_end)){
+                $phase = -1;
+            }
+            #3' UTR
+            elsif (($exon->strand == 1 and $exon->start > $transcript->coding_region_end) or
+                   ($exon->strand == -1 and $exon->end < $transcript->coding_region_start)){
+                $phase = -1;
+            }
+            #CDS
+            else{
+                $phase = ($exon->cdna_start($transcript) - $transcript->cdna_coding_start) % 3;
+            }
+            #Calculate end phase
+            #5' UTR
+            if (($exon->strand == 1 and $exon->end < $transcript->coding_region_start) or
+                ($exon->strand == -1 and $exon->start > $transcript->coding_region_end)){
+                $end_phase = -1;
+            }
+            #3' UTR
+            elsif (($exon->strand == 1 and $exon->end > $transcript->coding_region_end) or
+                   ($exon->strand == -1 and $exon->start < $transcript->coding_region_start)){
+                $end_phase = -1;
+            }
+            #CDS
+            else{
+                if ($phase == -1){
+                    $end_phase = ($exon->cdna_end($transcript) - $transcript->cdna_coding_start + 1) % 3;
+                }
+                else{
+                    $end_phase = ($phase + $exon->length) % 3;
+                }
+            }
+            if ($phase != $exon->phase){
+                $message .= "Expected phase ($phase) does not match database phase (".$exon->phase.") for exon ".$exon->stable_id." ".$exon->start."-".$exon->end." on strand ".$exon->strand."\n";
+            }
+            if ($end_phase != $exon->end_phase){
+                $message .= "Expected end phase ($end_phase) does not match database end phase (".$exon->end_phase.") for exon ".$exon->stable_id." ".$exon->start."-".$exon->end." on strand ".$exon->strand."\n";
+            }
+        }
+    }
+    return $message;
+}
 
 1;
 
