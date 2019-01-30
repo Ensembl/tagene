@@ -1504,6 +1504,48 @@ sub check_artifact_transcripts {
 }
 
 
+
+=head2 check_overlapped_loci
+
+ Arg[1]    : list of Bio::Vega::Gene objects
+ Arg[2]    : Integer
+ Function  : Check for transcripts overlapping a number of existing genes at the exon level that exceeds the number given in the second argument.
+ Returntype: Hashref - list of transcript names
+
+=cut
+
+sub check_overlapped_loci {
+    my ($self, $genes, $max_ov_loci) = @_;
+    my %list;
+
+    foreach my $gene (@$genes){
+        foreach my $transcript (@{$gene->get_all_Transcripts}){
+            #Fetch database genes overlapping our transcript
+            my $tr_slice = $transcript->slice->adaptor->fetch_by_region("toplevel", $transcript->seq_region_name, $transcript->start, $transcript->end);
+            my @db_genes = grep {$_->seq_region_strand == $gene->seq_region_strand} @{$tr_slice->get_all_Genes};
+            my $overlapped_genes_count = 0;
+            DBG:foreach my $db_gene (@db_genes){
+                next if $db_gene->biotype eq "artifact";
+                next if scalar(grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) > 0;
+                foreach my $db_exon (@{$db_gene->get_all_Exons}){
+                    foreach my $exon ($transcript->get_all_Exons){
+                        if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
+                            $overlapped_genes_count++;
+                            next DBG;
+                        }
+                    }
+                }
+            }
+            if ($overlapped_genes_count > $max_ov_loci){
+                my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+                print "KILL_2: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps $overlapped_genes_count loci\n";
+                $list{$t_name} = 1;
+            }
+        }
+    }
+
+    return \%list;
+}
 sub check_exon_phases {
     my ($self, $transcript) = @_;
     my $message = " ";

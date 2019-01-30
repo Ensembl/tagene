@@ -24,20 +24,24 @@ my $analysis_name;
 my $tsource;
 my $no_comp_pipe;
 my $no_intron_check;
+my $no_coding_genes;
+my $max_overlapped_loci;
 
 &GetOptions(
-            'file=s'        => \$file,
-            'dataset=s'     => \$dataset_name,
-            'author=s'      => \$author_name,
-            'source=s'      => \$source_info, #file with otter columns and read names supporting each transcript model
-            'remark=s'      => \$remark, #remark to be added to every transcript model
-            'comp_pipe!'    => \$use_comp_pipe_biotype,
-            'analysis=s'    => \$analysis_name,
-            'tsource=s'     => \$tsource,
-            'no_check!'     => \$no_artifact_check,
-            'no_comp_pipe!' => \$no_comp_pipe,
-            'no_intron_check!' => \$no_intron_check,
-            'write!'        => \$write,
+            'file=s'            => \$file,
+            'dataset=s'         => \$dataset_name,
+            'author=s'          => \$author_name,
+            'source=s'          => \$source_info, #file with otter columns and read names supporting each transcript model
+            'remark=s'          => \$remark, #remark to be added to every transcript model
+            'comp_pipe!'        => \$use_comp_pipe_biotype,
+            'analysis=s'        => \$analysis_name,
+            'tsource=s'         => \$tsource,
+            'no_check!'         => \$no_artifact_check,
+            'no_comp_pipe!'     => \$no_comp_pipe,
+            'no_intron_check!'  => \$no_intron_check,
+            'no_coding!'        => \$no_coding_genes,
+            'max_ov_loc=s'      => \$max_overlapped_loci,
+            'write!'            => \$write,
             );
 
 #die unless $dataset_name && $dataset_name =~ /test/;
@@ -58,6 +62,8 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -no_check       do no check for transcripts spanning a large number of genes
  -no_comp_pipe   do not add the comp_pipe attributes by default ('not_for_VEGA', 'Assembled from ... reads', 'ID: ...' remarks)
  -no_intron_check  allow transcripts with intron chains fully or partially identical to others in the database
+ -no_coding      do not import transcripts into protein-coding genes
+ -max_ov_loc     maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
  -write          store the gene annotation in the loutre database
 
 
@@ -91,6 +97,12 @@ unless ($no_artifact_check){
   $gene_objects = LoutreWrite::Default->recluster_transcripts($gene_objects, $kill_list);
 }
 
+#Remove transcripts overlapping more than the allowed number of existing loci at the exon level
+if ($max_overlapped_loci){
+  my $kill_list_2 = LoutreWrite::Default->check_overlapped_loci($gene_objects, $max_overlapped_loci);
+  $gene_objects = LoutreWrite::Default->recluster_transcripts($gene_objects, $kill_list_2);
+}
+
 #Add source info
 if ($source_info){
     $gene_objects = LoutreWrite::Default->add_sources($gene_objects, $source_info);
@@ -117,7 +129,11 @@ foreach my $gene_obj (@$gene_objects){
         #Find biotype of host gene
         if ($new_gene_obj->stable_id =~ /^OTT/){
           my $host_gene = $ga->fetch_by_stable_id($new_gene_obj->stable_id);
-          if ($host_gene->biotype eq "protein_coding"){
+          if ($host_gene->biotype eq "protein_coding" or $host_gene->biotype eq "ig_gene"){
+            if ($no_coding_genes){
+              print "Gene ".$host_gene->stable_id." will be ignored as it is coding and there is a NO_CODING flag\n";
+              next;
+            }
             #$new_gene_obj = LoutreWrite::Default->assign_cds_to_transcripts($new_gene_obj, $host_gene);
           }
         }
