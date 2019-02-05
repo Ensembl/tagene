@@ -251,7 +251,7 @@ sub make_vega_objects {
                 #Assign exon phases from gxf file if exon starts within CDS
                 #Compare also with stop_codon coordinates as stop codon is not included in CDS in GENCODE gtf files
                 my $gtf_phase = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'phase'} || $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'phase'};
-                print "\n$gtf_phase \n";
+                print "\n$gtf_phase \n" if $gtf_phase;
                 if ($gtf_phase and ($gtf_phase eq "p0" or $gtf_phase eq "p1" or $gtf_phase eq "p2")){
                 #if ($gtf_phase){
                   print "\nA\n";
@@ -439,7 +439,7 @@ sub process_gene {
             my ($db_gene) = grep {$_->stable_id eq $gene->stable_id} $region->genes;
             #There are two options now:
             my $submode = "cons";
-            #A) Only store new transcript model if it has a novel intron structure; do not update existing transcripts
+            #A) CONSERVATIVE: a new transcript model is only stored if it has a novel intron structure or an existing intron structure with novel sequence in its terminal exons; existing transcripts are never updated.
             if ($submode eq "cons"){
                 #Fetch all intron structures in the gene
                 my %db_gene_intr_str;
@@ -566,7 +566,8 @@ sub process_gene {
                 }
             }
 
-            #B) Replace existing transcript models with new ones if they have the same stable ids
+            #B) AGGRESSIVE: existing transcripts can be modified by merging them with new models if they are compatible.
+            #   Also, allows replacing existing transcript models with new ones if they have the same stable ids.
                 #NOTE: UNCLEAR WHEN THIS OPTION WOULD BE USED - 
                 #      JUST WANT TO KEEP A RECORD OF THE CODE THAT UPDATES EXON COORDINATES WHILE PRESERVING ATTRIBUTES AND EVIDENCE
             elsif ($submode eq "db"){
@@ -640,6 +641,200 @@ sub process_gene {
 
     return $g_msg;
 }
+
+
+
+
+=head2 process_gene_2
+
+ Arg[1]    : Vega gene object to be written
+ Arg[2]    : mode - either 'add' or 'update'
+ Arg[3]    : submode - either 'cons' or 'aggr'
+ Arg[4]    : Otter dataset name ('human', 'mouse', 'human_test', etc)
+ Arg[5]    : Bio::Vega::DBSQL::DBAdaptor
+ Arg[6]    : Boolean - if true, do not check for completely or partially identical intron chains in the annotation
+ Function  : get region with the gene coordinates; 'add' the gene to the region or 'update' pre-existing gene annotation; store changes in the database 
+ Returntype: String (message with the outcome)
+
+=cut
+
+sub process_gene_2 {
+    my ($self, $gene, $mode, $submode, $dataset_name, $dba, $no_intron_check) = @_;
+
+    #If in "update" mode, the region has to span the whole host gene to stop this from being "spliced out" as an incomplete gene. 
+    #That would prevent the new annotation from being added to the host gene.
+    my ($padded_start, $padded_end);
+    if ($mode eq "update"){
+        my $host_gene = $dba->get_GeneAdaptor->fetch_by_stable_id($gene->stable_id);
+        $padded_start = min($gene->start, $host_gene->start);
+        $padded_end = max($gene->end, $host_gene->end);
+    }
+
+    #Get Otter region for the gene
+    my $local_server = Bio::Otter::Server::Support::Local->new( otter_dba => $dba );
+    $local_server->set_params(
+        dataset => $dataset_name,
+        chr     => $gene->seq_region_name,
+        start   => $padded_start || $gene->start,   
+        end     => $padded_end || $gene->end,
+        cs      => "chromosome",
+        csver   => "Otter"
+    );
+
+    my $region_action = Bio::Otter::ServerAction::Script::Region->new_with_slice($local_server);
+    my $region = $region_action->get_region; #Bio::Vega::Region
+    print "\nFOUND ".scalar($region->genes)." GENES IN REGION ".$gene->seq_region_name.":".$gene->start."\n";
+
+    #Reset gene coordinates to the start of the region slice,
+    #otherwise the gene coordinates in loutre will be wrong
+    my $slice_offset = $region->slice->start - 1;
+    foreach my $tr (@{$gene->get_all_Transcripts}){
+        foreach my $exon (@{$tr->get_all_Exons}){
+            $exon->start($exon->start - $slice_offset);
+            $exon->end(  $exon->end   - $slice_offset);
+            $exon->slice($region->slice);
+        }
+    }
+
+    if ($mode eq "add"){
+        #Create a new gene name
+        my $new_gene_name = $self->get_new_gene_name($region, $gene, $dataset_name, $dba) or return " ";
+        my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_gene_name);
+        $gene->add_Attributes($name_att);
+        foreach my $tr (@{$gene->get_all_Transcripts}){
+            #Create a new transcript name
+            my $new_tr_name = $self->get_new_transcript_name($gene, $dba);
+            my $tr_name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
+            $tr->add_Attributes($tr_name_att);
+            my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+            print "TR: $id: Added transcript $new_tr_name to novel gene $new_gene_name\n";
+        }
+        #Add new gene to region
+        $region->add_genes($gene);
+    }
+
+    elsif ($mode eq "update"){
+        #Update existing gene: host gene that provided its stable id to the gene being stored
+        if (scalar(grep {$_->stable_id eq $gene->stable_id} $region->genes) == 1){
+            my ($db_gene) = grep {$_->stable_id eq $gene->stable_id} $region->genes;
+            
+            #Compare new transcripts with existing ones
+            TR:foreach my $tr (@{$gene->get_all_Transcripts}){
+                my $add_transcript = 0;
+                my @merge_candidates = ();
+                my %tr_comp;
+                foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
+                    next if scalar @{$db_tr->get_all_Introns} == 0;  #Do not merge with single-exon transcripts? (In case they are CLS Platinum...)
+                    my $i = intron_novelty($tr, $db_tr);
+                    my $e = exon_novelty($tr, $db_tr);
+                    my $m = can_be_merged($tr, $db_tr);                   
+                    $tr_comp{$db_tr->stable_id} = {'intron' => $i, 'exon' => $e, 'merge' => $m};
+                }
+                #Multi-exon transcripts
+                if (scalar @{$tr->get_all_Introns}){
+                    #Conservative mode: a new transcript model is only stored if it has a novel intron structure or an existing intron structure with novel sequence in its terminal exons; existing transcripts are never updated.
+                    if ($submode eq "cons"){
+                        #Add transcript if intron chain shows novelty w.r.t. all existing transcripts
+                        #Discard transcript if an existing transcript has identical intron chain
+                        DBTR:foreach my $db_tr_id (keys %tr_comp){
+                            if (($tr_comp{$db_tr_id}->{'intron'} == 1) or 
+                                ($tr_comp{$db_tr_id}->{'intron'} == -1 and $tr_comp{$db_tr_id}->{'exon'} == 1)){
+                                $add_transcript = 1;
+                            }
+                            elsif (($tr_comp{$db_tr_id}->{'intron'} == 0) or 
+                                   ($tr_comp{$db_tr_id}->{'intron'} == -1 and $tr_comp{$db_tr_id}->{'exon'} == 0)){
+                                $add_transcript = 0;
+                                last DBTR;
+                            }
+                        }
+                    }
+                    #Aggressive mode: existing transcripts can be modified by merging them with new models if they are compatible.
+                    #  TO DO: Also, allows replacing existing transcript models with new ones if they have the same stable ids.
+                    elsif ($submode eq "aggr"){
+                        #Merge transcript if there is exon novelty w.r.t. an existing transcript and both can be merged
+                        #Add transcript if intron novelty, or if exon novelty but transcripts can't be merged
+                        #Action may differ for different existing transcripts: prioritise merging?  with the one with the most intronic/exonic overlap?
+                        DBTR:foreach my $db_tr_id (keys %tr_comp){
+                            if ($tr_comp{$db_tr_id}->{'exon'} == 1){
+                                if ($tr_comp{$db_tr_id}->{'merge'} == 1){
+                                    push(@merge_candidates, $db_tr_id);
+                                }
+                                else{
+                                    $add_transcript = 1;
+                                }
+                            }
+                            elsif ($tr_comp{$db_tr_id}->{'exon'} == 0 and $tr_comp{$db_tr_id}->{'intron'} == 1){ #eg. exon skipping
+                                $add_transcript = 1;
+                            }
+                            elsif ($tr_comp{$db_tr_id}->{'exon'} == 0 and ($tr_comp{$db_tr_id}->{'intron'} == 0 or $tr_comp{$db_tr_id}->{'intron'} == -1)){
+                                $add_transcript = 0;
+                                @merge_candidates = ();
+                                last DBTR;
+                            }
+                        }
+                    }
+                }
+                #Single-exon transcripts
+                #If there is exon novelty, add new transcript
+                else{
+                    DBTR:foreach my $db_tr_id (keys %tr_comp){
+                        if ($tr_comp{$db_tr_id}->{'exon'} == 1){
+                            $add_transcript = 1;
+                        }
+                        else{
+                            $add_transcript = 0;
+                            last DBTR;
+                        }
+                    }
+                }
+              
+                #Take action
+                my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+                if (scalar @merge_candidates > 0){
+                    my $sel_db_tr;
+                    if (scalar @merge_candidates > 1){
+                        $sel_db_tr = pick_db_tr(@merge_candidates, $tr);
+                    }
+                    else{
+                        $sel_db_tr = $merge_candidates[0];
+                    }
+                    my $merged_transcript = merge_transcripts($tr, $sel_db_tr);
+                }
+                elsif ($add_transcript == 1){
+                    #Create a name for the new transcript
+                    my $new_tr_name = $self->get_new_transcript_name($db_gene, $dba);
+                    my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
+                    $tr->add_Attributes($name_att);
+                    $tr->slice($region->slice);
+                    $db_gene->add_Transcript($tr);
+                    print "TR: $id: Added transcript $new_tr_name to gene ".$db_gene->stable_id."\n";
+                }
+                else{
+                    print "TR: $id: Rejected transcript in host gene ".$db_gene->stable_id." as intron chain exists\n";
+                }
+            }
+        }
+        else{
+            warn "More than one gene with stable id ".$gene->stable_id."!!!\n";
+        }
+    }
+
+    #Gene biotype
+    #Check Bio::Vega::Gene->set_biotype_status_from_transcripts
+
+
+    #Write region
+    my $g_msg = " ";
+    #if ($write){
+        $local_server->authorized_user($gene->gene_author->name); # preserve authorship
+        $g_msg = write_gene_region($region_action, $region);
+        print $g_msg."\n";
+    #}
+
+    return $g_msg;
+}
+
+
 
 
 
@@ -1546,6 +1741,17 @@ sub check_overlapped_loci {
 
     return \%list;
 }
+
+
+
+=head2 check_exon_phases
+
+ Arg[1]    : Bio::Vega::Transcript object
+ Function  : 
+ Returntype: String
+
+=cut
+
 sub check_exon_phases {
     my ($self, $transcript) = @_;
     my $message = " ";
@@ -1598,6 +1804,252 @@ sub check_exon_phases {
     }
     return $message;
 }
+
+
+
+=head2 intron novelty
+
+ Arg[1]    : Bio::Vega::Transcript object (novel transcript)
+ Arg[2]    : Bio::Vega::Transcript object (database transcript)
+ Function  : Look for novel splice sites in the first transcript. Returns '1' if there is intron novelty, '0' if intron chains are identical, and '-1' if the intron chain of the first transcript is included in the intron chain of the second one and the latter has additional introns
+ Returntype: Integer 
+
+=cut
+
+sub intron_novelty {
+    my ($tr, $db_tr) = @_;
+    INT:foreach my $intron (@{$tr->get_all_Introns}){
+        my $seen = 0;
+        foreach my $db_intron (@{$db_tr->get_all_Introns}){
+            if ($intron->seq_region_start == $db_intron->seq_region_start and $intron->seq_region_end == $db_intron->seq_region_end){
+                $seen = 1;
+                next INT;
+            }
+        }
+        #Novel intron (may overlap existing intron but splice sites are different)
+        if ($seen == 0){
+            return 1;
+        }
+    }
+    #Even if no intron novelty, report if novel transcript's intron chain is included in database transcript's intron chain
+    if (scalar(@{$tr->get_all_Introns}) < scalar(@{$db_tr->get_all_Introns})){
+      return -1;
+    }
+    return 0;
+}
+
+
+
+=head2 exon novelty
+
+ Arg[1]    : Bio::Vega::Transcript object (novel transcript)
+ Arg[2]    : Bio::Vega::Transcript object (database transcript)
+ Function  : Look for exon sequence novelty in the first transcript.
+ Returntype: Boolean
+
+=cut
+
+sub exon_novelty {
+    my ($tr, $db_tr) = @_;
+    EX:foreach my $exon (@{$tr->get_all_Exons}){
+        my $seen = 0;
+        my $ovlp = 0;
+        foreach my $db_exon (@{$db_tr->get_all_Exons}){
+            if ($exon->seq_region_start <= $db_exon->seq_region_end and $exon->seq_region_end >= $db_exon->seq_region_start){
+                $ovlp = 1;
+                #if exons overlap but the novel exon extends past 5' or 3' end of the database exon
+                if ($exon->seq_region_start < $db_exon->seq_region_start or $exon->seq_region_end > $db_exon->seq_region_end){
+                    return 1;
+                }
+                else{
+                    next EX;
+                }
+            }
+        }
+        #if exon doesn't overlap any exon of the database transcript 
+        if ($ovlp == 0){
+            return 1;
+        }
+    }
+    return 0;
+}
+
+
+
+=head2 can_be_merged
+
+ Arg[1]    : Bio::Vega::Transcript object (novel transcript)
+ Arg[2]    : Bio::Vega::Transcript object (database transcript)
+ Function  : Returns true if transcripts can be merged, i.e. they have exon-exon overlap but no exon-intron overlap
+ Returntype: Boolean
+
+=cut
+
+sub can_be_merged {
+    my ($tr, $db_tr) = @_;
+    my $ex_ovlp = 0;
+    EX:foreach my $exon (@{$tr->get_all_Exons}){
+        #Exon-exon overlap: required
+        foreach my $db_exon (@{$db_tr->get_all_Exons}){
+            if ($exon->seq_region_start <= $db_exon->seq_region_end and $exon->seq_region_end >= $db_exon->seq_region_start){
+                $ex_ovlp = 1;
+            }
+        }
+        #Exon-intron overlap: not allowed
+        foreach my $db_intron (@{$db_tr->get_all_Introns}){
+            if ($exon->seq_region_start <= $db_intron->seq_region_end and $exon->seq_region_end >= $db_intron->seq_region_start){
+              return 0;
+            }
+        }
+    }
+    #Intron-exon overlap: not allowed
+    INT:foreach my $intron (@{$tr->get_all_Introns}){
+        foreach my $db_exon (@{$db_tr->get_all_Exons}){
+            if ($intron->seq_region_start <= $db_exon->seq_region_end and $intron->seq_region_end >= $db_exon->seq_region_start){
+                return 0;
+            }
+        }
+    }
+    if ($ex_ovlp == 1){
+      return 1;
+    }
+    return 0;
+}
+
+
+
+=head2 pick_db_tr
+
+ Arg[1]    : Array of Bio::Vega::Transcript objects (database transcripts that can be merged with the novel transcript)
+ Arg[2]    : Bio::Vega::Transcript object (novel transcript)
+ Function  : Returns the most suitable transcript to be merged with the novel transcript, based on exon-exon overlap and number of shared introns
+ Returntype: Bio::Vega::Transcript
+
+=cut
+
+sub pick_db_tr {
+    my (@merge_c, $tr) = @_;
+    my $selected_db_tr;
+    my @candidates;
+    my @best_candidates;
+    my $max_n_introns = 0;
+    #Prioritise number of shared introns
+    foreach my $db_tr (@merge_c){
+        my $shared_intron_count = 0;
+        I:foreach my $intron (@{$tr->get_all_Introns}){
+            foreach my $db_intron (@{$db_tr->get_all_Introns}){
+                if ($intron->seq_region_start == $db_intron->seq_region_start and $intron->seq_region_end == $db_intron->seq_region_end){
+                    $shared_intron_count++;
+                    next I;
+                }
+            }
+        }
+        if ($shared_intron_count > $max_n_introns){
+            @best_candidates = ();
+            push(@best_candidates, $db_tr);
+            $max_n_introns = $shared_intron_count;
+        }
+        elsif ($shared_intron_count == $max_n_introns){
+            push(@best_candidates, $db_tr);        
+        }
+    }
+    #If only one, pick it
+    if (scalar(@best_candidates) == 1){
+        $selected_db_tr = $best_candidates[0];
+    }
+    #Else, check exon overlap - find transcript with the most exonic overlap
+    else{
+        if (scalar(@best_candidates) == 0){
+            @best_candidates = @merge_c;
+        }
+        my %tr_loc; #Store genomic positions of transcript's exons
+        foreach my $exon (@{$tr->get_all_Exons}){
+            for (my $i = $exon->seq_region_start; $i <= $exon->seq_region_end; $i++){
+                $tr_loc{$i} = 1;
+            }
+        }
+        my $max = 0;
+        foreach my $db_tr (@best_candidates){
+            my %seen; #Store genomic positions where novel transcript's exons overlaps database transcript's exons
+            foreach my $db_exon (@{$db_tr->get_all_Exons}){
+                for (my $i = $db_exon->seq_region_start; $i <= $db_exon->seq_region_end; $i++){
+                    if ($tr_loc{$i}){
+                        $seen{$i} = 1;
+                    }
+                }
+            }
+            if (scalar(keys %seen) > $max){
+                $selected_db_tr = $db_tr;
+                $max = scalar(keys %seen);
+            }
+        }
+    }
+    return $selected_db_tr;
+}
+
+
+
+=head2 merge_transcripts
+
+ Arg[1]    : Bio::Vega::Transcript object (novel transcript)
+ Arg[2]    : Bio::Vega::Transcript object (database transcript)
+ Function  : Returns a transcript resulting from merging the two input transcripts
+ Returntype: Bio::Vega::Transcript
+
+=cut
+
+sub merge_transcripts {
+    my ($tr, $db_tr) = @_;
+    EX:foreach my $exon (@{$tr->get_all_Exons}){
+        #Check if exon is completely new or overlaps an existing exon
+        my $seen = 0;
+        foreach my $db_exon (@{$db_tr->get_all_Exons}){
+            if ($exon->seq_region_start == $db_exon->seq_region_start and $exon->seq_region_end == $db_exon->seq_region_end){
+                $seen = 1;
+                next EX;
+            }
+            elsif ($exon->seq_region_start <= $db_exon->seq_region_end and $exon->seq_region_end >= $db_exon->seq_region_start){
+                $seen = 1;
+                #If exons overlap, merge them, remove the old exon and add the merged exon to the database transcript.
+                #NOTE: not checking if there is exon-intron overlap or if an exon overlaps two exons of the other transcript. 
+                #It has been checked elsewhere.
+                my $new_start = min($exon->seq_region_start, $db_exon->seq_region_start);
+                my $new_end = max($exon->seq_region_end, $db_exon->seq_region_end);
+                my $novel_exon = new Bio::Vega::Exon ( -start => $new_start, 
+                                                       -end => $new_end,
+                                                       -strand => $db_tr->seq_region_strand,
+                                                       -slice => $db_tr->slice
+                                                      );
+                $novel_exon->phase(-1);
+                $novel_exon->end_phase(-1);
+                $db_tr->swap_exons($db_exon, $novel_exon);
+                next EX;
+            }
+        }
+        #If novel, make new Exon object and add it to the database transcript
+        if ($seen == 0){
+            my $novel_exon = new Bio::Vega::Exon ( -start => $exon->seq_region_start, 
+                                                   -end => $exon->seq_region_end,
+                                                   -strand => $db_tr->seq_region_strand,
+                                                   -slice => $db_tr->slice
+                                                  );
+            $novel_exon->phase(-1);
+            $novel_exon->end_phase(-1);
+            $db_tr->add_Exon($novel_exon);
+        }
+    }
+    #Add remarks (except 'non for VEGA') and hidden remarks from the novel transcript
+    foreach my $att (@{$tr->get_all_Attributes}){
+        unless ($att->value eq "not for VEGA"){
+            $db_tr->add_Attributes($att);
+        }
+    }
+    #Change authorship
+    $db_tr->transcript_author($tr->author);
+    
+    return $db_tr;        
+}
+
 
 1;
 
