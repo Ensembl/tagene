@@ -757,7 +757,8 @@ sub process_gene_2 {
                         DBTR:foreach my $db_tr_id (keys %tr_comp){
                             if ($tr_comp{$db_tr_id}->{'exon'} == 1){
                                 if ($tr_comp{$db_tr_id}->{'merge'} == 1){
-                                    push(@merge_candidates, $db_tr_id);
+                                    my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
+                                    push(@merge_candidates, $db_tr);
                                 }
                                 else{
                                     $add_transcript = 1;
@@ -1723,9 +1724,9 @@ sub check_overlapped_loci {
                 next if $db_gene->biotype eq "artifact";
                 next if scalar(grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) > 0;
                 foreach my $db_exon (@{$db_gene->get_all_Exons}){
-                    foreach my $exon ($transcript->get_all_Exons){
+                    foreach my $exon (@{$transcript->get_all_Exons}){
                         if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
-                            $overlapped_genes_count++;
+                            $overlapped_genes_count++; print "OV: ".$db_gene->stable_id."\n";
                             next DBG;
                         }
                     }
@@ -2045,7 +2046,7 @@ sub merge_transcripts {
         }
     }
     #Change authorship
-    $db_tr->transcript_author($tr->author);
+    $db_tr->transcript_author($tr->transcript_author);
     
     return $db_tr;        
 }
