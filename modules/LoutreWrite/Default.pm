@@ -1483,7 +1483,8 @@ sub assign_host_gene {
         my $max_n_introns = 0;
         foreach my $db_gene (@db_genes){
             #Exclude undesired host genes
-            if ($db_gene->biotype eq "artifact" or
+            if ($db_gene->source ne "havana" or
+                $db_gene->biotype eq "artifact" or
                 scalar (grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) == 1
             ){
               next;
@@ -1760,6 +1761,7 @@ sub check_overlapped_loci {
             my @db_genes = grep {$_->seq_region_strand == $gene->seq_region_strand} @{$tr_slice->get_all_Genes};
             my $overlapped_genes_count = 0;
             DBG:foreach my $db_gene (@db_genes){
+                next if $db_gene->source ne "havana";
                 next if $db_gene->biotype eq "artifact";
                 next if scalar(grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) > 0;
                 foreach my $db_exon (@{$db_gene->get_all_Exons}){
