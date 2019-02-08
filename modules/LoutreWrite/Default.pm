@@ -154,7 +154,7 @@ sub parse_gxf_file {
 =cut
 
 sub make_vega_objects {
-    my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype, $analysis_name, $source, $no_comp_pipe) = @_;
+    my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype, $analysis_name, $source, $no_comp_pipe, $no_NFV) = @_;
     
     #Some common features
     $source ||= "havana";
@@ -204,7 +204,10 @@ sub make_vega_objects {
         #$gene->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'name', -value => $genes{$gid}{'gene_name'})); #Let the script generate a name if needed
         $gene->gene_author($author);
         unless ($no_comp_pipe){
-          $gene->add_Attributes($nfv_remark, $source_remark);
+            $gene->add_Attributes($source_remark);
+        }
+        unless ($no_NFV){
+            $gene->add_Attributes($nfv_remark);
         }
         $gene->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => $genes{$gid}{'gene_name'}));
         
@@ -222,7 +225,10 @@ sub make_vega_objects {
             #$transcript->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'name', -value => $genes{$gid}{transcripts}{$tid}{'transcript_name'})); #Let the script generate a name if needed
             $transcript->transcript_author($author);
             unless ($no_comp_pipe){
-              $transcript->add_Attributes($nfv_remark, $source_remark);
+              $transcript->add_Attributes($source_remark);
+            }
+            unless ($no_NFV){
+                $transcript->add_Attributes($nfv_remark);
             }
             $transcript->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', 
                                                                      -value => "ID: ".$genes{$gid}{transcripts}{$tid}{'transcript_name'}));
