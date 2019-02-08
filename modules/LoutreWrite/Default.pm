@@ -666,6 +666,7 @@ sub process_gene {
 
 sub process_gene_2 {
     my ($self, $gene, $mode, $submode, $dataset_name, $dba, $no_intron_check) = @_;
+    my $log = "";
 print "SUBMODE: $submode\n";
     #If in "update" mode, the region has to span the whole host gene to stop this from being "spliced out" as an incomplete gene. 
     #That would prevent the new annotation from being added to the host gene.
@@ -715,6 +716,7 @@ print "SUBMODE: $submode\n";
             my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
             print "TR: $id: Added transcript $new_tr_name to novel gene $new_gene_name\n";
         }
+        $gene = $self->assign_biotypes($gene);
         #Add new gene to region
         $region->add_genes($gene);
     }
@@ -853,6 +855,12 @@ print "SUBMODE: $submode\n";
                     my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
                     $tr->add_Attributes($name_att);
                     $tr->slice($region->slice);
+                    #unless $use_comp_pipe_biotype, assign transcript biotype based on other transcripts
+                    my $use_comp_pipe_biotype = 0; #PASS THIS AS A PARAMETER!!!
+                    unless ($use_comp_pipe_biotype){
+                        my $t_biotype = get_transcript_biotype($db_gene);
+                        $tr->biotype($t_biotype);
+                    }
                     $db_gene->add_Transcript($tr);
                     print "TR: $id: Added transcript $new_tr_name to gene ".$db_gene->stable_id."\n";
                 }
@@ -2089,16 +2097,40 @@ sub merge_transcripts {
         }
     }
     print "AFTER: ".join('+', map {$_->vega_hashkey} @{$db_tr->get_all_Exons})."\n";
-    
+
     #Add remarks (except 'non for VEGA') and hidden remarks from the novel transcript
     foreach my $att (@{$tr->get_all_Attributes}){
         $db_tr->add_Attributes($att);
     }
     #Change authorship
     $db_tr->transcript_author($tr->transcript_author);
-    
-    return $db_tr;        
+
+    return $db_tr;
 }
+
+
+
+#Get transcript biotype from existing transcript biotypes
+#Mainly for non-coding genes
+sub get_transcript_biotype {
+    my $db_gene = shift;
+    my %biotypes;
+    if ($db_gene->biotype =~ /^(processed_transcript|tec|comp_pipe)$/){
+        foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
+            if ($db_tr->biotype =~ /^(antisense|lincrna|sense_intronic|sense_overlapping|bidirectional_promoter_lncrna|3\'_overlapping_ncrna)$/){
+                $biotypes{$db_tr->biotype}++;
+            }
+            #if ($biotypes{"antisense"} > 0 and !$biotypes{"lincrna"} and !$biotypes{"sense_intronic"} and !$biotypes{"sense_overlapping"} and !$biotypes{"bidirectional_promoter_lncrna"} and !$biotypes{"3'_overlapping_ncrna"}){
+        }
+        if (scalar keys %biotypes == 1){
+            foreach (keys %biotypes){
+                return $_;
+            }
+        }
+    }
+    return "processed_transcript";
+}
+
 
 
 1;
