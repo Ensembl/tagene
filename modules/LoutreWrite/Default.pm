@@ -148,13 +148,15 @@ sub parse_gxf_file {
  Arg[6]    : gene and transcript analysis logic name
  Arg[7]    : gene and transcript source
  Arg[8]    : Boolean - true if the default transcript attributes used in the comp_pipe models must be ignored
+ Arg[9]    : Boolean - if true, the "not for VEGA" remark will not be added
+ Arg[10]   : String - comma-separated list of chromosome(s) to be included
  Function  : convert gene annotation into Vega gene, transcript and exon objects
  Returntype: list of Bio::Vega::Gene objects
 
 =cut
 
 sub make_vega_objects {
-    my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype, $analysis_name, $source, $no_comp_pipe, $no_NFV) = @_;
+    my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype, $analysis_name, $source, $no_comp_pipe, $no_NFV, $only_chr) = @_;
     
     #Some common features
     $source ||= "havana";
@@ -191,9 +193,18 @@ sub make_vega_objects {
     my $sa = $dba->get_SliceAdaptor();
     my %slices;
     my @objects;
+    my %chrs;
+    if ($only_chr){
+        foreach (split(",", $only_chr)){
+            $chrs{$_} = 1;
+        }
+    }
 
     my %genes = %{$genes};
     foreach my $gid (keys %genes){
+        if ($only_chr and !$chrs{$genes{$gid}{'chr'}}){
+            next;
+        }
         my $gene = Bio::Vega::Gene->new(
                                         -stable_id  => ($gid =~ /^OTT/ ? $gid : ""),
                                         -biotype    => ($force_cp_biotype ? $CP_BIOTYPE : $genes{$gid}{'gene_type'}),
