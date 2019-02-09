@@ -201,10 +201,7 @@ sub make_vega_objects {
     }
 
     my %genes = %{$genes};
-    foreach my $gid (keys %genes){
-        if ($only_chr and !$chrs{$genes{$gid}{'chr'}}){
-            next;
-        }
+    GENE:foreach my $gid (keys %genes){
         my $gene = Bio::Vega::Gene->new(
                                         -stable_id  => ($gid =~ /^OTT/ ? $gid : ""),
                                         -biotype    => ($force_cp_biotype ? $CP_BIOTYPE : $genes{$gid}{'gene_type'}),
@@ -257,6 +254,10 @@ sub make_vega_objects {
                                                 );
                 my $chr = $genes{$gid}{transcripts}{$tid}{exons}{$exid}{'chr'};
                 $chr =~ s/^chr//;
+                #Filter by chromosome if there is a list of selected chromosomes
+                if ($only_chr and !($chrs{$chr})){
+                    next GENE;
+                }
                 if (!($slices{$chr})){
                     my $slice = $sa->fetch_by_region("chromosome", "chr$chr-38");
                     $slices{$chr} = $slice;
