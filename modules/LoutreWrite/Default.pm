@@ -187,7 +187,7 @@ sub make_vega_objects {
                 
     my $author = Bio::Vega::Author->new(
                                 -name   => $author_name,
-                                -email  => $author_name."\@sanger.ac.uk"
+                                -email  => $author_name."\@ebi.ac.uk"
                  );
 
     my $sa = $dba->get_SliceAdaptor();
