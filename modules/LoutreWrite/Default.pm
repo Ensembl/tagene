@@ -940,7 +940,7 @@ sub write_gene_region {
     $region_action->server->set_params( locknums => $lock->{locknums} );
     $region_action->unlock_region;
     push @msg, 'unlock ok';
-    if (scalar($new_region->genes)){
+    if ($new_region and scalar($new_region->genes)){
       push @msg, "gene ".join(",", map {$_->stable_id} $new_region->genes);
     }
   }
