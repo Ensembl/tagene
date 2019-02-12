@@ -149,7 +149,7 @@ sub parse_gxf_file {
  Arg[7]    : gene and transcript source
  Arg[8]    : Boolean - true if the default transcript attributes used in the comp_pipe models must be ignored
  Arg[9]    : Boolean - if true, the "not for VEGA" remark will not be added
- Arg[10]   : String - comma-separated list of chromosome(s) to be included
+ Arg[10]   : String - chromosome
  Function  : convert gene annotation into Vega gene, transcript and exon objects
  Returntype: list of Bio::Vega::Gene objects
 
@@ -193,12 +193,6 @@ sub make_vega_objects {
     my $sa = $dba->get_SliceAdaptor();
     my %slices;
     my @objects;
-    my %chrs;
-    if ($only_chr){
-        foreach (split(",", $only_chr)){
-            $chrs{$_} = 1;
-        }
-    }
 
     my %genes = %{$genes};
     GENE:foreach my $gid (keys %genes){
@@ -254,10 +248,7 @@ sub make_vega_objects {
                                                 );
                 my $chr = $genes{$gid}{transcripts}{$tid}{exons}{$exid}{'chr'};
                 $chr =~ s/^chr//;
-                #Filter by chromosome if there is a list of selected chromosomes
-                if ($only_chr and !($chrs{$chr})){
-                    next GENE;
-                }
+                next GENE if ($only_chr and $chr ne $only_chr);
                 if (!($slices{$chr})){
                     my $slice = $sa->fetch_by_region("chromosome", "chr$chr-38");
                     $slices{$chr} = $slice;
@@ -678,7 +669,7 @@ sub process_gene {
 
 sub process_gene_2 {
     my ($self, $gene, $mode, $submode, $dataset_name, $dba, $no_intron_check) = @_;
-    my $log = "";
+    my @log;
 print "SUBMODE: $submode\n";
     #If in "update" mode, the region has to span the whole host gene to stop this from being "spliced out" as an incomplete gene. 
     #That would prevent the new annotation from being added to the host gene.
@@ -727,6 +718,7 @@ print "SUBMODE: $submode\n";
             $tr->add_Attributes($tr_name_att);
             my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
             print "TR: $id: Added transcript $new_tr_name to novel gene $new_gene_name\n";
+            push (@log, "TR2: $id: Added transcript $new_tr_name to novel gene $new_gene_name");
         }
         $gene = $self->assign_biotypes($gene);
         #Add new gene to region
@@ -859,7 +851,8 @@ print "SUBMODE: $submode\n";
                     #    $sel_db_tr->add_Exon($exon);
                     #}
                     #$db_gene->add_Transcript($sel_db_tr);
-                    print "TR: $id: Merged transcript ".$merged_transcript->stable_id." in gene ".$db_gene->stable_id."\n";
+                    print "TR: $id: Extended transcript ".$merged_transcript->stable_id." in gene ".$db_gene->stable_id."\n";
+                    push (@log, "TR2: $id: Extended transcript ".$merged_transcript->stable_id." in gene ".$db_gene->stable_id);
                 }
                 elsif ($add_transcript == 1){
                     #Create a name for the new transcript
@@ -875,9 +868,11 @@ print "SUBMODE: $submode\n";
                     }
                     $db_gene->add_Transcript($tr);
                     print "TR: $id: Added transcript $new_tr_name to gene ".$db_gene->stable_id."\n";
+                    push (@log, "TR2: $id: Added transcript $new_tr_name to gene ".$db_gene->stable_id);
                 }
                 else{
                     print "TR: $id: Rejected transcript in host gene ".$db_gene->stable_id." as intron chain exists\n";
+                    push (@log, "TR2: $id: Rejected transcript in host gene ".$db_gene->stable_id." as intron chain exists");
                 }
             }
         }
@@ -898,7 +893,7 @@ print "SUBMODE: $submode\n";
         print $g_msg."\n";
     #}
 
-    return $g_msg;
+    return ($g_msg, \@log);
 }
 
 
