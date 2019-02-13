@@ -717,7 +717,7 @@ print "SUBMODE: $submode\n";
             my $tr_name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
             $tr->add_Attributes($tr_name_att);
             my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
-            print "TR: $id: Added transcript $new_tr_name to novel gene $new_gene_name\n";
+            print "TR: $id: Will add transcript $new_tr_name to novel gene $new_gene_name\n";
             push (@log, "TR2: $id: Added transcript $new_tr_name to novel gene $new_gene_name");
         }
         $gene = $self->assign_biotypes($gene);
@@ -851,7 +851,7 @@ print "SUBMODE: $submode\n";
                     #    $sel_db_tr->add_Exon($exon);
                     #}
                     #$db_gene->add_Transcript($sel_db_tr);
-                    print "TR: $id: Extended transcript ".$merged_transcript->stable_id." in gene ".$db_gene->stable_id."\n";
+                    print "TR: $id: Will extend transcript ".$merged_transcript->stable_id." in gene ".$db_gene->stable_id."\n";
                     push (@log, "TR2: $id: Extended transcript ".$merged_transcript->stable_id." in gene ".$db_gene->stable_id);
                 }
                 elsif ($add_transcript == 1){
@@ -867,11 +867,11 @@ print "SUBMODE: $submode\n";
                         $tr->biotype($t_biotype);
                     }
                     $db_gene->add_Transcript($tr);
-                    print "TR: $id: Added transcript $new_tr_name to gene ".$db_gene->stable_id."\n";
+                    print "TR: $id: Will add transcript $new_tr_name to gene ".$db_gene->stable_id."\n";
                     push (@log, "TR2: $id: Added transcript $new_tr_name to gene ".$db_gene->stable_id);
                 }
                 else{
-                    print "TR: $id: Rejected transcript in host gene ".$db_gene->stable_id." as intron chain exists\n";
+                    print "TR: $id: Will reject transcript in host gene ".$db_gene->stable_id." as intron chain exists\n";
                     push (@log, "TR2: $id: Rejected transcript in host gene ".$db_gene->stable_id." as intron chain exists");
                 }
             }
@@ -889,7 +889,10 @@ print "SUBMODE: $submode\n";
     my $g_msg = " ";
     #if ($write){
         $local_server->authorized_user($gene->gene_author->name); # preserve authorship
-        $g_msg = write_gene_region($region_action, $region);
+        while ($g_msg eq " " or $g_msg =~ /write failed/){
+            $g_msg = write_gene_region($region_action, $region);
+            sleep(int(rand(3)));
+        }
         print $g_msg."\n";
     #}
 
