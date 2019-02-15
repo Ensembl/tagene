@@ -16,6 +16,7 @@
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::DB::Fasta;
 $|=1;
 
 my $tlist;
@@ -27,6 +28,7 @@ my $dbpass;
 my $dbname;
 my $analysis_name;
 my $biotype;
+my $only_chr;
 
 &GetOptions(
             'tids=s'     => \$tlist,
@@ -38,8 +40,11 @@ my $biotype;
             'dbname=s'   => \$dbname,
             'analysis=s' => \$analysis_name,
             'biotype=s'  => \$biotype,
+            'chr=s'      => \$only_chr,
            );
 
+my $host = `hostname`;
+chomp $host;
 
 #Connect to the query database
 my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
@@ -65,7 +70,7 @@ my $l_db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
 );
 my $l_dbc = $l_db->dbc;
 my $l_sa = $l_db->get_SliceAdaptor;
-
+$db->dnadb($l_db) if $dbname =~ /loutre/;
 
 #Connect to the database that stores the long read transcripts
 my $lr_db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
@@ -128,9 +133,11 @@ if ($tlist){
   close (LIST);
 }
 
-
+#if ($only_chr){
+#  $outfile = "$only_chr/$outfile";
+#}
 open (OUT, ">$outfile") or die "Can't open $outfile: $!";
-print OUT "coords\ttranscript_id\tgene_name\tis_novel\tsplice_site\tss_antisense\trepeat_overlap\tscore\trel_int_score\tlength\tbroad_biotype\toutcome\treal_outcome\n";
+print OUT "#coords\ttranscript_id\tgene_name\tis_novel\tsplice_site\tss_antisense\trepeat_overlap\tscore\trel_int_score\tlength\texonerate_ali\tbroad_biotype\tsource\toutcome\treal_outcome\n";
 
 my %all_introns;
 my %rejected_introns;
@@ -141,6 +148,11 @@ my %real_outcome;
 
 #Fetch comp_pipe models
 foreach my $slice (@{$sa->fetch_all("chromosome")}){
+  if ($only_chr){
+    next unless $slice->seq_region_name eq $only_chr or 
+                $slice->seq_region_name eq "chr".$only_chr or 
+                $slice->seq_region_name eq "chr".$only_chr."-38";
+  }
   foreach my $gene (@{$slice->get_all_Genes($analysis_name, undef, 1)}){
     my $gene_name;
     if (scalar(@{$gene->get_all_Attributes('name')})){
@@ -157,6 +169,12 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
         next unless $tids{$tr->stable_id};
       }
       $tr_c++;
+      my $source;
+      foreach my $att (@{$tr->get_all_Attributes('remark')}){
+        if ($att->value =~ /^Assembled from PacBio CLS reads - (\w+)$/){
+          $source = $1;
+        }
+      }
       foreach my $intron (@{$tr->get_all_Introns}){
         #Introns may be present in several transcripts - use coordinates to avoid redundancy
         my $intron_coord = $intron->seq_region_name.":".$intron->seq_region_start."-".$intron->seq_region_end;
@@ -168,6 +186,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
         $all_introns{$intron_coord}{'length'} = get_intron_length($intron);
         $all_introns{$intron_coord}{'rel_score'} = get_relative_intron_score($intron, $tr);
         $all_introns{$intron_coord}{'inferred_outcome'} = infer_intron_outcome($intron, $tr);
+        $all_introns{$intron_coord}{'exonerate_ali'} = get_exonerate_alignment_support($intron, $tr);
 
         if ($all_introns{$intron_coord}{'is_novel'} eq "yes" and
            ($all_introns{$intron_coord}{'ss_sequence'} ne "GT..AG" or
@@ -189,7 +208,9 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
                   $all_introns{$intron_coord}{'intropolis_score'}."\t".
                   $all_introns{$intron_coord}{'rel_score'}."\t".
                   $all_introns{$intron_coord}{'length'}."\t".
+                  $all_introns{$intron_coord}{'exonerate_ali'}."\t".
                   broad_biotype($gene->biotype)."\t".
+                  $source."\t".
                   ($rejected_introns{$intron_coord} ? "rejected" : "accepted")."\t".
                   $all_introns{$intron_coord}{'inferred_outcome'}."\n";
       }
@@ -208,13 +229,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
         }
       }
       $real_outcome{$outcome}++;
-      #my $source = map {$_->value} grep {$_->value =~ /^Assembled/} @{$tr->get_all_Attributes('remark')};
-      my $source;
-      foreach my $att (@{$tr->get_all_Attributes('remark')}){
-        if ($att->value =~ /^Assembled/){
-          $source = $att->value;
-        }
-      }
+
       print "\nTR\t".$source."\t".$outcome."\t".$tr->biotype."\n";
     }
   }
@@ -566,4 +581,185 @@ sub infer_intron_outcome {
   }
 
   return $outcome;
+}
+
+
+
+sub get_exonerate_alignment_support {
+  my ($intron, $tr) = @_;
+  my $read_seq = "";
+  foreach my $att (@{$tr->get_all_Attributes('hidden_remark')}){
+    if ($att->value =~ /^pacbio/){ #TO DO: COVER OTHER CASES!
+      $read_seq .= get_read_sequences($att->value);
+      last;
+    }
+  }
+  my @all_introns;
+  print_query_seq($read_seq);
+  print_target_seq($tr->get_Gene);
+
+      #my $cmd = "exonerate -q query.fa -t target.fa -m est2genome --exhaustive --geneseed 250 -n 1 > z_ex_out";
+      #my $cmd = "exonerate -q query.fa -t target.fa -m est2genome --refine region --geneseed 250 -n 1 > z_ex_out";
+      #my $cmd = "exonerate -q query.fa -t target.fa -m est2genome --geneseed 250 -n 1 --forcegtag yes > z_ex_out";
+  
+  my $exonerate = $host eq "havana-06" ? "exonerate" : "/nfs/ensembl/bin/exonerate-2.2.0/exonerate";
+  my $pssm_dir = "/homes/jmgonzalez/work/long_read_pipeline/annotation_exercise_results/third_round/exonerate";
+  my $dir = $only_chr ? $only_chr : ".";
+  if (`wc -l $dir/query.fa | cut -d' ' -f1` < 2){
+    return "NA";
+  }
+  my $cmd = "$exonerate -q $dir/query.fa -t $dir/target.fa -m est2genome --splice5 $pssm_dir/s5.pssm --splice3 $pssm_dir/s3.pssm --geneseed 250 -n 1 > $dir/z_ex_out";
+  my $err = system($cmd);
+  unless ($err){
+    my @vulgars = `grep ^vulgar $dir/z_ex_out`;
+    chomp @vulgars;
+    foreach my $vulgar (@vulgars){
+      my $introns = parse_vulgar($vulgar);
+      push(@all_introns, @$introns);
+    }
+  }
+  my %all_introns = map {$_ => 1} @all_introns;
+  #print OUT $slice->seq_region_name."\n".$tr->stable_id."\n".join("\n", keys %all_introns)."\n";
+  my $e_strand = $intron->seq_region_strand == 1 ? "+" : "-";
+  my $intron_str = $intron->seq_region_name.":".$intron->start.":".$intron->end.":".$e_strand."_".get_ss_seq($intron);
+  if ($all_introns{$intron_str}){
+    return "yes";
+  }
+  else {
+    return "no";
+  }
+}
+
+sub get_read_sequences {
+  my $read_names = shift;
+  my $fasta_dir = $host eq "havana-06" ? "/ebi/teams/ensembl/jmgonzalez/lrp" : "/nfs/production/panda/ensembl/havana/lrp";
+  my %db = ('SLRseq'  => Bio::DB::Fasta->new("$fasta_dir/SLRseq_merged.fasta"),
+            'CLS'     => Bio::DB::Fasta->new("$fasta_dir/Captureseq_merged.fasta"),
+            'RACEseq' => Bio::DB::Fasta->new("$fasta_dir/RACEseq_merged.fasta"));
+  my %fasta_seqs;
+  my @warnings;
+  #pacbio_raceseq_testis : m160112_015449_42182_c100967152550000001823202805121624_s1_p0_34050_ccs, m160115_185856_42182_c100967052550000001823202805121653_s1_p0_130345_ccs ; pacbio_raceseq_lung : m160322_092041_42182_c100987092550000001823224907191673_s1_p0_45294_ccs ; pacbio_raceseq_liver : m160321_201548_42182_c100987182550000001823224907191657_s1_p0_25946_ccs ;
+  my @reads_by_sample = split(/\s?;\s?/, $read_names);
+  foreach my $sample (@reads_by_sample){
+    my ($sample_name, $sample_read_names) = split(" : ", $sample);
+    #if no sample name provided, reassign read names to the right variable
+    if ($sample_name and !($sample_read_names)){
+      ($sample_name, $sample_read_names) = ("none", $sample_name);
+    }
+    foreach my $read_name (split(", ", $sample_read_names)){
+      if ($read_name =~ /\%3D/){
+        $read_name =~ s/\%3D/=/g;
+      }
+      my $seq;
+
+      if ($sample_name =~ /SLR-seq/){
+        $seq = $db{'SLRseq'}->seq($read_name);
+      }
+      elsif ($sample_name =~ /pacbio_capture_seq/){
+        $seq = $db{'CLS'}->seq($read_name);
+      }
+      elsif ($sample_name =~ /pacbio_raceseq/){
+        $seq = $db{'RACEseq'}->seq($read_name);
+      }
+      elsif ($sample_name eq "none"){
+        foreach my $dataset (qw(SLRseq CLS RACEseq)){
+          $seq = $db{$dataset}->seq($read_name);
+          last if $seq;
+        }
+      }
+
+      if ($seq){
+        $read_name =~ s/=/_/g; #Replace "=" character as it would be transformed to "%3D" by OTF, which would render it unusable by Blixem
+        $fasta_seqs{$read_name} = $seq;
+      }
+      else{
+        push(@warnings, "WARNING: no sequence found for read name $read_name in library $sample_name");
+      }
+    }
+  }
+  
+  my @keys = keys(%fasta_seqs);
+  my $multi_seq;
+  foreach my $key (@keys){
+    $multi_seq .= ">".$key."\n".$fasta_seqs{$key}."\n";
+  }
+  if (scalar @warnings){
+    $multi_seq = join("\n", @warnings)."\n".$multi_seq;
+  }
+  return $multi_seq;
+}
+
+
+sub print_query_seq {
+  my $seq = shift;
+  my $dir = $only_chr ? $only_chr : ".";
+  open (SEQ, ">$dir/query.fa") or die "Can't open query.fa: $!";
+  print SEQ $seq."\n";
+  close (SEQ);
+}
+
+sub print_target_seq {
+  my $gene = shift;
+  my $dir = $only_chr ? $only_chr : ".";
+  open (SEQ, ">$dir/target.fa") or die "Can't open target.fa: $!";
+  my $ext = 0;
+  #my $seq = $gene->seq;
+  my $slice = $sa->fetch_by_region("chromosome", $gene->seq_region_name, $gene->start - $ext, $gene->end + $ext);
+  my $seq = $slice->seq;  
+  if ($gene->seq_region_strand == -1){
+    $seq = reverse($seq);
+    $seq =~ tr/ACGTacgt/TGCAtgca/;
+  }
+  print SEQ ">".$gene->seq_region_name.":".($gene->seq_region_start-$ext).":".($gene->seq_region_end+$ext)."\n".$seq."\n";
+  close (SEQ);
+}
+
+sub parse_vulgar {
+  my $vulgar = shift;
+  my @introns;
+  #vulgar: m150420_082649_42137_c100793212550000001823172010081515_s1_p0_100150_ccs 120 667 + 86720575-86722026 1448 2 - 2653 M 80 80 G 0 1 M 65 65 G 1 0 M 276 276 3 0 2 I 0 895 5 0 2 M 125 125
+  $vulgar =~ s/^vulgar: //; #print OUT "\n".$vulgar."\n";
+  my ($q_id, $q_start, $q_end, $q_strand, $t_id, $t_start, $t_end, $t_strand, $score, @elem) = split(/\s+/, $vulgar);
+  my ($chr, $gnm_start, $gnm_end) = split(/:/, $t_id); #Genomic start and end
+  my $target_coord = ($t_strand eq "+" ) ? $gnm_start + $t_start : $gnm_end - $t_start + 1;
+  my $intron_coord;
+  my ($has_5, $has_3);
+  while (my ($type, $q_size, $t_size) = splice(@elem, 0, 3)){
+    #We expect a VULGAR string like "5 0 2 I 0 X 3 0 2" or "3 0 2 I 0 X 5 0 2", usually the former for the plus strand and the latter for the minus strand but, strangely, not always.
+    if ($type eq "5" and !$has_3 or
+        $type eq "3" and !$has_5){
+      my $intron_start = $target_coord;
+      $intron_coord = "$chr:$intron_start:";
+      $has_5 = 1;
+      $has_3 = 1;
+    }
+    elsif ($type eq "3" and $has_5 or
+           $type eq "5" and $has_3){
+      my $intron_end = $target_coord + $t_size - 1;
+      $intron_coord .= "$intron_end:$t_strand";
+      $intron_coord = add_ss_seq($intron_coord);
+      #push(@introns, "$intron_start:$intron_end");
+      push(@introns, $intron_coord);
+      $intron_coord = "";
+      $has_5 = 0;
+      $has_3 = 0;
+    }
+    $target_coord += $t_size;
+  }
+  return \@introns;
+}
+
+
+sub add_ss_seq {
+  my $coord = shift;
+  my ($chr, $start, $end, $strand) = split(/:/, $coord);
+  my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $start, $end);
+  my $donor = substr($intron_slice->seq, 0, 2);
+  my $acceptor = substr($intron_slice->seq, -2);
+  my $ssite = "$donor..$acceptor";
+  if ($strand eq "-"){
+    $ssite = reverse($ssite);
+    $ssite =~ tr/ACGTacgt/TGCAtgca/;
+  }
+  return $coord."_".$ssite;
 }
