@@ -214,6 +214,7 @@ sub get_ss_repeat_overlap {
         ($rf->seq_region_start <= $intron->seq_region_end + 2 and $rf->seq_region_end >= $intron->seq_region_end - 1)){
       $overlaps_repeat = 1;
       my $repeat_type = get_repeat_type($rf); #pipe_human does not store repeat types, unlike ensembl_core
+      $repeat_type =~ s/ /_/g;
       $intron_repeat_overlaps{$repeat_type}++;
     }
   }
@@ -323,7 +324,7 @@ sub get_exonerate_alignment_support {
   my ($intron, $tr) = @_;
   my $read_seq = "";
   foreach my $att (@{$tr->get_all_Attributes('hidden_remark')}){
-    if ($att->value =~ /^pacbio/){ #TO DO: COVER OTHER CASES!
+    if ($att->value =~ /^(pacbio_capture_seq|pacbio_raceseq|SLR-seq)_\w+/){ #TO DO: COVER OTHER CASES!
       $read_seq .= get_read_sequences($att->value);
       last;
     }
