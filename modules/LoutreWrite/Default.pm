@@ -1706,10 +1706,10 @@ sub recluster_transcripts {
             }
         }
         print "Clusters: ".scalar(@clusters)."\n";
-        if (scalar @clusters == 1){
-            push (@checked_genes, $gene);
-        }
-        else{
+        #if (scalar @clusters == 1){
+        #    push (@checked_genes, $gene);
+        #}
+        #else{
             foreach my $cluster (@clusters){
                 my $new_gene = Bio::Vega::Gene->new(
                                         -stable_id  => $gene->stable_id,
@@ -1721,12 +1721,19 @@ sub recluster_transcripts {
                 $new_gene->gene_author($gene->gene_author);
                 $new_gene->add_Attributes(@{$gene->get_all_Attributes});
         
-                foreach my $transcript (@{$cluster->{transcripts}}){
-                    $new_gene->add_Transcript($transcript);
+                foreach my $transcript (@{$cluster->{transcripts}}){ 
+                    #Check again that no transcript on the kill list goes through
+                    # as the first checkpoint seems to fail (?)
+                    my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+                    unless ($kill_list->{$t_name}){
+                        $new_gene->add_Transcript($transcript);
+                    }
                 }
-                push (@checked_genes, $new_gene);
+                unless (scalar(@{$new_gene->get_all_Transcripts}) == 0){
+                    push (@checked_genes, $new_gene);
+                }
             }
-        }
+        #}
     }
     
     return \@checked_genes;
