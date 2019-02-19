@@ -222,7 +222,7 @@ sub get_ss_repeat_overlap {
     return join(",", keys %intron_repeat_overlaps);
   }
   else{
-    return "No overlap";
+    return "No_overlap";
   }
 }
 
