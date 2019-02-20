@@ -736,7 +736,8 @@ print "SUBMODE: $submode\n";
                 my $add_transcript = 0;
                 my @merge_candidates = ();
                 my %tr_comp;
-                foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
+                foreach my $db_tr (@{$db_gene->get_all_Transcripts}){ 
+                    next if scalar(grep {$_->value eq "comp_pipe_rejected"} @{$db_tr->get_all_Attributes('remark')});
                     next if scalar @{$db_tr->get_all_Introns} == 0;  #Do not merge with single-exon transcripts? (In case they are CLS Platinum...)
                     my $i = intron_novelty($tr, $db_tr);
                     my $e = exon_novelty($tr, $db_tr);
@@ -837,6 +838,16 @@ print "SUBMODE: $submode\n";
                                 foreach my $att (@{$merged_transcript->get_all_Attributes}){
                                     unless ($att->value eq "not for VEGA"){
                                         $ts->add_Attributes($att);
+                                    }
+                                }
+                                #If 'comp_pipe' transcript, change biotype and remove 'not for VEGA' attribute
+                                #unless 'comp_pipe_rejected' remark
+                                if ($ts->biotype eq "comp_pipe" and scalar(grep {$_->value eq "comp_pipe_rejected"} @{$ts->get_all_Attributes('remark')}) == 0){
+                                    my $t_biotype = get_transcript_biotype($db_gene);
+                                    $ts->biotype($t_biotype);
+                                    if (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
+                                       my $array = $ts->{'attributes'};
+                                       @$array = grep { $_->value ne "not for VEGA" } @$array;
                                     }
                                 }
                                 #Change authorship
@@ -2116,10 +2127,11 @@ sub merge_transcripts {
     }
     print "AFTER: ".join('+', map {$_->vega_hashkey} @{$db_tr->get_all_Exons})."\n";
 
-    #Add remarks (except 'non for VEGA') and hidden remarks from the novel transcript
+    #Add remarks (except 'not for VEGA') and hidden remarks from the novel transcript
     foreach my $att (@{$tr->get_all_Attributes}){
         $db_tr->add_Attributes($att);
     }
+    
     #Change authorship
     $db_tr->transcript_author($tr->transcript_author);
 
