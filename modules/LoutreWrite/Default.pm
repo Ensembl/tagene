@@ -745,7 +745,7 @@ print "SUBMODE: $submode\n";
                     $tr_comp{$db_tr->stable_id} = {'intron' => $i, 'exon' => $e, 'merge' => $m};
                 }
                 #Multi-exon transcripts
-                if (scalar @{$tr->get_all_Introns}){
+                if (scalar @{$tr->get_all_Introns} > 1){
                     #Conservative mode: a new transcript model is only stored if it has a novel intron structure or an existing intron structure with novel sequence in its terminal exons; existing transcripts are never updated.
                     if ($submode eq "cons"){
                         #Add transcript if intron chain shows novelty w.r.t. all existing transcripts
@@ -790,15 +790,29 @@ print "SUBMODE: $submode\n";
                     }
                 }
                 #Single-exon transcripts
-                #If there is exon novelty, add new transcript
                 else{
-                    DBTR:foreach my $db_tr_id (keys %tr_comp){
-                        if ($tr_comp{$db_tr_id}->{'exon'} == 1){
-                            $add_transcript = 1;
+                    #Merge with existing single-exon transcript if it is larger
+                    #This rule needs to be refined
+                    if (scalar keys %tr_comp == 1){
+                        my ($db_tr_id) = keys %tr_comp;
+                        my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
+                        if (scalar(@{$db_tr->get_all_Exons}) == 1){
+                            if ($tr->start <= $db_tr->start and $tr->end => $db_tr->end and
+                                !($tr->start == $db_tr->start and $tr->end == $db_tr->end)){
+                                push(@merge_candidates, $db_tr);
+                            }
                         }
-                        else{
-                            $add_transcript = 0;
-                            last DBTR;
+                    }
+                    #If there is exon novelty, add new transcript
+                    else{
+                        DBTR:foreach my $db_tr_id (keys %tr_comp){
+                            if ($tr_comp{$db_tr_id}->{'exon'} == 1){
+                                $add_transcript = 1;
+                            }
+                            else{
+                                $add_transcript = 0;
+                                last DBTR;
+                            }
                         }
                     }
                 }
