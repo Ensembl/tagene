@@ -167,13 +167,13 @@ sub make_vega_objects {
                                 -code => 'remark',
                                 -value => 'not for VEGA'
                     );
-                       
-    #my $comp_remark = Bio::EnsEMBL::Attribute->new(
-    #                            -code => 'remark',
-    #                            -value => 'computationally generated'
-    #                    );
 
-    my $source_remark_string;             
+    my $tagene_attrib = Bio::EnsEMBL::Attribute->new(
+                                -code => 'TAGENE_transcript',
+                                -value => '1'
+                        );
+
+    my $source_remark_string;
     if ($remark){
         $source_remark_string = $remark;
     }
@@ -211,6 +211,7 @@ sub make_vega_objects {
         unless ($no_NFV){
             $gene->add_Attributes($nfv_remark);
         }
+        $gene->add_Attributes($tagene_attrib);
         $gene->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => $genes{$gid}{'gene_name'}));
         
         #Add biotype-status combination sanity check!!!
