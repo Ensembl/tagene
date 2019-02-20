@@ -211,7 +211,7 @@ sub make_vega_objects {
         unless ($no_NFV){
             $gene->add_Attributes($nfv_remark);
         }
-        $gene->add_Attributes($tagene_attrib);
+        #$gene->add_Attributes($tagene_attrib);
         $gene->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => $genes{$gid}{'gene_name'}));
         
         #Add biotype-status combination sanity check!!!
@@ -239,6 +239,7 @@ sub make_vega_objects {
             if ($source_remark){
               $transcript->add_Attributes($source_remark);
             }
+            $transcript->add_Attributes($tagene_attrib);
 
             #Make exon objects
             foreach my $exid (keys %{$genes{$gid}{transcripts}{$tid}{exons}}){
