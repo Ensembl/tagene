@@ -56,6 +56,19 @@ sub predict_outcome {
 
 
 
+sub exonerate_support {
+    my ($self, $intron, $transcript) = @_;
+    my $exonerate_ali = get_exonerate_alignment_support($intron, $transcript);
+    if ($exonerate_ali eq "yes"){
+        return 1;
+    }
+    else{
+        return 0;
+    }
+}
+
+
+
 #Connect to the loutre database
 sub get_loutre_db_adaptor {
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
