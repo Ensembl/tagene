@@ -43,7 +43,7 @@ sub predict_outcome {
     if ($is_novel eq "yes" and
         ($ss_sequence ne "GT..AG" or
         $antisense_ovlp eq "yes" or
-        $repeat_ovlp =~ /SINE|Tandem repeats/ or
+        $repeat_ovlp =~ /SINE|Tandem_repeats/ or
         $intropolis_score == 0 or
         ($rel_score ne "NA" and $rel_score < $rel_score_cutoff) or
         $intron_length < $length_cutoff)){
