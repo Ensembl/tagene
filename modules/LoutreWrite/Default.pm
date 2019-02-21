@@ -738,6 +738,8 @@ print "SUBMODE: $submode\n";
                 my @merge_candidates = ();
                 my %tr_comp;
                 foreach my $db_tr (@{$db_gene->get_all_Transcripts}){ 
+                    next if $db_tr->biotype eq "artifact";
+                    next if scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')}) and $db_tr->biotype ne "comp_pipe";
                     next if scalar(grep {$_->value eq "comp_pipe_rejected"} @{$db_tr->get_all_Attributes('remark')});
                     next if scalar @{$db_tr->get_all_Introns} == 0;  #Do not merge with single-exon transcripts? (In case they are CLS Platinum...)
                     my $i = intron_novelty($tr, $db_tr);
@@ -857,13 +859,12 @@ print "SUBMODE: $submode\n";
                                         ($att->code eq "hidden_remark" and $att->value =~ /^SLR-seq.+;/) or
                                         ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_raceseq.+;/)) and
                                         (scalar(@{$ts->get_all_Attributes('GENCODE_transcript')}))){
-                                            foreach my $att2 (@{$ts->get_all_Attributes('hidden_remark')}){
-                                                if ($att2->value =~ /^pacbio_capture_seq.+;/ or
-                                                    $att2->value =~ /^SLR-seq.+;/ or
-                                                    $att2->value =~ /^pacbio_raceseq.+;/){
-                                                    $att2->value($att2->value." ".$att->value);
-                                                    last;
-                                                }
+                                        foreach my $att2 (@{$ts->get_all_Attributes('hidden_remark')}){
+                                            if ($att2->value =~ /^pacbio_capture_seq.+;/ or
+                                                $att2->value =~ /^SLR-seq.+;/ or
+                                                $att2->value =~ /^pacbio_raceseq.+;/){
+                                                $att2->value($att2->value." ".$att->value);
+                                                last;
                                             }
                                         }
                                     }
