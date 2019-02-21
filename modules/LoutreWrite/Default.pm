@@ -849,20 +849,20 @@ print "SUBMODE: $submode\n";
                                     $ts->add_Exon($exon);
                                 }
                 
-                                #Add remarks (except 'non for VEGA') and hidden remarks from the novel transcript
+                                #Add remarks (except 'not for VEGA') and hidden remarks from the novel transcript
                                 foreach my $att (@{$merged_transcript->get_all_Attributes}){
                                     next if ($att->code eq "remark" and $att->value eq "not for VEGA");
                                     #Append read names
-                                    if (($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq.+;/) or
+                                    if ((($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq.+;/) or
                                         ($att->code eq "hidden_remark" and $att->value =~ /^SLR-seq.+;/) or
-                                        ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_raceseq.+;/)
-                                        ){
-                                        if (scalar(@{$ts->get_all_Attributes('GENCODE_transcript')})){
+                                        ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_raceseq.+;/)) and
+                                        (scalar(@{$ts->get_all_Attributes('GENCODE_transcript')}))){
                                             foreach my $att2 (@{$ts->get_all_Attributes('hidden_remark')}){
                                                 if ($att2->value =~ /^pacbio_capture_seq.+;/ or
                                                     $att2->value =~ /^SLR-seq.+;/ or
                                                     $att2->value =~ /^pacbio_raceseq.+;/){
                                                     $att2->value($att2->value." ".$att->value);
+                                                    last;
                                                 }
                                             }
                                         }
