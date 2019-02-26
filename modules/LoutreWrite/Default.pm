@@ -172,6 +172,10 @@ sub make_vega_objects {
                                 -code => 'TAGENE_transcript',
                                 -value => '1'
                         );
+    my $tagene_remark = Bio::EnsEMBL::Attribute->new(
+                                -code => 'remark',
+                                -value => 'TAGENE_transcript'
+                        );
 
     my $source_remark_string;
     if ($remark){
@@ -235,11 +239,12 @@ sub make_vega_objects {
             }
             $transcript->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', 
                                                                      -value => "ID: ".$genes{$gid}{transcripts}{$tid}{'transcript_name'}));
-            
+
             if ($source_remark){
               $transcript->add_Attributes($source_remark);
             }
-            $transcript->add_Attributes($tagene_attrib);
+            $transcript->add_Attributes($tagene_attrib, $tagene_remark);
+
 
             #Make exon objects
             foreach my $exid (keys %{$genes{$gid}{transcripts}{$tid}{exons}}){
