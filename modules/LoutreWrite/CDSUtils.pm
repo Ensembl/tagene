@@ -75,8 +75,19 @@ sub assign_cds_to_transcripts {
         my ($cds_start, $cds_end) = $transcript->seq_region_strand == 1 ? ($unique_cds_tr->coding_region_start, $unique_cds_tr->coding_region_end) : ($unique_cds_tr->coding_region_end, $unique_cds_tr->coding_region_start);
         create_cds($transcript, $cds_start, $cds_end);
         #Re-assign biotype and status
-        $transcript->biotype($unique_cds_tr->biotype);
-        $transcript->status($unique_cds_tr->status);
+        if (predicted_nmd_transcript($transcript, $cds_end)){
+          $transcript->biotype("nonsense_mediated_decay");
+        }
+        else{
+          if ($unique_cds_tr->biotype eq "nonsense_mediated_decay"){
+            $transcript->biotype("protein_coding");
+            $transcript->status("PUTATIVE");
+          }
+          else{
+            $transcript->biotype($unique_cds_tr->biotype);
+            $transcript->status($unique_cds_tr->status);
+          }
+        }
         print $unique_cds_tr->stable_id." CDS matches ".$transcript->stable_id."\n";
         next TR;
       }
@@ -112,7 +123,7 @@ sub assign_cds_to_transcripts {
 
  Arg[1]    : Bio::Vega::Gene object
  Arg[2]    : Bio::Vega::Transcript object
- Function  : finds whether novel transcript is a retained_intron model in the host gene
+ Function  : finds whether the novel transcript is a retained_intron model in the host gene
  Returntype: boolean
 
 =cut
@@ -606,7 +617,7 @@ sub start_codon_fits {
         }
         my $cds_end = $coords2[0]->start;
         #Avoid making an NMD transcript with a CDS smaller than 35 aa
-        unless (predicted_nmd_transcript($transcript, $cds_end) and length($transcript->translation->seq) <= 35){
+        unless (predicted_nmd_transcript($transcript, $cds_end) and $transcript->translation->length <= 35){
           print $transcript->stable_id.": complete CDS of $cds_length bp $3\n";
           return ($cds_start, $cds_end);
         }
@@ -629,28 +640,28 @@ sub start_codon_fits {
 
  Arg[1]    : Bio::Vega::Transcript object
  Arg[2]    : integer (CDS end in genomic coordinates)
- Function  : returns true if the transcript would get a nonsense_mediated_decay biotype if  a CDS was created with the given genome coordinates, that is, if there were 50 bp or more between the stop codon and a downstream splice site (according to the HAVANA rules)
+ Function  : returns true if the transcript would get a nonsense_mediated_decay biotype if a CDS was created with the given genome coordinates, that is, if there were 50 bp or more between the stop codon and a downstream splice site (according to the HAVANA rules)
  Returntype: boolean
 
 =cut
 
 sub predicted_nmd_transcript {
-  my ($acceptor_transcript, $cds_end) = @_;
-  foreach my $exon (@{$acceptor_transcript->get_all_Exons}){
-    #CDS end must lie in exon
+  my ($transcript, $cds_end) = @_;
+  foreach my $exon (@{$transcript->get_all_Exons}){
+    #CDS end must lie in an exon
     if ($exon->seq_region_start <= $cds_end and $exon->seq_region_end >= $cds_end){
-      #Find if exon is not the last one, ie. there is a splice site downstream
-      if ($exon->rank($acceptor_transcript) < scalar(@{$acceptor_transcript->get_all_Exons})){
-        #Find if distance between CDS end and exon end is at least 50bp
-        if ($acceptor_transcript->seq_region_strand == 1){
-          if (($exon->seq_region_end - $cds_end) >= 50){
-            print $acceptor_transcript->stable_id.": nonsense_mediated_decay\n";
+      #Find if exon with stop codon is not the last one, ie. there is a splice site downstream
+      if ($exon->rank($transcript) < scalar(@{$transcript->get_all_Exons})){
+        #Find if distance between CDS end and next splice site donor is at least 50bp
+        if ($transcript->seq_region_strand == 1){
+          if (($exon->seq_region_end - $cds_end + 1) >= 50){
+            print $transcript->stable_id.": nonsense_mediated_decay\n";
             return 1;
           }
         }
         else{
-          if (($cds_end - $exon->seq_region_start) >= 50){
-            print $acceptor_transcript->stable_id.": nonsense_mediated_decay\n";
+          if (($cds_end - $exon->seq_region_start + 1) >= 50){
+            print $transcript->stable_id.": nonsense_mediated_decay\n";
             return 1;
           }
         }
