@@ -69,11 +69,6 @@ sub assign_cds_to_transcripts {
   my $cds_set = get_host_gene_cds_set($host_gene);
   my $start_codon_set = get_host_gene_start_codon_set($host_gene);
   TR:foreach my $transcript (@{$novel_gene->get_all_Transcripts}){
-    #Check for intron retention
-    if (is_retained_intron ($transcript, $host_gene)){
-      $transcript->biotype("retained_intron");
-      next TR;
-    }
     #Try to find a suitable CDS from the host gene
     foreach my $unique_cds_tr (@$cds_set){
       if (cds_fits($transcript, $unique_cds_tr)){
@@ -97,7 +92,12 @@ sub assign_cds_to_transcripts {
         next TR;
       }
     }
-    #Else, try to create a CDS using a start codon from the host gene
+    #Else, try to create a CDS using a start codon from the host gene    
+    #But first, check for intron retention
+    if (is_retained_intron ($transcript, $host_gene)){
+      $transcript->biotype("retained_intron");
+      next TR;
+    }
     foreach my $unique_start_codon (@$start_codon_set){
       my ($cds_start, $cds_end) = start_codon_fits($transcript, $unique_start_codon);
       if ($cds_start and $cds_end){
