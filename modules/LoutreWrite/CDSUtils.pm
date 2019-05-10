@@ -4,7 +4,7 @@ package LoutreWrite::CDSUtils;
 use strict;
 use warnings;
 use base 'Exporter';
-our @EXPORT = qw( sort_by_categ get_host_gene_cds_set assign_cds_to_transcripts get_appris_tag get_ccds_tag cds_exon_chain start_codon_fits has_complete_cds get_host_gene_start_codon_set );
+our @EXPORT = qw( sort_by_categ get_host_gene_cds_set assign_cds_to_transcripts get_appris_tag get_ccds_tag cds_exon_chain start_codon_fits has_complete_cds get_host_gene_start_codon_set is_retained_intron );
 use Bio::Vega::Translation;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptUtils qw(calculate_exon_phases);
 use Bio::EnsEMBL::Registry;
@@ -60,7 +60,7 @@ my $core_gene_adaptor = $registry->get_adaptor( 'Human', 'Core', 'Gene' );
  Arg[1]    : Bio::Vega::Gene object
  Arg[2]    : Bio::Vega::Gene object
  Function  : assign a CDS to every transcript in the first gene, based on the CDSs and start codons in the second gene
- Returntype: Bio::Vega::Gene object
+ Returntype: none
 
 =cut
 
@@ -69,6 +69,11 @@ sub assign_cds_to_transcripts {
   my $cds_set = get_host_gene_cds_set($host_gene);
   my $start_codon_set = get_host_gene_start_codon_set($host_gene);
   TR:foreach my $transcript (@{$novel_gene->get_all_Transcripts}){
+    #Check for intron retention
+    if (is_retained_intron ($transcript, $host_gene)){
+      $transcript->biotype("retained_intron");
+      next TR;
+    }
     #Try to find a suitable CDS from the host gene
     foreach my $unique_cds_tr (@$cds_set){
       if (cds_fits($transcript, $unique_cds_tr)){
@@ -94,9 +99,9 @@ sub assign_cds_to_transcripts {
     }
     #Else, try to create a CDS using a start codon from the host gene
     foreach my $unique_start_codon (@$start_codon_set){
-      if (my ($cds_start, $cds_end) = start_codon_fits($transcript, $unique_start_codon)){
-        if ($cds_start =~ /\d+/ and $cds_end =~ /\d+/){
-          create_cds($transcript, $cds_start, $cds_end);
+      my ($cds_start, $cds_end) = start_codon_fits($transcript, $unique_start_codon);
+      if ($cds_start and $cds_end){
+        if (create_cds($transcript, $cds_start, $cds_end)){
           #Re-assign biotype and status
           if (predicted_nmd_transcript($transcript, $cds_end)){
             $transcript->biotype("nonsense_mediated_decay");
@@ -113,27 +118,54 @@ sub assign_cds_to_transcripts {
     }
     print "No match for transcript ".$transcript->stable_id."\t".$transcript->biotype."\n";
   }
-
-  return $novel_gene;
 }
 
 
 
 =head2 is_retained_intron
 
- Arg[1]    : Bio::Vega::Gene object
- Arg[2]    : Bio::Vega::Transcript object
+ Arg[1]    : Bio::Vega::Transcript object
+ Arg[2]    : Bio::Vega::Gene object
  Function  : finds whether the novel transcript is a retained_intron model in the host gene
  Returntype: boolean
 
 =cut
 
 sub is_retained_intron {
-
-  #get all annotated CDSs in the host gene
-  
-  #compare transcript's exon chain with CDS exon chain
-
+  my ($transcript, $host_gene) = @_;
+  #i) Full intron retention: the model fully transcribes the sequence between the splice donor site and acceptor site of adjacent coding exons (i.e. a ‘CDS intron’) of a model in loutre. This could include scenarios where the TAGENE model retains multiple CDS introns of the same loutre model. 
+  #ii) Partial intron retention: the model has a start or end coordinate within a CDS intron of a loutre model, but not (respectively) a splice donor site or splice acceptor site within that same intron. Do we need some kind of size cut-off here? I.e. for fuzzy edges that are misalignments rather than real retained introns. Should we clip these? 
+  foreach my $tr (@{$host_gene->get_all_Transcripts}){
+    if ($tr->translate){
+      foreach my $intron (@{$tr->get_all_Introns}){
+        #Is CDS intron?
+        if ($intron->seq_region_start > $tr->coding_region_start and $intron->seq_region_end < $tr->coding_region_end){
+          #Full intron retention
+          #  ref: #######-------#######------######
+          #   tr:       #########
+          foreach my $exon (@{$transcript->get_all_Exons}){
+            if ($exon->seq_region_start < $intron->seq_region_start and $exon->seq_region_end > $intron->seq_region_end){
+              return 1;
+            }
+          }
+          #Partial intron retention
+          #  ref: #######-------#######------######
+          #   tr:          #######---####
+          if ($transcript->seq_region_start >= $intron->seq_region_start and $transcript->seq_region_start <= $intron->seq_region_end){
+            unless (($transcript->seq_region_strand == 1 and $transcript->start_Exon->seq_region_end < $intron->seq_region_end) or ($transcript->seq_region_strand == -1 and $transcript->end_Exon->seq_region_end < $intron->seq_region_end)){
+              return 1;
+            }
+          }
+          if ($transcript->seq_region_end >= $intron->seq_region_start and $transcript->seq_region_end <= $intron->seq_region_end){
+            unless (($transcript->seq_region_strand == 1 and $transcript->end_Exon->seq_region_start > $intron->seq_region_start) or ($transcript->seq_region_strand == -1 and $transcript->start_Exon->seq_region_start > $intron->seq_region_start)){
+              return 1;
+            }
+          }
+        }
+      }
+    }
+  }
+  return 0;
 }
 
 
@@ -321,7 +353,7 @@ sub cds_fits {
 =head2 has_complete_cds
 
  Arg[1]    : Bio::Vega::Transcript object
- Function  : returns true if transcript has no 'cds start not found' or 'cds end not found' attribute
+ Function  : returns true if transcript has neither 'CDS start not found' nor 'CDS end not found' attributes
  Returntype: boolean
 
 =cut
@@ -586,7 +618,7 @@ sub sort_by_categ_2 {
  Arg[1]    : Bio::Vega::Transcript object
  Arg[2]    : integer (genomic position)
  Function  : returns true if a CDS beginning from the given genomic position can be built for the transcript
- Returntype: boolean
+ Returntype: array of integers corresponding to the CDS start and end genomic coordinates
 
 =cut
 
@@ -617,7 +649,7 @@ sub start_codon_fits {
         }
         my $cds_end = $coords2[0]->start;
         #Avoid making an NMD transcript with a CDS smaller than 35 aa
-        unless (predicted_nmd_transcript($transcript, $cds_end) and $transcript->translation->length <= 35){
+        unless (predicted_nmd_transcript($transcript, $cds_end) and ($cds_length-3)/3  <= 35){
           print $transcript->stable_id.": complete CDS of $cds_length bp $3\n";
           return ($cds_start, $cds_end);
         }
@@ -679,7 +711,7 @@ sub predicted_nmd_transcript {
  Arg[2]    : integer (CDS start in genomic coordinates)
  Arg[3]    : integer (CDS end in genomic coordinates)
  Function  : Creates a Bio::Vega::Translation object associated to the transcript using the genomic coordinates provided
- Returntype: none
+ Returntype: boolean
 
 =cut
 
@@ -726,6 +758,7 @@ print "CDS_START: $cds_start ; CDS_END: $cds_end\n";
   #Assign phase and end_phase values to CDS exons
   #Assume start phase equals 0 in all cases
   calculate_exon_phases($transcript, 0);
+  return 1;
 }
 
 
