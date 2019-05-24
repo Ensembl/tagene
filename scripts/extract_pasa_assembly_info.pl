@@ -38,7 +38,7 @@ foreach my $lib_file (@lib_files){
 		$lib_name =~ s/-DNA_A01-LRAAD-01//;
 	}
 	else{
-	  ($lib_name) = $lib_file =~ /\/(\w+)\.gff3(\.gz)?/;
+	  ($lib_name) = $lib_file =~ /\/?(\w+)\.gff3(\.gz)?/;
 	}
 	
 	if ($lib_file =~ /\.gz/){
