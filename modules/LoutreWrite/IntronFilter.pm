@@ -337,7 +337,7 @@ sub get_exonerate_alignment_support {
   my ($intron, $tr) = @_;
   my $read_seq = "";
   foreach my $att (@{$tr->get_all_Attributes('hidden_remark')}){
-    if ($att->value =~ /^(pacbio_capture_seq|pacbio_raceseq|SLR-seq)_\w+/){ #TO DO: COVER OTHER CASES!
+    if ($att->value =~ /^(pacbio_capture_seq|pacbio_raceseq|SLR-seq|postfilter)_\w+/){ #TO DO: COVER OTHER CASES!
       $read_seq .= get_read_sequences($att->value);
       last;
     }
@@ -387,7 +387,9 @@ sub get_read_sequences {
   my $fasta_dir = $host eq "havana-06" ? "/ebi/teams/ensembl/jmgonzalez/lrp" : "/nfs/production/panda/ensembl/havana/lrp";
   my %db = ('SLRseq'  => Bio::DB::Fasta->new("$fasta_dir/SLRseq_merged.fasta"),
             'CLS'     => Bio::DB::Fasta->new("$fasta_dir/Captureseq_merged.fasta"),
-            'RACEseq' => Bio::DB::Fasta->new("$fasta_dir/RACEseq_merged.fasta"));
+            'RACEseq' => Bio::DB::Fasta->new("$fasta_dir/RACEseq_merged.fasta"),
+            'PB_test' => Bio::DB::Fasta->new("$fasta_dir/PB_test.fasta"),
+           );
   my %fasta_seqs;
   my @warnings;
   #pacbio_raceseq_testis : m160112_015449_42182_c100967152550000001823202805121624_s1_p0_34050_ccs, m160115_185856_42182_c100967052550000001823202805121653_s1_p0_130345_ccs ; pacbio_raceseq_lung : m160322_092041_42182_c100987092550000001823224907191673_s1_p0_45294_ccs ; pacbio_raceseq_liver : m160321_201548_42182_c100987182550000001823224907191657_s1_p0_25946_ccs ;
@@ -412,6 +414,9 @@ sub get_read_sequences {
       }
       elsif ($sample_name =~ /pacbio_raceseq/){
         $seq = $db{'RACEseq'}->seq($read_name);
+      }
+      elsif ($sample_name =~ /postfilter/){
+        $seq = $db{'PB_test'}->seq($read_name);
       }
       elsif ($sample_name eq "none"){
         foreach my $dataset (qw(SLRseq CLS RACEseq)){
