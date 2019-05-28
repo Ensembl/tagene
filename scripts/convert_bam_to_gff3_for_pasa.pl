@@ -300,7 +300,7 @@ sub print_gff3 {
 
 
     #if ($percent_id > 100){
-      print LOG "\nname = $read_name\npercent_id = $percent_id\nquery_length = ".$fa->query->length."\nmatch_count = ".scalar(@match_count)."\nspliced_length = ".$spliced_length."\nleft_padding = $left_padding\nright_padding = $right_padding\n\n";
+      print LOG "\nname = $read_name\npercent_id = $percent_id\nquery_length = ".$fa->query->length."\nmatch_count = ".scalar(@match_count)."\nn_mismatches = $n_mismatches"."\nspliced_length = ".$spliced_length."\nleft_padding = $left_padding\nright_padding = $right_padding\n\n";
      #print LOG "\n#$read_name\n$ref\n$matches\n$query\n\n";
     #  $percent_id = 100; #hack
     #}
