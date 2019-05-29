@@ -164,7 +164,7 @@ foreach my $gene_obj (@$gene_objects_2){
                 $wrong_host = 1;
             }
             #Ignore if gene has an ASB_protein_coding remark
-            elsif (scalar(grep {$_->value eq "ASB_protein_coding"} @{$host_gene->get_all_Attributes('remark')})){
+            elsif ($host_biotype and !($host_biotype =~ /protein_coding/) and scalar(grep {$_->value eq "ASB_protein_coding"} @{$host_gene->get_all_Attributes('remark')})){
                 print "Gene ".$host_gene->stable_id." will be ignored as it has an ASB_protein_coding remark\n";
                 $wrong_host = 1;
             }
@@ -172,7 +172,7 @@ foreach my $gene_obj (@$gene_objects_2){
             #There are a few cases in loutre_human
             else{
                 foreach my $tr (@{$host_gene->get_all_Transcripts}){
-                    if ($tr->translate){
+                    if ($tr->translate and $host_biotype and !($host_biotype =~ /protein_coding/)){
                         print "Gene ".$host_gene->stable_id." will be ignored as it has a coding transcript\n";
                         $wrong_host = 1;
                         last;
