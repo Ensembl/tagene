@@ -52,12 +52,13 @@ my $core_gene_adaptor = $registry->get_adaptor( 'Human', 'Core', 'Gene' );
 #NOTE: needs to deal with merged transcripts where the CDS must be modified, 
 # eg. if the pre-existing transcript was 'CDS end not found' and it has been extended.
 
+#Ensure MANE transcripts are not modified.
 
 
 
 =head2 assign_cds_to_transcripts
 
- Arg[1]    : Bio::Vega::Gene object
+ Arg[1]    : Bio::Vega::Gene or Bio::Vega::Transcript object
  Arg[2]    : Bio::Vega::Gene object
  Function  : assign a CDS to every transcript in the first gene, based on the CDSs and start codons in the second gene
  Returntype: none
@@ -65,10 +66,22 @@ my $core_gene_adaptor = $registry->get_adaptor( 'Human', 'Core', 'Gene' );
 =cut
 
 sub assign_cds_to_transcripts {
-  my ($novel_gene, $host_gene) = @_;
+  my ($novel_obj, $host_gene) = @_;
+  my @novel_transcripts;
+  if ($novel_obj->isa("Bio::Vega::Gene")){
+    @novel_transcripts = @{$novel_obj->get_all_Transcripts};
+  }
+  elsif ($novel_obj->isa("Bio::Vega::Transcript")){
+    @novel_transcripts = ($novel_obj);
+  }
+  else{
+    die "First parameter must be a Bio::Vega::Gene or Bio::Vega::Transcript object!";
+  }
   my $cds_set = get_host_gene_cds_set($host_gene);
   my $start_codon_set = get_host_gene_start_codon_set($host_gene);
-  TR:foreach my $transcript (@{$novel_gene->get_all_Transcripts}){
+  print "HOST GENE START = ".$host_gene->seq_region_start." HOST GENE END = ".$host_gene->seq_region_end."\n";
+  TR:foreach my $transcript (@novel_transcripts){
+    print "TR_START=".$transcript->seq_region_start."; TR_END=".$transcript->seq_region_end."\n";
     #Try to find a suitable CDS from the host gene
     foreach my $unique_cds_tr (@$cds_set){
       if (cds_fits($transcript, $unique_cds_tr)){
@@ -99,7 +112,14 @@ sub assign_cds_to_transcripts {
       next TR;
     }
     foreach my $unique_start_codon (@$start_codon_set){
-      my ($cds_start, $cds_end) = start_codon_fits($transcript, $unique_start_codon);
+      #Start codon coordinates are relative to the region slice: convert to genomic
+      my $slice_offset = $host_gene->seq_region_start - 1;
+      unless ($transcript->seq_region_start >= $unique_start_codon and $transcript->seq_region_end <= $unique_start_codon){
+        $unique_start_codon += $slice_offset; 
+      }
+      print "start_codon=$unique_start_codon; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
+      my ($cds_start, $cds_end) = start_codon_fits($transcript, $unique_start_codon); 
+      print "start_codon2=$unique_start_codon; transcript2=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
       if ($cds_start and $cds_end){
         if (create_cds($transcript, $cds_start, $cds_end)){
           #Re-assign biotype and status
@@ -336,10 +356,11 @@ sub cds_fits {
       last;
     }
   }
-  
+  #print "cds_start_present=$cds_start_present; cds_end_present=$cds_end_present\n";
   #CDS introns must coincide
   if ($cds_start_present and $cds_end_present and
       intron_chain($acceptor_transcript, $cds_start, $cds_end) eq intron_chain($donor_transcript, $cds_start, $cds_end)){
+      print "cds_start, cds_end and intron chain match\n";
     #Avoid making an NMD transcript with a CDS smaller than 35 aa
     unless (predicted_nmd_transcript($acceptor_transcript, $cds_end) and $donor_transcript->translation->length < 35){
       return 1;
@@ -536,11 +557,16 @@ sub get_core_transcript {
 
 sub get_host_gene_start_codon_set {
   my $gene = shift;
+  print "G_START=".$gene->seq_region_start."; G_END=".$gene->seq_region_end."\n";
+  print "G_START=".$gene->start."; G_END=".$gene->end."\n";
   my @start_codon_set;
   my %seen_sc;
   my @filtered_transcripts = grep {has_cds_start($_)} @{$gene->get_all_Transcripts};
   foreach my $transcript (sort_by_categ_2(\@filtered_transcripts)){
+    #$transcript = $transcript->transform("chromosome");
+    print "T_START=".$transcript->seq_region_start."; T_END=".$transcript->seq_region_end."\n";
     my $cds_start = $transcript->seq_region_strand == 1 ? $transcript->coding_region_start : $transcript->coding_region_end;
+    print "CDS_START=$cds_start\n";
     unless ($seen_sc{$cds_start}){
       push(@start_codon_set, $cds_start);
       $seen_sc{$cds_start} = 1;
@@ -628,6 +654,7 @@ sub start_codon_fits {
   #Start codon must fall in exon
   foreach my $exon (@{$transcript->get_all_Exons}){
     if ($exon->seq_region_start <= $cds_start and $exon->seq_region_end >= $cds_start){
+      print "cds_start $cds_start in exon ".$exon->seq_region_start."-".$exon->seq_region_end."\n";
       #Find start position in transcript coordinates
       my @coords = $transcript->genomic2cdna($cds_start, $cds_start, $transcript->seq_region_strand);
       my $tr_cds_start = $coords[0]->start;
