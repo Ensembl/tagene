@@ -244,8 +244,8 @@ sub make_vega_objects {
             if ($source_remark){
               $transcript->add_Attributes($source_remark);
             }
-            $transcript->add_Attributes($tagene_attrib, $tagene_remark);
-
+            #$transcript->add_Attributes($tagene_attrib);
+            $transcript->add_Attributes($tagene_remark);
 
             #Make exon objects
             foreach my $exid (keys %{$genes{$gid}{transcripts}{$tid}{exons}}){
