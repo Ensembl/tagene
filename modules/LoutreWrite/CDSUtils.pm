@@ -82,6 +82,10 @@ sub assign_cds_to_transcripts {
   print "HOST GENE START = ".$host_gene->seq_region_start." HOST GENE END = ".$host_gene->seq_region_end."\n";
   TR:foreach my $transcript (@novel_transcripts){
     print "TR_START=".$transcript->seq_region_start."; TR_END=".$transcript->seq_region_end."\n";
+    
+    foreach my $unique_cds_tr (@$cds_set){
+      print "C_START=".$unique_cds_tr->coding_region_start."; C_END=".$unique_cds_tr->coding_region_end."\n";
+    }
     #Try to find a suitable CDS from the host gene
     foreach my $unique_cds_tr (@$cds_set){
       if (cds_fits($transcript, $unique_cds_tr)){
@@ -668,13 +672,15 @@ sub start_codon_fits {
         #Find CDS end in genomic coordinates
         my $cds_length = length($1);
         my @coords2;
-        if ($transcript->seq_region_strand == 1){
+        print "TR_CDS_START=$tr_cds_start; CDS_LENGTH=$cds_length\n";
+        #if ($transcript->seq_region_strand == 1){
           @coords2 = $transcript->cdna2genomic($tr_cds_start + $cds_length - 1, $tr_cds_start + $cds_length - 1);
-        }
-        else{
-          @coords2 = $transcript->cdna2genomic($tr_cds_start - $cds_length + 1, $tr_cds_start - $cds_length + 1);
-        }
+        #}
+        #else{
+        #  @coords2 = $transcript->cdna2genomic($tr_cds_start - $cds_length + 1, $tr_cds_start - $cds_length + 1);
+        #}
         my $cds_end = $coords2[0]->start;
+        print "CDS_END=$cds_end\n";
         #Avoid making an NMD transcript with a CDS smaller than 35 aa
         unless (predicted_nmd_transcript($transcript, $cds_end) and ($cds_length-3)/3  <= 35){
           print $transcript->stable_id.": complete CDS of $cds_length bp $3\n";
