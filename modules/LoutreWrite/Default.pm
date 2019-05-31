@@ -14,6 +14,7 @@ use Sys::Hostname;
 use Try::Tiny;
 use List::Util qw[min max];
 use List::MoreUtils qw(uniq);
+use LoutreWrite::CDSUtils qw(assign_cds_to_transcripts);
 
 our $CP_BIOTYPE = "comp_pipe";
 
@@ -705,6 +706,7 @@ print "SUBMODE: $submode\n";
     #Reset gene coordinates to the start of the region slice,
     #otherwise the gene coordinates in loutre will be wrong
     my $slice_offset = $region->slice->start - 1;
+    print "OFFSET=$slice_offset\n";
     foreach my $tr (@{$gene->get_all_Transcripts}){
         foreach my $exon (@{$tr->get_all_Exons}){
             $exon->start($exon->start - $slice_offset);
@@ -749,7 +751,7 @@ print "SUBMODE: $submode\n";
                     next if scalar @{$db_tr->get_all_Introns} == 0;  #Do not merge with single-exon transcripts? (In case they are CLS Platinum...)
                     my $i = intron_novelty($tr, $db_tr);
                     my $e = exon_novelty($tr, $db_tr);
-                    my $m = can_be_merged($tr, $db_tr);  print "COMP: $i, $e, $m \n";
+                    my $m = can_be_merged($tr, $db_tr);  print "COMP: i=$i, e=$e, m=$m\n";
                     $tr_comp{$db_tr->stable_id} = {'intron' => $i, 'exon' => $e, 'merge' => $m};
                 }
                 #Multi-exon transcripts
@@ -780,7 +782,9 @@ print "SUBMODE: $submode\n";
                             if ($tr_comp{$db_tr_id}->{'exon'} == 1){
                                 if ($tr_comp{$db_tr_id}->{'merge'} == 1){
                                     my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
-                                    push(@merge_candidates, $db_tr);
+                                    unless ($db_tr->translate){ #Do not merge coding transcripts
+                                      push(@merge_candidates, $db_tr);
+                                    }
                                 }
                                 else{
                                     $add_transcript = 1;
@@ -839,7 +843,7 @@ print "SUBMODE: $submode\n";
 #     $db_gene->flush_Transcripts;
 #                     #$db_gene->remove_Transcript($sel_db_tr);
 #     $db_gene->add_Transcript($merged_transcript);    
-                    $slice_offset = $region->slice->start - 1;
+                    #$slice_offset = $region->slice->start - 1;
 #     foreach my $tr2 (@{$db_gene->get_all_Transcripts}){
                     foreach my $exon (@{$merged_transcript->get_all_Exons}){
                         $exon->start($exon->start - $slice_offset);
@@ -893,8 +897,15 @@ print "SUBMODE: $submode\n";
                                        @$array = grep { $_->value ne "not for VEGA" } @$array;
                                     }
                                 }
+                                
+                                #If coding gene, try to assign a CDS and change the biotype accordingly
+                                assign_cds_to_transcripts($ts, $g);
+                                
                                 #Change authorship
                                 $ts->transcript_author($merged_transcript->transcript_author);
+                                
+                                print "TR: $id: Will extend transcript ".$ts->stable_id." in gene ".$g->stable_id."\n";
+                                push (@log, "TR2: $id: Extended transcript ".$ts->stable_id." (".$ts->biotype.") in gene ".$g->stable_id." (".$g->biotype.")");
                             }
                         }
                     }
@@ -906,24 +917,35 @@ print "SUBMODE: $submode\n";
                     #    $sel_db_tr->add_Exon($exon);
                     #}
                     #$db_gene->add_Transcript($sel_db_tr);
-                    print "TR: $id: Will extend transcript ".$merged_transcript->stable_id." in gene ".$db_gene->stable_id."\n";
-                    push (@log, "TR2: $id: Extended transcript ".$merged_transcript->stable_id." in gene ".$db_gene->stable_id);
+              #      print "TR: $id: Will extend transcript ".$merged_transcript->stable_id." in gene ".$db_gene->stable_id."\n";
+              #      push (@log, "TR2: $id: Extended transcript ".$merged_transcript->stable_id." (".$tr->biotype.") in gene ".$db_gene->stable_id." (".$db_gene->biotype.")");
                 }
                 elsif ($add_transcript == 1){
                     #Create a name for the new transcript
                     my $new_tr_name = $self->get_new_transcript_name($db_gene, $dba);
                     my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
                     $tr->add_Attributes($name_att);
+                    print "TR0_START=".$tr->seq_region_start."; TR0_END=".$tr->seq_region_end."\n";
                     $tr->slice($region->slice);
+                    $tr->start($tr->start - $slice_offset);
+                    $tr->end($tr->end - $slice_offset);
+                    #foreach my $exon (@{$tr->get_all_Exons}){
+                    #    $exon->start($exon->start - $slice_offset);
+                    #    $exon->end(  $exon->end   - $slice_offset);
+                    #    $exon->slice($region->slice);
+                    #}
                     #unless $use_comp_pipe_biotype, assign transcript biotype based on other transcripts
                     my $use_comp_pipe_biotype = 0; #PASS THIS AS A PARAMETER!!!
                     unless ($use_comp_pipe_biotype){
                         my $t_biotype = get_transcript_biotype($db_gene);
                         $tr->biotype($t_biotype);
                     }
+                    #If coding gene, try to assign a CDS and change the biotype accordingly
+                    print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."\n";
+                    assign_cds_to_transcripts($tr, $db_gene);
                     $db_gene->add_Transcript($tr);
                     print "TR: $id: Will add transcript $new_tr_name to gene ".$db_gene->stable_id."\n";
-                    push (@log, "TR2: $id: Added transcript $new_tr_name to gene ".$db_gene->stable_id);
+                    push (@log, "TR2: $id: Added transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id." (".$db_gene->biotype.")");
                 }
                 else{
                     print "TR: $id: Will reject transcript in host gene ".$db_gene->stable_id." as intron chain exists\n";
@@ -944,9 +966,11 @@ print "SUBMODE: $submode\n";
     my $g_msg = " ";
     #if ($write){
         $local_server->authorized_user($gene->gene_author->name); # preserve authorship
-        while ($g_msg eq " " or $g_msg =~ /write failed/){
+        my $n = 0;
+        while (($g_msg eq " " or $g_msg =~ /write failed/) and $n<10){
             $g_msg = write_gene_region($region_action, $region);
             sleep(int(rand(3)));
+            $n++;
         }
         print $g_msg."\n";
     #}
