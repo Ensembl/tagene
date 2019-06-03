@@ -1349,7 +1349,7 @@ sub assign_biotypes {
                 $gene->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'remark', -value => 'overlapping locus'));            
             }
             else{
-                $biotype = "lincrna";
+                $biotype = "lincRNA";
             }
             
             $gene->biotype($biotype);
@@ -1362,7 +1362,7 @@ sub assign_biotypes {
             #novel transcript, sense overlapping XBOX1
             #novel transcript, sense intronic to RPS3
             if (!$gene->description){
-                if ($gene->biotype eq "lincrna"){
+                if ($gene->biotype eq "lincRNA"){
                     $gene->description("novel transcript");
                 }
                 elsif ($gene->biotype eq "antisense"){
@@ -1397,7 +1397,7 @@ sub assign_biotypes {
 
 sub assign_status {
     my ($self, $gene) = @_;
-    if ($gene->biotype =~ /^(lincrna|sense_intronic|sense_overlapping|antisense)$/){
+    if ($gene->biotype =~ /^(lincRNA|sense_intronic|sense_overlapping|antisense)$/){
         $gene->status("UNKNOWN"); #This is the default status in the GTF file anyway
         foreach my $transcript (@{$gene->get_all_Transcripts}){
             $transcript->status("UNKNOWN");
