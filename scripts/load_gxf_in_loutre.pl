@@ -48,7 +48,7 @@ my $only_chr;
             'max_ov_loc=s'      => \$max_overlapped_loci,
             'filter_introns!'   => \$filter_introns,
             'chr=s'             => \$only_chr,
-            'write!'            => \$write,
+            'write!'            => \$WRITE,
             );
 
 #die unless $dataset_name && $dataset_name =~ /test/;
@@ -225,7 +225,7 @@ foreach my $gene_obj (@$gene_objects_2){
       }
     
         #Store gene
-        if ($write){
+        #if ($write){
             my $mode;
             #if ($host_gene){
             #    $gene_obj->stable_id($host_gene->stable_id);
@@ -262,7 +262,7 @@ foreach my $gene_obj (@$gene_objects_2){
             else{
                 print "\nRESULT: gene ".$new_gene_obj->stable_id." could not be unlocked\n";
             }
-        }
+        #}
     }
 }
 

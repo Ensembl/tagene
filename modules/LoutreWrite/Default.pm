@@ -15,7 +15,11 @@ use Try::Tiny;
 use List::Util qw[min max];
 use List::MoreUtils qw(uniq);
 use LoutreWrite::CDSUtils qw(assign_cds_to_transcripts);
+use base 'Exporter';
 
+our @EXPORT = qw( $WRITE );
+
+our $WRITE = 0;
 our $CP_BIOTYPE = "comp_pipe";
 
 sub new {
@@ -964,7 +968,7 @@ print "SUBMODE: $submode\n";
 
     #Write region
     my $g_msg = " ";
-    #if ($write){
+    if ($WRITE){
         $local_server->authorized_user($gene->gene_author->name); # preserve authorship
         my $n = 0;
         while (($g_msg eq " " or $g_msg =~ /write failed/) and $n<10){
@@ -973,7 +977,7 @@ print "SUBMODE: $submode\n";
             $n++;
         }
         print $g_msg."\n";
-    #}
+    }
 
     return ($g_msg, \@log);
 }
