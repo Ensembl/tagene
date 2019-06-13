@@ -759,7 +759,7 @@ print "SUBMODE: $submode\n";
                     $tr_comp{$db_tr->stable_id} = {'intron' => $i, 'exon' => $e, 'merge' => $m};
                 }
                 #Multi-exon transcripts
-                if (scalar @{$tr->get_all_Introns} > 1){
+                if (scalar @{$tr->get_all_Exons} > 1){
                     #Conservative mode: a new transcript model is only stored if it has a novel intron structure or an existing intron structure with novel sequence in its terminal exons; existing transcripts are never updated.
                     if ($submode eq "cons"){
                         #Add transcript if intron chain shows novelty w.r.t. all existing transcripts
