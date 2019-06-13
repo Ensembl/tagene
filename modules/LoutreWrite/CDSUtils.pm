@@ -4,18 +4,34 @@ package LoutreWrite::CDSUtils;
 use strict;
 use warnings;
 use base 'Exporter';
-our @EXPORT = qw( sort_by_categ get_host_gene_cds_set assign_cds_to_transcripts get_appris_tag get_ccds_tag cds_exon_chain start_codon_fits has_complete_cds get_host_gene_start_codon_set is_retained_intron );
+our @EXPORT = qw( sort_by_categ get_host_gene_cds_set assign_cds_to_transcripts get_appris_tag get_ccds_tag cds_exon_chain start_codon_fits has_complete_cds get_host_gene_start_codon_set is_retained_intron %HOST_CDS_SET %HOST_START_CODON_SET );
 use Bio::Vega::Translation;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptUtils qw(calculate_exon_phases);
 use Bio::EnsEMBL::Registry;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
-my $registry = 'Bio::EnsEMBL::Registry';
-$registry->load_registry_from_db(
-    -host => 'ensembldb.ensembl.org',
-    -user => 'anonymous'
-);
-my $core_slice_adaptor = $registry->get_adaptor( 'Human', 'Core', 'Slice' );
-my $core_gene_adaptor = $registry->get_adaptor( 'Human', 'Core', 'Gene' );
+our %HOST_CDS_SET;
+our %HOST_START_CODON_SET;
+
+#my $registry = 'Bio::EnsEMBL::Registry';
+#$registry->load_registry_from_db(
+#    -host => 'ensembldb.ensembl.org',
+#    -user => 'anonymous'
+#);
+
+#my $core_slice_adaptor = $registry->get_adaptor( 'Human', 'Core', 'Slice' );
+#my $core_gene_adaptor = $registry->get_adaptor( 'Human', 'Core', 'Gene' );
+
+
+my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+    -host   => 'mysql-ens-havana-prod-1',
+    -port   => '4581',
+    -user   => 'ensro',
+    -dbname => 'homo_sapiens_core_96_38_status',
+    -driver => 'mysql'
+  );
+my $core_slice_adaptor = $db->get_SliceAdaptor();
+my $core_gene_adaptor = $db->get_GeneAdaptor();
 
 
 #https://docs.google.com/document/d/17PIripFaSkGkHmZbwR1ZCRYQhyu5ov6dgBVNqVtDjt4/edit?ts=5b6b0748
@@ -77,8 +93,23 @@ sub assign_cds_to_transcripts {
   else{
     die "First parameter must be a Bio::Vega::Gene or Bio::Vega::Transcript object!";
   }
-  my $cds_set = get_host_gene_cds_set($host_gene);
-  my $start_codon_set = get_host_gene_start_codon_set($host_gene);
+  my $cds_set;
+  if ($HOST_CDS_SET{$host_gene->stable_id}){
+    $cds_set = $HOST_CDS_SET{$host_gene->stable_id};
+  }
+  else{
+    $cds_set = get_host_gene_cds_set($host_gene);
+    $HOST_CDS_SET{$host_gene->stable_id} = $cds_set;
+  }
+  my $start_codon_set;
+  if ($HOST_START_CODON_SET{$host_gene->stable_id}){
+    $start_codon_set = $HOST_START_CODON_SET{$host_gene->stable_id};
+  }
+  else{
+    $start_codon_set = get_host_gene_start_codon_set($host_gene);
+  }
+        print "HOST_CDS_SET=".scalar(keys %HOST_CDS_SET)."\n";
+        print "HOST_START_CODON_SET=".scalar(keys %HOST_START_CODON_SET)."\n";
   print "HOST GENE START = ".$host_gene->seq_region_start." HOST GENE END = ".$host_gene->seq_region_end."\n";
   TR:foreach my $transcript (@novel_transcripts){
     print "TR_START=".$transcript->seq_region_start."; TR_END=".$transcript->seq_region_end."\n";
@@ -712,11 +743,13 @@ sub start_codon_fits {
 
 sub predicted_nmd_transcript {
   my ($transcript, $cds_end) = @_;
+  my $rank = 0; #use a separate variable instead of the exon_rank method in the Ensembl Core API as this seems to rely on exon stable ids, which are not available at this stage
   foreach my $exon (@{$transcript->get_all_Exons}){
+    $rank++;
     #CDS end must lie in an exon
     if ($exon->seq_region_start <= $cds_end and $exon->seq_region_end >= $cds_end){
       #Find if exon with stop codon is not the last one, ie. there is a splice site downstream
-      if ($exon->rank($transcript) < scalar(@{$transcript->get_all_Exons})){
+      if ($rank < scalar(@{$transcript->get_all_Exons})){
         #Find if distance between CDS end and next splice site donor is at least 50bp
         if ($transcript->seq_region_strand == 1){
           if (($exon->seq_region_end - $cds_end + 1) >= 50){
