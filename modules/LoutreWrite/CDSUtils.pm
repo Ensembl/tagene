@@ -96,6 +96,7 @@ sub assign_cds_to_transcripts {
   my $cds_set;
   if ($HOST_CDS_SET{$host_gene->stable_id}){
     $cds_set = $HOST_CDS_SET{$host_gene->stable_id};
+    #print "Using HOST_CDS_SET\n";
   }
   else{
     $cds_set = get_host_gene_cds_set($host_gene);
@@ -104,22 +105,28 @@ sub assign_cds_to_transcripts {
   my $start_codon_set;
   if ($HOST_START_CODON_SET{$host_gene->stable_id}){
     $start_codon_set = $HOST_START_CODON_SET{$host_gene->stable_id};
+    #print "Using HOST_START_CODON_SET\n";
   }
   else{
     $start_codon_set = get_host_gene_start_codon_set($host_gene);
+    $HOST_START_CODON_SET{$host_gene->stable_id} = $start_codon_set;
   }
-        print "HOST_CDS_SET=".scalar(keys %HOST_CDS_SET)."\n";
-        print "HOST_START_CODON_SET=".scalar(keys %HOST_START_CODON_SET)."\n";
+        #print "HOST_CDS_SET=".scalar(keys %HOST_CDS_SET)."\n";
+        #print "HOST_START_CODON_SET=".scalar(keys %HOST_START_CODON_SET)."\n";
   print "HOST GENE START = ".$host_gene->seq_region_start." HOST GENE END = ".$host_gene->seq_region_end."\n";
-  TR:foreach my $transcript (@novel_transcripts){
+  TR:foreach my $transcript (@novel_transcripts){ 
+    my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+    print "\nFinding a CDS for transcript $t_name\n";
     print "TR_START=".$transcript->seq_region_start."; TR_END=".$transcript->seq_region_end."\n";
     
+    print "\nAvailable CDSs:\n";
     foreach my $unique_cds_tr (@$cds_set){
-      print "C_START=".$unique_cds_tr->coding_region_start."; C_END=".$unique_cds_tr->coding_region_end."\n";
+      print "CDS_START=".$unique_cds_tr->coding_region_start."; CDS_END=".$unique_cds_tr->coding_region_end."\n";
     }
     #Try to find a suitable CDS from the host gene
     foreach my $unique_cds_tr (@$cds_set){
       if (cds_fits($transcript, $unique_cds_tr)){
+        print "CDS FITS: CDS_START=".$unique_cds_tr->coding_region_start."; CDS_END=".$unique_cds_tr->coding_region_end."\n";
         my ($cds_start, $cds_end) = $transcript->seq_region_strand == 1 ? ($unique_cds_tr->coding_region_start, $unique_cds_tr->coding_region_end) : ($unique_cds_tr->coding_region_end, $unique_cds_tr->coding_region_start);
         create_cds($transcript, $cds_start, $cds_end);
         #Re-assign biotype and status
@@ -142,10 +149,13 @@ sub assign_cds_to_transcripts {
     }
     #Else, try to create a CDS using a start codon from the host gene    
     #But first, check for intron retention
+    print "\nChecking for intron retention...\n";
     if (is_retained_intron ($transcript, $host_gene)){
       $transcript->biotype("retained_intron");
+      print "Found retained_intron\n";
       next TR;
     }
+    print "\nChecking start codons...\n";
     foreach my $unique_start_codon (@$start_codon_set){
       #Start codon coordinates are relative to the region slice: convert to genomic
       my $slice_offset = $host_gene->seq_region_start - 1;
@@ -154,7 +164,7 @@ sub assign_cds_to_transcripts {
       }
       print "start_codon=$unique_start_codon; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
       my ($cds_start, $cds_end) = start_codon_fits($transcript, $unique_start_codon); 
-      print "start_codon2=$unique_start_codon; transcript2=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
+      #print "start_codon2=$unique_start_codon; transcript2=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
       if ($cds_start and $cds_end){
         if (create_cds($transcript, $cds_start, $cds_end)){
           #Re-assign biotype and status
@@ -190,16 +200,28 @@ sub is_retained_intron {
   my ($transcript, $host_gene) = @_;
   #i) Full intron retention: the model fully transcribes the sequence between the splice donor site and acceptor site of adjacent coding exons (i.e. a ‘CDS intron’) of a model in loutre. This could include scenarios where the TAGENE model retains multiple CDS introns of the same loutre model. 
   #ii) Partial intron retention: the model has a start or end coordinate within a CDS intron of a loutre model, but not (respectively) a splice donor site or splice acceptor site within that same intron. Do we need some kind of size cut-off here? I.e. for fuzzy edges that are misalignments rather than real retained introns. Should we clip these? 
+  my $slice_offset = $host_gene->seq_region_start - 1; #print "OFFSET=$slice_offset\n";
   foreach my $tr (@{$host_gene->get_all_Transcripts}){
     if ($tr->translate){
+      #print "TR:  ".$tr->stable_id." ".$tr->biotype."\n"; 
+      my $cds_start = $tr->coding_region_start + $slice_offset;
+      my $cds_end = $tr->coding_region_end + $slice_offset;
+      if ($cds_start > $cds_end){
+        ($cds_start, $cds_end) = ($cds_end, $cds_start);
+      }
+      #print "CDS: $cds_start-$cds_end\n";
       foreach my $intron (@{$tr->get_all_Introns}){
+        #print "INTRON: ".$intron->seq_region_start."-".$intron->seq_region_end."\n";
         #Is CDS intron?
-        if ($intron->seq_region_start > $tr->coding_region_start and $intron->seq_region_end < $tr->coding_region_end){
+        if ($intron->seq_region_start > $cds_start and $intron->seq_region_end < $cds_end){
+          #print "CDS INTRON: ".$intron->seq_region_start."-".$intron->seq_region_end."\n";
           #Full intron retention
           #  ref: #######-------#######------######
           #   tr:       #########
           foreach my $exon (@{$transcript->get_all_Exons}){
+            #print "EXON: ".$exon->seq_region_start."-".$exon->seq_region_end."\n";
             if ($exon->seq_region_start < $intron->seq_region_start and $exon->seq_region_end > $intron->seq_region_end){
+              #print "FOUND\n";
               return 1;
             }
           }
