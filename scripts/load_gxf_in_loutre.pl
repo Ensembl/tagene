@@ -13,6 +13,8 @@ use Bio::Otter::Lace::Defaults;
 use Bio::Otter::Server::Config;
 $| = 1;
 
+our %HOST_CDS_SET;
+our %HOST_START_CODON_SET;
 my $file;
 my $source_info;
 my $write;
@@ -196,10 +198,19 @@ foreach my $gene_obj (@$gene_objects_2){
         #Predict intron outcome
         #Only if novel intron?
       if ($filter_introns){
+        my %PASSED_INTRONS;
         TR:foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
             my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
             foreach my $intron (@{$transcript->get_all_Introns}){
-                my $pass = LoutreWrite::IntronFilter->predict_outcome($intron, $transcript, 1);
+                my $pass;
+                if ($PASSED_INTRONS{$intron->seq_region_start."-".$intron->seq_region_end}){
+                  $pass = 1;
+                  #print "Using PASSED_INTRONS\n";
+                }
+                else {
+                  $pass = LoutreWrite::IntronFilter->predict_outcome($intron, $transcript, 1);
+                  $PASSED_INTRONS{$intron->seq_region_start."-".$intron->seq_region_end} = $pass;
+                }
                 #Give another chance to HiSeq-supported introns
                 if (($file =~ /_HiSeq/ or $remark =~ /_HiSeq/) and $pass == 0){
                   $pass = LoutreWrite::IntronFilter->exonerate_support($intron, $transcript);
@@ -246,6 +257,8 @@ foreach my $gene_obj (@$gene_objects_2){
             my $novel_gene = $new_gene_obj->stable_id ? 0 : 1;
             print "\nMODE: $mode\n";
             my ($msg, $log) = LoutreWrite::Default->process_gene_2($new_gene_obj, $mode, "aggr", $dataset_name, $otter_dba, $no_intron_check);
+        #print "HOST_CDS_SET_B=".scalar(keys %HOST_CDS_SET)."\n";
+        #print "HOST_START_CODON_SET_B=".scalar(keys %HOST_START_CODON_SET)."\n";
             if ($msg =~ /lock ok,write ok,unlock ok(,(.+))?/){
                 if ($2){
                     if ($novel_gene){
