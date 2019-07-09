@@ -769,36 +769,37 @@ sub start_codon_fits {
 
  Arg[1]    : Bio::Vega::Transcript object
  Arg[2]    : integer (CDS end in genomic coordinates)
- Function  : returns true if the transcript would get a nonsense_mediated_decay biotype if a CDS was created with the given genome coordinates, that is, if there were 50 bp or more between the stop codon and a downstream splice site (according to the HAVANA rules)
+ Function  : returns true if the transcript would get a nonsense_mediated_decay biotype if a CDS was created with the given genome coordinates, that is, if there were 50 exonic bp or more between the stop codon and the last downstream splice site (according to the HAVANA rules)
  Returntype: boolean
 
 =cut
 
 sub predicted_nmd_transcript {
   my ($transcript, $cds_end) = @_;
-  my $rank = 0; #use a separate variable instead of the exon_rank method in the Ensembl Core API as this seems to rely on exon stable ids, which are not available at this stage
+  my $rank = 0; #use a separate variable instead of the exon_rank method in the Ensembl Core API as this seems to rely on exon stable ids, which will not be available until the annotation is stored in the database
+  my $is_exonic = 0;
+  my $distance = 0;
   print "Entering predicted_nmd_transcript - cds_end=$cds_end\n";
   foreach my $exon (@{$transcript->get_all_Exons}){
-    $rank++; print "rank".$rank.":".$exon->seq_region_start."-".$exon->seq_region_end."\n";
+    $rank++; 
+    print "rank".$rank.":".$exon->seq_region_start."-".$exon->seq_region_end."\n";
     #CDS end must lie in an exon
     if ($exon->seq_region_start <= $cds_end and $exon->seq_region_end >= $cds_end){
-      #Find if exon with stop codon is not the last one, ie. there is a splice site downstream
-      if ($rank < scalar(@{$transcript->get_all_Exons})){ print "1.rank=$rank\n";
-        #Find if distance between CDS end and next splice site donor is at least 50bp
-        if ($transcript->seq_region_strand == 1){
-          if (($exon->seq_region_end - $cds_end + 1) >= 50){
-            print $transcript->stable_id.": nonsense_mediated_decay\n";
-            return 1;
-          }
-        }
-        else{
-          if (($cds_end - $exon->seq_region_start + 1) >= 50){
-            print $transcript->stable_id.": nonsense_mediated_decay\n";
-            return 1;
-          }
-        }
-      }
+      $is_exonic = 1;
+      $distance = $transcript->seq_region_strand == 1 ? $exon->seq_region_end - $cds_end :  $cds_end - $exon->seq_region_start;
     }
+    #Keep counting to find distance between the CDS end position and the last splice site
+    if ($is_exonic and $rank != scalar(@{$transcript->get_all_Exons})){
+      $distance += $exon->length;
+    }
+  }
+  
+  if ($is_exonic and $distance >= 50){
+    print $transcript->stable_id.": nonsense_mediated_decay\n";
+    return 1;
+  }
+  unless ($is_exonic){
+    warn "Position $cds_end is not exonic in this transcript!\n";
   }
   return 0;
 }
