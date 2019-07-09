@@ -14,13 +14,15 @@ $| = 1;
 
 
 my $dataset_name;
-my $outfile;
 my $only_chr;
+my $only_gene;
+my $outfile;
 
 &GetOptions(
             'dataset=s'  =>  \$dataset_name,
-            'outfile=s'  =>  \$outfile,
             'chr=s'      =>  \$only_chr,
+            'geneid=s'   =>  \$only_gene,
+            'outfile=s'  =>  \$outfile,
             );
 
 #Find chromosome name if it has been passed as a job array index
@@ -48,6 +50,9 @@ foreach my $slice (@{$sa->fetch_all("chromosome", "Otter")}){
   }
   print $slice->seq_region_name."\n";
   foreach my $gene (@{$slice->get_all_Genes}){
+    if ($only_gene){
+      next unless $gene->stable_id eq $only_gene;
+    }
     my @trs = @{$gene->get_all_Transcripts};
     for (my $i=0; $i<scalar(@trs); $i++){
       my $tr = $trs[$i];
