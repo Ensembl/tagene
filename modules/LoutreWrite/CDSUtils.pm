@@ -161,12 +161,8 @@ sub assign_cds_to_transcripts {
     print "\nChecking start codons...\n";
     foreach my $unique_start_codon (@$start_codon_set){
       #Start codon coordinates are relative to the region slice: convert to genomic
-      unless ($transcript->seq_region_start >= $unique_start_codon and $transcript->seq_region_end <= $unique_start_codon){
-        $unique_start_codon += $slice_offset; 
-      }
-      print "start_codon=$unique_start_codon; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
-      my ($cds_start, $cds_end) = start_codon_fits($transcript, $unique_start_codon); 
-      #print "start_codon2=$unique_start_codon; transcript2=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
+      print "start_codon=".($unique_start_codon+$slice_offset)."; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
+      my ($cds_start, $cds_end) = start_codon_fits($transcript, $unique_start_codon + $slice_offset); 
       if ($cds_start and $cds_end){
         if (create_cds($transcript, $cds_start, $cds_end)){
           #Re-assign biotype and status
@@ -178,7 +174,7 @@ sub assign_cds_to_transcripts {
             $transcript->status("PUTATIVE");
           }
           add_end_NF_attributes($transcript);
-          print $unique_start_codon." start codon matches ".$transcript->stable_id." (".$transcript->biotype."-".$transcript->status.")\n";
+          print ($unique_start_codon + $slice_offset)." start codon matches ".$transcript->stable_id." (".$transcript->biotype."-".$transcript->status.")\n";
           next TR;
         }
       }
