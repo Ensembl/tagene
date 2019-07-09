@@ -962,7 +962,7 @@ print "SUBMODE: $submode\n";
                     print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."\n";
                     assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
                     $db_gene->add_Transcript($tr);
-                    print "TR: $id: Will add transcript $new_tr_name to gene ".$db_gene->stable_id."\n";
+                    print "TR: $id: Will add transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id."\n";
                     push (@log, "TR2: $id: Added transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id." (".$db_gene->biotype.")");
                 }
                 else{
