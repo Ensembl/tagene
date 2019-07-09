@@ -1,0 +1,76 @@
+#!/usr/bin/perl -w
+
+#This script performs quality checks of the TAGENE annotation
+#Usage: perl post_import_QC.pl -dataset human_test
+
+
+use strict;
+use warnings;
+use Getopt::Long;
+use LoutreWrite::Default qw ( exon_novelty can_be_merged );
+use Bio::Otter::Lace::Defaults;
+use Bio::Otter::Server::Config;
+$| = 1;
+
+
+my $dataset_name;
+my $outfile;
+my $only_chr;
+
+&GetOptions(
+            'dataset=s'  =>  \$dataset_name,
+            'outfile=s'  =>  \$outfile,
+            'chr=s'      =>  \$only_chr,
+            );
+
+#Find chromosome name if it has been passed as a job array index
+$only_chr ||= $ENV{LSB_JOBINDEX};
+if ($only_chr){
+  $only_chr = "X" if $only_chr eq "23";
+  $only_chr = "Y" if $only_chr eq "24";
+}
+
+#Connect to loutre database
+#DataSet interacts directly with an otter database
+my $dataset = Bio::Otter::Server::Config->SpeciesDat->dataset($dataset_name);
+my $otter_dba = $dataset->otter_dba or die "can't get db adaptor\n";
+$otter_dba->dbc->reconnect_when_lost(1);
+my $sa = $otter_dba->get_SliceAdaptor();
+my $ga = $otter_dba->get_GeneAdaptor();
+my $ta = $otter_dba->get_TranscriptAdaptor();
+
+open (OUT, ">$outfile.$only_chr") or die "Can't open $outfile.$only_chr: $!";
+
+foreach my $slice (@{$sa->fetch_all("chromosome", "Otter")}){
+  next unless $slice->seq_region_name =~ /-38$/;
+  if ($only_chr){
+    next unless $slice->seq_region_name eq "chr$only_chr-38";
+  }
+  print $slice->seq_region_name."\n";
+  foreach my $gene (@{$slice->get_all_Genes}){
+    my @trs = @{$gene->get_all_Transcripts};
+    for (my $i=0; $i<scalar(@trs); $i++){
+      my $tr = $trs[$i];
+      if (scalar grep {$_->value eq "TAGENE_transcript"} @{$tr->get_all_Attributes('remark')}){
+        for (my $j=$i+1; $j<scalar(@trs); $j++){
+          my $db_tr = $trs[$j];
+          next if $db_tr->biotype eq "artifact";
+          next if scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')}) and $db_tr->biotype ne "comp_pipe";
+          next if scalar(grep {$_->value eq "comp_pipe_rejected"} @{$db_tr->get_all_Attributes('remark')});
+          next if scalar @{$db_tr->get_all_Introns} == 0;  #Do not merge with single-exon transcripts?
+
+          if ((exon_novelty($tr, $db_tr) or exon_novelty($db_tr, $tr)) and can_be_merged($tr, $db_tr)){
+            print OUT join("\t", $tr->stable_id, scalar(@{$tr->get_all_Exons}), $tr->biotype,
+                                 $db_tr->stable_id, scalar(@{$db_tr->get_all_Exons}), $db_tr->biotype,
+                                 $gene->stable_id, $gene->biotype)."\n";
+          }
+        }
+      }
+    }
+  }
+}
+
+close (OUT);
+
+
+
