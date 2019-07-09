@@ -14,11 +14,11 @@ use Sys::Hostname;
 use Try::Tiny;
 use List::Util qw[min max];
 use List::MoreUtils qw(uniq);
-use LoutreWrite::CDSUtils qw(assign_cds_to_transcripts);
+use LoutreWrite::CDSUtils qw(assign_cds_to_transcripts has_complete_cds);
 use base 'Exporter';
 
 our @EXPORT = qw( $WRITE );
-
+our @EXPORT_OK = qw( exon_novelty can_be_merged );
 our $WRITE = 0;
 our $CP_BIOTYPE = "comp_pipe";
 
@@ -429,6 +429,7 @@ sub process_gene {
     #Reset gene coordinates to the start of the region slice,
     #otherwise the gene coordinates in loutre will be wrong
     my $slice_offset = $region->slice->start - 1;
+
     foreach my $tr (@{$gene->get_all_Transcripts}){
         foreach my $exon (@{$tr->get_all_Exons}){
             $exon->start($exon->start - $slice_offset);
@@ -748,6 +749,7 @@ print "SUBMODE: $submode\n";
                 my $add_transcript = 0;
                 my @merge_candidates = ();
                 my %tr_comp;
+                print "\n\nComparing with existing transcripts:\n";
                 foreach my $db_tr (@{$db_gene->get_all_Transcripts}){ 
                     next if $db_tr->biotype eq "artifact";
                     next if scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')}) and $db_tr->biotype ne "comp_pipe";
@@ -755,8 +757,9 @@ print "SUBMODE: $submode\n";
                     next if scalar @{$db_tr->get_all_Introns} == 0;  #Do not merge with single-exon transcripts? (In case they are CLS Platinum...)
                     my $i = intron_novelty($tr, $db_tr);
                     my $e = exon_novelty($tr, $db_tr);
-                    my $m = can_be_merged($tr, $db_tr);  print "COMP: i=$i, e=$e, m=$m\n";
+                    my $m = can_be_merged($tr, $db_tr);  
                     $tr_comp{$db_tr->stable_id} = {'intron' => $i, 'exon' => $e, 'merge' => $m};
+                    print "COMP: i=$i, e=$e, m=$m ".$db_tr->stable_id." ".$db_tr->biotype."\n";
                 }
                 #Multi-exon transcripts
                 if (scalar @{$tr->get_all_Exons} > 1){
@@ -786,7 +789,18 @@ print "SUBMODE: $submode\n";
                             if ($tr_comp{$db_tr_id}->{'exon'} == 1){
                                 if ($tr_comp{$db_tr_id}->{'merge'} == 1){
                                     my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
-                                    unless ($db_tr->translate){ #Do not merge coding transcripts
+                                    #Do not merge with full-length CDS transcripts (TO DO)
+                                    #unless ($db_tr->translate and has_complete_cds($db_tr)){ 
+                                    #Do not merge with coding transcripts
+                                    #Skip transcript if it could be merged with a coding transcript,
+                                    # so as not to make a partially redundant transcript
+                                    if ($db_tr->translate($db_tr)){
+                                      print "Skipping transcript as partially redundant with a coding transcript\n";
+                                      $add_transcript = 0;
+                                      @merge_candidates = ();
+                                      last DBTR;
+                                    }
+                                    else{
                                       push(@merge_candidates, $db_tr);
                                     }
                                 }
@@ -901,9 +915,9 @@ print "SUBMODE: $submode\n";
                                        @$array = grep { $_->value ne "not for VEGA" } @$array;
                                     }
                                 }
-                                
+
                                 #If coding gene, try to assign a CDS and change the biotype accordingly
-                                assign_cds_to_transcripts($ts, $g);
+                                assign_cds_to_transcripts($ts, $g, $slice_offset);
                                 
                                 #Change authorship
                                 $ts->transcript_author($merged_transcript->transcript_author);
@@ -946,7 +960,7 @@ print "SUBMODE: $submode\n";
                     }
                     #If coding gene, try to assign a CDS and change the biotype accordingly
                     print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."\n";
-                    assign_cds_to_transcripts($tr, $db_gene);
+                    assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
                     $db_gene->add_Transcript($tr);
                     print "TR: $id: Will add transcript $new_tr_name to gene ".$db_gene->stable_id."\n";
                     push (@log, "TR2: $id: Added transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id." (".$db_gene->biotype.")");
