@@ -57,18 +57,25 @@ foreach my $slice (@{$sa->fetch_all("chromosome", "Otter")}){
     for (my $i=0; $i<scalar(@trs); $i++){
       my $tr = $trs[$i];
       if (scalar grep {$_->value eq "TAGENE_transcript"} @{$tr->get_all_Attributes('remark')}){
+        #Check for redundant transcripts (where one could be merged into the other)
         for (my $j=$i+1; $j<scalar(@trs); $j++){
           my $db_tr = $trs[$j];
           next if $db_tr->biotype eq "artifact";
           next if scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')}) and $db_tr->biotype ne "comp_pipe";
           next if scalar(grep {$_->value eq "comp_pipe_rejected"} @{$db_tr->get_all_Attributes('remark')});
-          next if scalar @{$db_tr->get_all_Introns} == 0;  #Do not merge with single-exon transcripts?
-
+          next if scalar @{$db_tr->get_all_Introns} == 0;
+          
           if ((exon_novelty($tr, $db_tr) or exon_novelty($db_tr, $tr)) and can_be_merged($tr, $db_tr)){
-            print OUT join("\t", $tr->stable_id, scalar(@{$tr->get_all_Exons}), $tr->biotype,
+            print OUT join("\t", "Redundant_transcript", 
+                                 $tr->stable_id, scalar(@{$tr->get_all_Exons}), $tr->biotype,
                                  $db_tr->stable_id, scalar(@{$db_tr->get_all_Exons}), $db_tr->biotype,
                                  $gene->stable_id, $gene->biotype)."\n";
           }
+        }
+        
+        #Check for NMDs with an ORF < 35 aa
+        if ($tr->biotype eq "nonsense_mediated_decay" and $tr->translation->length < 35){
+          print OUT join("\t", "Short_NMD_ORF", $tr->stable_id, $tr->translation->length)."\n";
         }
       }
     }
