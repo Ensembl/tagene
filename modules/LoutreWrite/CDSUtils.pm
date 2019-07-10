@@ -27,7 +27,7 @@ my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
     -host   => 'mysql-ens-havana-prod-1',
     -port   => '4581',
     -user   => 'ensro',
-    -dbname => 'homo_sapiens_core_96_38_status',
+    -dbname => 'homo_sapiens_core_97_38_status',
     -driver => 'mysql'
   );
 my $core_slice_adaptor = $db->get_SliceAdaptor();
@@ -173,7 +173,7 @@ sub assign_cds_to_transcripts {
             $transcript->biotype("protein_coding");
             $transcript->status("PUTATIVE");
           }
-          add_end_NF_attributes($transcript);
+          add_end_NF_attributes($transcript, $slice_offset);
           print ($unique_start_codon + $slice_offset)." start codon matches ".$transcript->stable_id." (".$transcript->biotype."-".$transcript->status.")\n";
           next TR;
         }
@@ -873,9 +873,10 @@ print "create_cds => CDS_START: $cds_start ; CDS_END: $cds_end\n";
 =cut
 
 sub add_end_NF_attributes {
-  my $transcript = shift;
-  if (($transcript->seq_region_strand == 1 and $transcript->coding_region_end == $transcript->seq_region_end) or
-    ($transcript->seq_region_strand == -1 and $transcript->coding_region_start == $transcript->seq_region_start)
+  my ($transcript, $slice_offset) = @_;
+  #print "add_end_NF_attributes: ".join("==", $transcript->seq_region_start, $transcript->coding_region_start+$slice_offset, $transcript->coding_region_end+$slice_offset, $transcript->seq_region_end)."\n";
+  if (($transcript->seq_region_strand == 1 and $transcript->coding_region_end+$slice_offset == $transcript->seq_region_end) or
+    ($transcript->seq_region_strand == -1 and $transcript->coding_region_start+$slice_offset == $transcript->seq_region_start)
   ){
     unless ($transcript->seq->seq =~ /(TGA|TAG|TAA)$/){
       $transcript->add_Attributes(
