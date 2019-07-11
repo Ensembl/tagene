@@ -751,9 +751,14 @@ print "SUBMODE: $submode\n";
                 my %tr_comp;
                 print "\n\nComparing with existing transcripts:\n";
                 foreach my $db_tr (@{$db_gene->get_all_Transcripts}){ 
+                    #Exclude artifacts
                     next if $db_tr->biotype eq "artifact";
-                    next if scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')}) and $db_tr->biotype ne "comp_pipe";
+                    #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
+                    next if (scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')}) and 
+                            ($db_tr->biotype ne "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$db_tr->get_all_Attributes('remark')}));
+                    #Exclude transcripts having a "comp_pipe_rejected" remark
                     next if scalar(grep {$_->value eq "comp_pipe_rejected"} @{$db_tr->get_all_Attributes('remark')});
+                    #Ignore single-exon transcripts (?)
                     next if scalar @{$db_tr->get_all_Introns} == 0;  #Do not merge with single-exon transcripts? (In case they are CLS Platinum...)
                     my $i = intron_novelty($tr, $db_tr);
                     my $e = exon_novelty($tr, $db_tr);
@@ -794,7 +799,7 @@ print "SUBMODE: $submode\n";
                                     #Do not merge with coding transcripts
                                     #Skip transcript if it could be merged with a coding transcript,
                                     # so as not to make a partially redundant transcript
-                                    if ($db_tr->translate($db_tr)){
+                                    if ($db_tr->translate()){
                                       print "Skipping transcript as partially redundant with a coding transcript\n";
                                       $add_transcript = 0;
                                       @merge_candidates = ();
@@ -922,7 +927,7 @@ print "SUBMODE: $submode\n";
                                 #Change authorship
                                 $ts->transcript_author($merged_transcript->transcript_author);
                                 
-                                print "TR: $id: Will extend transcript ".$ts->stable_id." in gene ".$g->stable_id."\n";
+                                print "TR: $id: Will extend transcript ".$ts->stable_id." (".$ts->biotype.") in gene ".$g->stable_id."\n";
                                 push (@log, "TR2: $id: Extended transcript ".$ts->stable_id." (".$ts->biotype.") in gene ".$g->stable_id." (".$g->biotype.")");
                             }
                         }
