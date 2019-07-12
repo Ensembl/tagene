@@ -30,6 +30,7 @@ my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
     -dbname => 'homo_sapiens_core_97_38_status',
     -driver => 'mysql'
   );
+$db->dbc->disconnect_when_inactive(1);
 my $core_slice_adaptor = $db->get_SliceAdaptor();
 my $core_gene_adaptor = $db->get_GeneAdaptor();
 
@@ -883,6 +884,7 @@ sub add_end_NF_attributes {
         new Bio::EnsEMBL::Attribute(-code => 'cds_end_NF', -value => 1), 
         new Bio::EnsEMBL::Attribute(-code => 'mRNA_end_NF', -value => 1)
       );
+      print "Added cds_end_NF/mRNA_end_NF attribute to transcript ".$transcript->stable_id."\n";
     }
   }
 }

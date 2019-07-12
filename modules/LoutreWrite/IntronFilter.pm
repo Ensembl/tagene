@@ -76,9 +76,10 @@ sub get_loutre_db_adaptor {
     -port   => 4581,
     -user   => 'ensro',
     -pass   => undef,
-    -dbname => 'loutre_human',
+    -dbname => 'loutre_human_tagene_test_6', #this should point to the database being modified
     -driver => 'mysql',
   );
+  $db->dbc->disconnect_when_inactive(1);
   return $db;
 }
 
@@ -97,6 +98,7 @@ sub get_pipe_db_adaptor {
     -dbname => 'pipe_human',
     -driver => 'mysql',
   );
+  $db->dbc->disconnect_when_inactive(1);
   return $db;
 }
 
@@ -114,6 +116,7 @@ sub get_intropolis_db_adaptor {
     -dbname => 'gencode_sf5_human_introns',
     -driver => 'mysql',
   );
+  $db->dbc->disconnect_when_inactive(1);
   return $db;
 }
 
