@@ -754,7 +754,7 @@ print "SUBMODE: $submode\n";
                     #Exclude artifacts
                     next if $db_tr->biotype eq "artifact";
                     #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
-                    next if (scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')}) and 
+                    next if scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')}) and 
                             ($db_tr->biotype ne "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$db_tr->get_all_Attributes('remark')}));
                     #Exclude transcripts having a "comp_pipe_rejected" remark
                     next if scalar(grep {$_->value eq "comp_pipe_rejected"} @{$db_tr->get_all_Attributes('remark')});
@@ -824,32 +824,56 @@ print "SUBMODE: $submode\n";
                         }
                     }
                 }
-                #Single-exon transcripts
+                #Single-exon transcripts: do not merge unless it includes and extends a single-exon non-coding transcript; else, add unless it can be merged
                 else{
-                    #Merge with existing single-exon transcript if it is larger
-                    #This rule needs to be refined
-                    if (scalar keys %tr_comp == 1){
-                        my ($db_tr_id) = keys %tr_comp;
-                        my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
-                        if (scalar(@{$db_tr->get_all_Exons}) == 1){
-                            if ($tr->start <= $db_tr->start and $tr->end => $db_tr->end and
-                                !($tr->start == $db_tr->start and $tr->end == $db_tr->end)){
-                                push(@merge_candidates, $db_tr);
+                    DBTR:foreach my $db_tr_id (keys %tr_comp){
+                        if ($tr_comp{$db_tr_id}->{'exon'} == 1 and $tr_comp{$db_tr_id}->{'merge'} == 1){
+                            my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
+                            if (scalar(@{$db_tr->get_all_Exons}) == 1 and !($db_tr->translate())){
+                                if ($tr->start <= $db_tr->start and $tr->end => $db_tr->end and
+                                    !($tr->start == $db_tr->start and $tr->end == $db_tr->end)){
+                                    push(@merge_candidates, $db_tr);
+                                }
                             }
                         }
-                    }
-                    #If there is exon novelty, add new transcript
-                    else{
-                        DBTR:foreach my $db_tr_id (keys %tr_comp){
-                            if ($tr_comp{$db_tr_id}->{'exon'} == 1){
-                                $add_transcript = 1;
-                            }
-                            else{
-                                $add_transcript = 0;
-                                last DBTR;
-                            }
+                        #Add as new transcript if there is exon novelty with a transcript but can't be merged (eg. retained intron)
+                        elsif ($tr_comp{$db_tr_id}->{'exon'} == 1 and $tr_comp{$db_tr_id}->{'merge'} == 0){
+                            $add_transcript = 1;
+                        }
+                        #Reject if no exon novelty with a transcript
+                        elsif ($tr_comp{$db_tr_id}->{'exon'} == 0){ 
+                            $add_transcript = 0;
+                            @merge_candidates = ();
+                            last DBTR;
                         }
                     }
+
+#                     #Merge with current single-exon transcript/gene if it encompasses it and extends it
+#                     #Skip if the current transcript is coding!
+#                     #This rule needs to be refined: single-exon transcripts in multi-transcript genes are ignored now
+#                     if (scalar keys %tr_comp == 1){
+#                         my ($db_tr_id) = keys %tr_comp;
+#                         my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
+#                         if (scalar(@{$db_tr->get_all_Exons}) == 1 and !($db_tr->translate())){
+#                             if ($tr->start <= $db_tr->start and $tr->end => $db_tr->end and
+#                                 !($tr->start == $db_tr->start and $tr->end == $db_tr->end)){
+#                                 push(@merge_candidates, $db_tr);
+#                             }
+#                         }
+#                     }
+#                     #If there is exon novelty and can't be merged with any existing transcript, add new transcript
+#                     #We are ignoring transcripts that could extend 5' or 3' ends for the moment
+#                     else{
+#                         DBTR:foreach my $db_tr_id (keys %tr_comp){
+#                             if ($tr_comp{$db_tr_id}->{'exon'} == 1 and $tr_comp{$db_tr_id}->{'merge'} == 0){
+#                                 $add_transcript = 1;
+#                             }
+#                             else{
+#                                 $add_transcript = 0;
+#                                 last DBTR;
+#                             }
+#                         }
+#                     }
                 }
               
                 #Take action
