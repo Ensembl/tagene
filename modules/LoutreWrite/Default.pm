@@ -909,7 +909,8 @@ print "SUBMODE: $submode\n";
                 
                                 #Add remarks (except 'not for VEGA') and hidden remarks from the novel transcript
                                 foreach my $att (@{$merged_transcript->get_all_Attributes}){
-                                    next if ($att->code eq "remark" and $att->value eq "not for VEGA");
+                                    #COMMENTING THIS OUT AS WE MAY WANT TO KEEP THE NOT FOR VEGA REMARK (NEEDS TO READ THE $no_NFV VARIABLE) - TO DO
+                                    #next if ($att->code eq "remark" and $att->value eq "not for VEGA");
                                     #Append read names to existing remark
                                     if ((($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq_\w+ : .+;/) or
                                         ($att->code eq "hidden_remark" and $att->value =~ /^SLR-seq_\w+ : .+;/) or
