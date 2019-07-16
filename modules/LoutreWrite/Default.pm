@@ -754,8 +754,9 @@ print "SUBMODE: $submode\n";
                     #Exclude artifacts
                     next if $db_tr->biotype eq "artifact";
                     #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
-                    next if scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')}) and 
-                            ($db_tr->biotype ne "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$db_tr->get_all_Attributes('remark')}));
+                    if (scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')})){
+                      next unless ($db_tr->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$db_tr->get_all_Attributes('remark')}));
+                    }
                     #Exclude transcripts having a "comp_pipe_rejected" remark
                     next if scalar(grep {$_->value eq "comp_pipe_rejected"} @{$db_tr->get_all_Attributes('remark')});
                     #Ignore single-exon transcripts (?)
