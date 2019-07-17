@@ -778,6 +778,7 @@ sub start_codon_fits {
 sub predicted_nmd_transcript {
   my ($transcript, $cds_end) = @_;
   my $rank = 0; #use a separate variable instead of the exon_rank method in the Ensembl Core API as this seems to rely on exon stable ids, which will not be available until the annotation is stored in the database
+  my $cds_end_exon_rank = 0;
   my $is_exonic = 0;
   my $distance = 0;
   print "Entering predicted_nmd_transcript - cds_end=$cds_end\n";
@@ -787,16 +788,19 @@ sub predicted_nmd_transcript {
     #CDS end must lie in an exon
     if ($exon->seq_region_start <= $cds_end and $exon->seq_region_end >= $cds_end){
       $is_exonic = 1;
+      $cds_end_exon_rank = $rank;
+    }
+    #Start counting distance downstream of stop codon
+    if ($rank == $cds_end_exon_rank){
       $distance = $transcript->seq_region_strand == 1 ? $exon->seq_region_end - $cds_end :  $cds_end - $exon->seq_region_start;
     }
     #Keep counting to find distance between the CDS end position and the last splice site
-    if ($is_exonic and $rank != scalar(@{$transcript->get_all_Exons})){
+    elsif ($is_exonic and $rank < scalar(@{$transcript->get_all_Exons})){
       $distance += $exon->length;
     }
   }
-  
-  if ($is_exonic and $distance >= 50){
-    print $transcript->stable_id.": nonsense_mediated_decay\n";
+  if ($is_exonic and $cds_end_exon_rank != scalar(@{$transcript->get_all_Exons}) and $distance >= 50){
+    print $transcript->stable_id.": nonsense_mediated_decay  - cds_end_exon=$cds_end_exon_rank DIST=$distance\n";
     return 1;
   }
   unless ($is_exonic){
