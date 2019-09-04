@@ -21,6 +21,31 @@ my $date;
 open (OUT, ">$outfile") or die "Can't open $outfile:$!";
 open (EXT, ">$outfile.tsv") or die "Can't open $outfile.tsv:$!";
 
+print OUT join(", ", "gene_id",
+                     "gene_symbol",
+                     "gene_biotype",
+                     "modified_date",
+                     "",
+                     "novel_transcripts",
+                     "extended_transcripts",
+                     "transcript_info",
+                     "data_source",
+              )."\n";
+
+print EXT join("\t", "gene_id",
+                     "gene_symbol",
+                     "gene_biotype",
+                     "transcript_id",
+                     "transcript_biotype",
+                     "previous_transcript_biotype",
+                     "novel/extended",
+                     "data_source",
+                     "CDS_end_not_found?",
+                     "model_name",
+                     "unique_CDS?",
+                     "transcript_length",
+              )."\n";
+
 #Connect to loutre database
 #DataSet interacts directly with an otter database
 my $dataset = Bio::Otter::Server::Config->SpeciesDat->dataset($dataset_name);
@@ -162,6 +187,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
             }
           }
         }
+        
         print EXT join("\t", $gene->stable_id, 
                            ($gene->get_all_Attributes('name')->[0]->value || "NA"),
                            $gene->biotype, 
