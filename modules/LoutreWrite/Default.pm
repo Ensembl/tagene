@@ -752,7 +752,9 @@ print "SUBMODE: $submode\n";
                 my @merge_candidates = ();
                 my %tr_comp;
                 print "\n\nComparing with existing transcripts:\n";
-                foreach my $db_tr (@{$db_gene->get_all_Transcripts}){ 
+                foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
+                    #Exclude transcripts not yet stored in the database
+                    next unless $db_tr->stable_id;
                     #Exclude artifacts
                     next if $db_tr->biotype eq "artifact";
                     #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
