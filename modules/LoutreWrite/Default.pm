@@ -746,6 +746,8 @@ print "SUBMODE: $submode\n";
             
             #Compare new transcripts with existing ones
             TR:foreach my $tr (@{$gene->get_all_Transcripts}){
+                my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+                print "\n\n#Looking at transcript $id\n";
                 my $add_transcript = 0;
                 my @merge_candidates = ();
                 my %tr_comp;
@@ -878,7 +880,7 @@ print "SUBMODE: $submode\n";
                 }
               
                 #Take action
-                my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+                #my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
                 if (scalar @merge_candidates > 0){
                     my $sel_db_tr;
                     if (scalar @merge_candidates > 1){
