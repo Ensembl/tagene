@@ -21,7 +21,7 @@ my $date;
 open (OUT, ">$outfile") or die "Can't open $outfile:$!";
 open (EXT, ">$outfile.tsv") or die "Can't open $outfile.tsv:$!";
 
-print OUT join(", ", "gene_id",
+print OUT join("\t", "gene_id",
                      "gene_symbol",
                      "gene_biotype",
                      "modified_date",
@@ -43,7 +43,7 @@ print EXT join("\t", "gene_id",
                      "CDS_end_not_found?",
                      "model_name",
                      "unique_CDS?",
-                     "transcript_length",
+                     "translation_length",
               )."\n";
 
 #Connect to loutre database
