@@ -86,11 +86,11 @@ my $lr_sa = $lr_db->get_SliceAdaptor;
 
 #Connect to the Ensembl core database
 my $e_db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-    -host   => 'mysql-ensembl-mirror',
-    -port   => 4240,
+    -host   => 'mysql-ens-havana-prod-1',
+    -port   => 4581,
     -user   => 'ensro',
     -pass   => undef,
-    -dbname => 'homo_sapiens_core_95_38',
+    -dbname => 'homo_sapiens_core_97_38',
     -driver => 'mysql',
 );
 my $e_sa = $e_db->get_SliceAdaptor;
@@ -171,7 +171,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
       $tr_c++;
       my $source;
       foreach my $att (@{$tr->get_all_Attributes('remark')}){
-        if ($att->value =~ /^Assembled from PacBio CLS reads - (\w+)$/){
+        if ($att->value =~ /^Assembled from PacBio .* reads - (CAGE_PolyA_HiSeq|CAGE_PolyA_noHiSeq|CAGE_xor_PolyA_HiSeq|noCAGE_noPolyA_noHiSeq)/){
           $source = $1;
         }
       }
@@ -230,7 +230,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
       }
       $real_outcome{$outcome}++;
 
-      print "\nTR\t".$source."\t".$outcome."\t".$tr->biotype."\n";
+      print "\nTR\t".$tr->stable_id."\t$source\t$outcome\t".$tr->biotype."\n";
     }
   }
 }
