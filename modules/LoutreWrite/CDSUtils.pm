@@ -155,7 +155,7 @@ sub assign_cds_to_transcripts {
     #Else, try to create a CDS using a start codon from the host gene    
     #But first, check for intron retention
     print "\nChecking for intron retention...\n";
-    if (is_retained_intron ($transcript, $host_gene)){
+    if (is_retained_intron ($transcript, $host_gene, 5)){
       $transcript->biotype("retained_intron");
       print "Found retained_intron\n";
       next TR;
@@ -191,16 +191,18 @@ sub assign_cds_to_transcripts {
 
  Arg[1]    : Bio::Vega::Transcript object
  Arg[2]    : Bio::Vega::Gene object
+ Arg[3]    : integer (minimum overhang in partial intron retention)
  Function  : finds whether the novel transcript is a retained_intron model in the host gene
  Returntype: boolean
 
 =cut
 
 sub is_retained_intron {
-  my ($transcript, $host_gene) = @_;
+  my ($transcript, $host_gene, $min_overhang) = @_;
   #i) Full intron retention: the model fully transcribes the sequence between the splice donor site and acceptor site of adjacent coding exons (i.e. a ‘CDS intron’) of a model in loutre. This could include scenarios where the TAGENE model retains multiple CDS introns of the same loutre model. 
   #ii) Partial intron retention: the model has a start or end coordinate within a CDS intron of a loutre model, but not (respectively) a splice donor site or splice acceptor site within that same intron. Do we need some kind of size cut-off here? I.e. for fuzzy edges that are misalignments rather than real retained introns. Should we clip these? 
   my $slice_offset = $host_gene->seq_region_start - 1; #print "OFFSET=$slice_offset\n";
+  $min_overhang ||= 1;
   foreach my $tr (@{$host_gene->get_all_Transcripts}){
     if ($tr->translate){
       #print "TR:  ".$tr->stable_id." ".$tr->biotype."\n"; 
@@ -230,12 +232,14 @@ sub is_retained_intron {
           #   tr:          #######---####
           if ($transcript->seq_region_strand == 1 and 
               $transcript->start_Exon->seq_region_start >= $intron->seq_region_start and
-              $transcript->start_Exon->seq_region_end > $intron->seq_region_end){
+              $transcript->start_Exon->seq_region_end > $intron->seq_region_end and
+              ($transcript->start_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
                 return 1;
           }
           if ($transcript->seq_region_strand == -1 and 
               $transcript->end_Exon->seq_region_start >= $intron->seq_region_start and
-              $transcript->end_Exon->seq_region_end > $intron->seq_region_end){
+              $transcript->end_Exon->seq_region_end > $intron->seq_region_end and
+              ($transcript->end_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
                 #Check polyAs
                 unless (matches_polyA_site($transcript, 500)){
                   return 1;
@@ -243,7 +247,8 @@ sub is_retained_intron {
           }
           if ($transcript->seq_region_strand == 1 and 
               $transcript->end_Exon->seq_region_start < $intron->seq_region_start and
-              $transcript->end_Exon->seq_region_end <= $intron->seq_region_end){
+              $transcript->end_Exon->seq_region_end <= $intron->seq_region_end and
+              ($transcript->end_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
                 #Check polyAs
                 unless (matches_polyA_site($transcript, 500)){
                   return 1;
@@ -251,21 +256,10 @@ sub is_retained_intron {
           }
           if ($transcript->seq_region_strand == -1 and 
               $transcript->start_Exon->seq_region_start < $intron->seq_region_start and
-              $transcript->start_Exon->seq_region_end <= $intron->seq_region_end){
+              $transcript->start_Exon->seq_region_end <= $intron->seq_region_end
+              ($transcript->start_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
                 return 1;
           }
-          
-          
-#           if ($transcript->seq_region_start >= $intron->seq_region_start and $transcript->seq_region_start <= $intron->seq_region_end){
-#             unless (($transcript->seq_region_strand == 1 and $transcript->start_Exon->seq_region_end < $intron->seq_region_end) or ($transcript->seq_region_strand == -1 and $transcript->end_Exon->seq_region_end < $intron->seq_region_end)){
-#               return 1;
-#             }
-#           }
-#           if ($transcript->seq_region_end >= $intron->seq_region_start and $transcript->seq_region_end <= $intron->seq_region_end){
-#             unless (($transcript->seq_region_strand == 1 and $transcript->end_Exon->seq_region_start > $intron->seq_region_start) or ($transcript->seq_region_strand == -1 and $transcript->start_Exon->seq_region_start > $intron->seq_region_start)){
-#               return 1;
-#             }
-#           }
         }
       }
     }
