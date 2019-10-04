@@ -9,6 +9,7 @@ use Bio::Vega::Translation;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptUtils qw(calculate_exon_phases);
 use Bio::EnsEMBL::Registry;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use LoutreWrite::Default;
 
 our %HOST_CDS_SET;
 our %HOST_START_CODON_SET;
@@ -27,7 +28,7 @@ my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
     -host   => 'mysql-ens-havana-prod-1',
     -port   => '4581',
     -user   => 'ensro',
-    -dbname => 'homo_sapiens_core_97_38_status',
+    -dbname => 'homo_sapiens_core_98_38_status',
     -driver => 'mysql'
   );
 $db->dbc->disconnect_when_inactive(1);
@@ -175,7 +176,7 @@ sub assign_cds_to_transcripts {
             $transcript->status("PUTATIVE");
           }
           add_end_NF_attributes($transcript, $slice_offset);
-          print ($unique_start_codon + $slice_offset)." start codon matches ".$transcript->stable_id." (".$transcript->biotype."-".$transcript->status.")\n";
+          print "".($unique_start_codon + $slice_offset)." start codon matches ".$transcript->stable_id." (".$transcript->biotype."-".$transcript->status.")\n";
           next TR;
         }
       }
@@ -227,16 +228,44 @@ sub is_retained_intron {
           #Partial intron retention
           #  ref: #######-------#######------######
           #   tr:          #######---####
-          if ($transcript->seq_region_start >= $intron->seq_region_start and $transcript->seq_region_start <= $intron->seq_region_end){
-            unless (($transcript->seq_region_strand == 1 and $transcript->start_Exon->seq_region_end < $intron->seq_region_end) or ($transcript->seq_region_strand == -1 and $transcript->end_Exon->seq_region_end < $intron->seq_region_end)){
-              return 1;
-            }
+          if ($transcript->seq_region_strand == 1 and 
+              $transcript->start_Exon->seq_region_start >= $intron->seq_region_start and
+              $transcript->start_Exon->seq_region_end > $intron->seq_region_end){
+                return 1;
           }
-          if ($transcript->seq_region_end >= $intron->seq_region_start and $transcript->seq_region_end <= $intron->seq_region_end){
-            unless (($transcript->seq_region_strand == 1 and $transcript->end_Exon->seq_region_start > $intron->seq_region_start) or ($transcript->seq_region_strand == -1 and $transcript->start_Exon->seq_region_start > $intron->seq_region_start)){
-              return 1;
-            }
+          if ($transcript->seq_region_strand == -1 and 
+              $transcript->end_Exon->seq_region_start >= $intron->seq_region_start and
+              $transcript->end_Exon->seq_region_end > $intron->seq_region_end){
+                #Check polyAs
+                unless (matches_polyA_site($transcript, 500)){
+                  return 1;
+                }
           }
+          if ($transcript->seq_region_strand == 1 and 
+              $transcript->end_Exon->seq_region_start < $intron->seq_region_start and
+              $transcript->end_Exon->seq_region_end <= $intron->seq_region_end){
+                #Check polyAs
+                unless (matches_polyA_site($transcript, 500)){
+                  return 1;
+                }
+          }
+          if ($transcript->seq_region_strand == -1 and 
+              $transcript->start_Exon->seq_region_start < $intron->seq_region_start and
+              $transcript->start_Exon->seq_region_end <= $intron->seq_region_end){
+                return 1;
+          }
+          
+          
+#           if ($transcript->seq_region_start >= $intron->seq_region_start and $transcript->seq_region_start <= $intron->seq_region_end){
+#             unless (($transcript->seq_region_strand == 1 and $transcript->start_Exon->seq_region_end < $intron->seq_region_end) or ($transcript->seq_region_strand == -1 and $transcript->end_Exon->seq_region_end < $intron->seq_region_end)){
+#               return 1;
+#             }
+#           }
+#           if ($transcript->seq_region_end >= $intron->seq_region_start and $transcript->seq_region_end <= $intron->seq_region_end){
+#             unless (($transcript->seq_region_strand == 1 and $transcript->end_Exon->seq_region_start > $intron->seq_region_start) or ($transcript->seq_region_strand == -1 and $transcript->start_Exon->seq_region_start > $intron->seq_region_start)){
+#               return 1;
+#             }
+#           }
         }
       }
     }
@@ -891,6 +920,27 @@ sub add_end_NF_attributes {
       print "Added cds_end_NF/mRNA_end_NF attribute to transcript ".$transcript->stable_id."\n";
     }
   }
+}
+
+
+
+=head2 matches_polyA_site
+
+ Arg[1]    : Bio::Vega::Transcript object
+ Arg[1]    : integer (distance threshold)
+ Function  : Returns true if there is a Havana-annotated polyA site within the distance to the transcript 3' end indicated by the second argument
+ Returntype: none
+
+=cut
+
+sub matches_polyA_site {
+  my ($transcript, $threshold) = @_;
+  my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
+  my $ext_slice = $OTTER_SA->fetch_by_region("chromosome", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
+  if (scalar grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures('polyA_site')}){
+    return 1;
+  }
+  return 0;
 }
 
 

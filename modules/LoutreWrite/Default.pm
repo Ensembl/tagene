@@ -17,10 +17,11 @@ use List::MoreUtils qw(uniq);
 use LoutreWrite::CDSUtils qw(assign_cds_to_transcripts has_complete_cds);
 use base 'Exporter';
 
-our @EXPORT = qw( $WRITE );
+our @EXPORT = qw( $WRITE $OTTER_DBA $OTTER_SA );
 our @EXPORT_OK = qw( exon_novelty can_be_merged );
 our $WRITE = 0;
 our $CP_BIOTYPE = "comp_pipe";
+our $OTTER_DBA;
 
 sub new {
   my $package = shift;
