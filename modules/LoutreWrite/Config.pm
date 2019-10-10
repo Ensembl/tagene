@@ -23,7 +23,7 @@ $DBA{'intron'} = $intron_db;
 
 
 
-#Connect to the loutre database
+#Connect to the loutre database (the live/production one, not necessarily the otter database that is being edited)
 sub get_loutre_db_adaptor {
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
      -host   => 'mysql-ens-havana-prod-1',
