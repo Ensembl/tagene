@@ -256,7 +256,7 @@ sub is_retained_intron {
           }
           if ($transcript->seq_region_strand == -1 and 
               $transcript->start_Exon->seq_region_start < $intron->seq_region_start and
-              $transcript->start_Exon->seq_region_end <= $intron->seq_region_end
+              $transcript->start_Exon->seq_region_end <= $intron->seq_region_end and
               ($transcript->start_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
                 return 1;
           }
@@ -917,25 +917,6 @@ sub add_end_NF_attributes {
 }
 
 
-
-=head2 matches_polyA_site
-
- Arg[1]    : Bio::Vega::Transcript object
- Arg[1]    : integer (distance threshold)
- Function  : Returns true if there is a Havana-annotated polyA site within the distance to the transcript 3' end indicated by the second argument
- Returntype: none
-
-=cut
-
-sub matches_polyA_site {
-  my ($transcript, $threshold) = @_;
-  my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
-  my $ext_slice = $OTTER_SA->fetch_by_region("chromosome", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
-  if (scalar grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures('polyA_site')}){
-    return 1;
-  }
-  return 0;
-}
 
 
 1;

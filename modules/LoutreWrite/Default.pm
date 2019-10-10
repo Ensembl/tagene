@@ -18,10 +18,11 @@ use LoutreWrite::CDSUtils qw(assign_cds_to_transcripts has_complete_cds);
 use base 'Exporter';
 
 our @EXPORT = qw( $WRITE $OTTER_DBA $OTTER_SA );
-our @EXPORT_OK = qw( exon_novelty can_be_merged );
+our @EXPORT_OK = qw( exon_novelty intron_novelty can_be_merged merge_transcripts );
 our $WRITE = 0;
 our $CP_BIOTYPE = "comp_pipe";
 our $OTTER_DBA;
+our $OTTER_SA;
 
 sub new {
   my $package = shift;
@@ -753,6 +754,35 @@ print "SUBMODE: $submode\n";
                 my @merge_candidates = ();
                 my %tr_comp;
                 print "\n\nComparing with existing transcripts:\n";
+                
+                #First round: look for micro-intron overlaps (false partial intron retention due to misalignment)
+                foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
+                    #Exclude transcripts not yet stored in the database
+                    next unless $db_tr->stable_id;
+                    #Exclude artifacts
+                    next if $db_tr->biotype eq "artifact";
+                    #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
+                    if (scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')})){
+                      next unless ($db_tr->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$db_tr->get_all_Attributes('remark')}));
+                    }
+                    #Exclude transcripts having a "comp_pipe_rejected" remark
+                    next if scalar(grep {$_->value eq "comp_pipe_rejected"} @{$db_tr->get_all_Attributes('remark')});
+                    #Ignore single-exon transcripts (?)
+                    next if scalar @{$db_tr->get_all_Introns} == 0;  #Do not merge with single-exon transcripts? (In case they are CLS Platinum...)
+                    
+                    #######---------########------#######-------#######  i=0, e=1, m=0 ; e=0
+                    #######-----------------------#######-------#######  i=1, e=1, m=0
+                                ############------#######                i=1, e=1, m=0
+                    #######---------########------########
+                
+                    #Compare coordinates: transcript's start/end vs. db transcript's internal exon
+                    
+                    #Trim transcript start/end if small overhang detected
+                    
+                }
+                #IDEALLY, CREATE A METHOD FOR CHECKING NOVELTY SO THAT IT IS EASIER TO RE-RUN IT IF A TRANSCRIPT IS CLIPPED
+                
+                ###
                 foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
                     #Exclude transcripts not yet stored in the database
                     next unless $db_tr->stable_id;
@@ -768,7 +798,10 @@ print "SUBMODE: $submode\n";
                     next if scalar @{$db_tr->get_all_Introns} == 0;  #Do not merge with single-exon transcripts? (In case they are CLS Platinum...)
                     my $i = intron_novelty($tr, $db_tr);
                     my $e = exon_novelty($tr, $db_tr);
-                    my $m = can_be_merged($tr, $db_tr);  
+                    my $m = can_be_merged($tr, $db_tr);
+                    ###
+                 #   my $c = can_be_clipped($tr, $db_tr, 15);
+                    ###
                     $tr_comp{$db_tr->stable_id} = {'intron' => $i, 'exon' => $e, 'merge' => $m};
                     print "COMP: i=$i, e=$e, m=$m ".$db_tr->stable_id." ".$db_tr->biotype."\n";
                 }
@@ -779,8 +812,8 @@ print "SUBMODE: $submode\n";
                         #Add transcript if intron chain shows novelty w.r.t. all existing transcripts
                         #Discard transcript if an existing transcript has identical intron chain
                         DBTR:foreach my $db_tr_id (keys %tr_comp){
-                            if (($tr_comp{$db_tr_id}->{'intron'} == 1) or 
-                                ($tr_comp{$db_tr_id}->{'intron'} == -1 and $tr_comp{$db_tr_id}->{'exon'} == 1)){
+                            if ($tr_comp{$db_tr_id}->{'intron'} == 1 or
+                               ($tr_comp{$db_tr_id}->{'intron'} == -1 and $tr_comp{$db_tr_id}->{'exon'} == 1)){
                                 $add_transcript = 1;
                             }
                             elsif (($tr_comp{$db_tr_id}->{'intron'} == 0) or 
@@ -816,6 +849,10 @@ print "SUBMODE: $submode\n";
                                     }
                                 }
                                 else{
+                                    #check if start/end extends internal exon of another transcript
+                                    #clip start/end if likely misalignment: 
+                                    #ref: ########-----#######-----####
+                                    #tr:    ######-----########
                                     $add_transcript = 1;
                                 }
                             }
@@ -2280,6 +2317,27 @@ sub get_transcript_biotype {
         }
     }
     return "processed_transcript";
+}
+
+
+
+=head2 matches_polyA_site
+
+ Arg[1]    : Bio::Vega::Transcript object
+ Arg[1]    : integer (distance threshold)
+ Function  : Returns true if there is a Havana-annotated polyA site within the distance to the transcript 3' end indicated by the second argument
+ Returntype: none
+
+=cut
+
+sub matches_polyA_site {
+  my ($transcript, $threshold) = @_;
+  my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
+  my $ext_slice = $OTTER_SA->fetch_by_region("chromosome", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
+  if (scalar grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures('polyA_site')}){
+    return 1;
+  }
+  return 0;
 }
 
 
