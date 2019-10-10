@@ -4,6 +4,7 @@ package LoutreWrite::IntronFilter;
 use strict;
 use warnings;
 use LoutreWrite::Default;
+use LoutreWrite::Config;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::DB::Fasta;
 
@@ -80,7 +81,7 @@ sub get_loutre_db_adaptor {
 #     -dbname => 'loutre_human_tagene_test_6', #this should point to the database being modified - CHANGE THIS!
 #     -driver => 'mysql',
 #   );
-  my $db = $OTTER_DBA;
+  my $db = $DBA{'otter'};
   $db->dbc->disconnect_when_inactive(1);
   return $db;
 }
@@ -130,7 +131,8 @@ my $i_sa = $i_db->get_SliceAdaptor;
 sub is_novel {
   my $intron = shift;
   my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
-  my $intron_slice = $OTTER_SA->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
+  my $sa = $DBA{'otter'}->get_SliceAdaptor();
+  my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
   foreach my $tr (@{$intron_slice->get_all_Transcripts}){
     if ($tr->source eq "havana" and $tr->biotype ne "artifact" and
         scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')}) == 0){
@@ -148,7 +150,8 @@ sub is_novel {
 sub get_ss_seq {
   my $intron = shift;
   my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
-  my $intron_slice = $OTTER_SA->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
+  my $sa = $DBA{'otter'}->get_SliceAdaptor();
+  my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
   my $donor = substr($intron_slice->seq, 0, 2);
   my $acceptor = substr($intron_slice->seq, -2);
   my $ssite = "$donor..$acceptor";
@@ -166,7 +169,8 @@ sub get_ss_antisense_overlap {
   my $padding = 10; #Number of nucleotides each side of the splice site that will define the slices 
   my $donor_as = 0;
   my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
-  my $donor_slice = $OTTER_SA->fetch_by_region("chromosome", $chr, $intron->seq_region_start-$padding, $intron->seq_region_start+$padding-1);
+  my $sa = $DBA{'otter'}->get_SliceAdaptor();
+  my $donor_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start-$padding, $intron->seq_region_start+$padding-1);
   if (scalar(grep {$_->seq_region_strand != $intron->seq_region_strand} @{$donor_slice->get_all_Exons})){
     $donor_as = 1;
     #Check that the same splice site does not exist in annotation
@@ -183,7 +187,7 @@ sub get_ss_antisense_overlap {
     }
   }
   my $acceptor_as = 0;
-  my $acceptor_slice = $OTTER_SA->fetch_by_region("chromosome", $chr, $intron->seq_region_end-$padding+1, $intron->seq_region_end+$padding);
+  my $acceptor_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_end-$padding+1, $intron->seq_region_end+$padding);
   if (scalar(grep {$_->seq_region_strand != $intron->seq_region_strand} @{$acceptor_slice->get_all_Exons})){
     $acceptor_as = 1;
     #Check that the same splice site does not exist in annotation
@@ -518,7 +522,8 @@ sub parse_vulgar {
 sub add_ss_seq {
   my $coord = shift;
   my ($chr, $start, $end, $strand) = split(/:/, $coord);
-  my $intron_slice = $OTTER_SA->fetch_by_region("chromosome", $chr, $start, $end);
+  my $sa = $DBA{'otter'}->get_SliceAdaptor();
+  my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $start, $end);
   my $donor = substr($intron_slice->seq, 0, 2);
   my $acceptor = substr($intron_slice->seq, -2);
   my $ssite = "$donor..$acceptor";

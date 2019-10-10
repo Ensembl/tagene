@@ -15,14 +15,14 @@ use Try::Tiny;
 use List::Util qw[min max];
 use List::MoreUtils qw(uniq);
 use LoutreWrite::CDSUtils qw(assign_cds_to_transcripts has_complete_cds);
+use LoutreWrite::Config;
 use base 'Exporter';
 
-our @EXPORT = qw( $WRITE $OTTER_DBA $OTTER_SA );
+our @EXPORT = qw( $WRITE );
 our @EXPORT_OK = qw( exon_novelty intron_novelty can_be_merged merge_transcripts );
 our $WRITE = 0;
 our $CP_BIOTYPE = "comp_pipe";
-our $OTTER_DBA;
-our $OTTER_SA;
+
 
 sub new {
   my $package = shift;
@@ -2333,7 +2333,8 @@ sub get_transcript_biotype {
 sub matches_polyA_site {
   my ($transcript, $threshold) = @_;
   my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
-  my $ext_slice = $OTTER_SA->fetch_by_region("chromosome", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
+  my $sa = $DBA{'otter'}->get_SliceAdaptor();
+  my $ext_slice = $sa->fetch_by_region("chromosome", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
   if (scalar grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures('polyA_site')}){
     return 1;
   }

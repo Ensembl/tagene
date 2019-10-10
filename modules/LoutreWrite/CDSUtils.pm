@@ -10,6 +10,7 @@ use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptUtils qw(calculate_
 use Bio::EnsEMBL::Registry;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use LoutreWrite::Default;
+use LoutreWrite::Config;
 
 our %HOST_CDS_SET;
 our %HOST_START_CODON_SET;

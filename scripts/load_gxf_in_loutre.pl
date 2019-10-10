@@ -7,6 +7,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use LoutreWrite::Config;
 use LoutreWrite::Default;
 use LoutreWrite::IntronFilter;
 use Bio::Otter::Lace::Defaults;
@@ -96,11 +97,12 @@ die $usage unless ($file and $dataset_name and $author_name);
 #Connect to loutre database
 #DataSet interacts directly with an otter database
 my $dataset = Bio::Otter::Server::Config->SpeciesDat->dataset($dataset_name);
-$OTTER_DBA = $dataset->otter_dba or die "can't get db adaptor\n";
-$OTTER_DBA->dbc->reconnect_when_lost(1);
-$OTTER_SA = $OTTER_DBA->get_SliceAdaptor();
-my $ga = $OTTER_DBA->get_GeneAdaptor();
-my $ta = $OTTER_DBA->get_TranscriptAdaptor();
+my $otter_dba = $dataset->otter_dba or die "can't get db adaptor\n";
+$otter_dba->dbc->reconnect_when_lost(1);
+my $sa = $otter_dba->get_SliceAdaptor();
+my $ga = $otter_dba->get_GeneAdaptor();
+my $ta = $otter_dba->get_TranscriptAdaptor();
+$DBA{'otter'} = $otter_dba;
 
 
 #Read data file
