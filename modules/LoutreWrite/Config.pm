@@ -48,7 +48,7 @@ sub get_pipe_db_adaptor {
     -dbname => 'pipe_human',
     -driver => 'mysql',
   );
-  $db->dbc->disconnect_when_inactive(1);
+  $db->dbc->reconnect_when_lost(1);
   return $db;
 }
 
@@ -78,7 +78,7 @@ sub get_intropolis_db_adaptor {
     -dbname => 'gencode_sf5_human_introns',
     -driver => 'mysql',
   );
-  $db->dbc->disconnect_when_inactive(1);
+  $db->dbc->reconnect_when_lost(1);
   return $db;
 }
 
