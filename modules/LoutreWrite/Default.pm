@@ -2321,7 +2321,7 @@ sub get_transcript_biotype {
 
 
 
-=head2 matches_polyA_site
+=head2 has_polyA_site_support
 
  Arg[1]    : Bio::Vega::Transcript object
  Arg[1]    : integer (distance threshold)
@@ -2330,7 +2330,7 @@ sub get_transcript_biotype {
 
 =cut
 
-sub matches_polyA_site {
+sub has_polyA_site_support {
   my ($transcript, $threshold) = @_;
   my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
   my $sa = $DBA{'otter'}->get_SliceAdaptor();

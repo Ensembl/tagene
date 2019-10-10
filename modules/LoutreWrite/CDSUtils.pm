@@ -123,6 +123,12 @@ sub assign_cds_to_transcripts {
     print "\nFinding a CDS for transcript $t_name\n";
     print "TR_START=".$transcript->seq_region_start."; TR_END=".$transcript->seq_region_end."\n";
     
+    #Find out if the transcript has polyA support - otherwise it can't be made coding
+    unless (has_polyA_site_support($transcript, 500)){ #TO DO: find polyA-seq support
+      print "No polyA site support found\n";
+      next TR;
+    }
+    
     print "\nAvailable CDSs:\n";
     foreach my $unique_cds_tr (@$cds_set){
       print "CDS_START=".$unique_cds_tr->coding_region_start."; CDS_END=".$unique_cds_tr->coding_region_end."\n";
@@ -242,7 +248,7 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_end > $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
                 #Check polyAs
-                unless (matches_polyA_site($transcript, 500)){
+                unless (has_polyA_site_support($transcript, 500)){
                   return 1;
                 }
           }
@@ -251,7 +257,7 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_end <= $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
                 #Check polyAs
-                unless (matches_polyA_site($transcript, 500)){
+                unless (has_polyA_site_support($transcript, 500)){
                   return 1;
                 }
           }
