@@ -2333,7 +2333,7 @@ sub get_transcript_biotype {
 sub has_polyA_site_support {
   my ($transcript, $threshold) = @_;
   my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
-  my $sa = $DBA{'otter'}->get_SliceAdaptor();
+  my $sa = $DBA{'loutre'}->get_SliceAdaptor();
   my $ext_slice = $sa->fetch_by_region("chromosome", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
   if (scalar grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures('polyA_site')}){
     return 1;
@@ -2342,6 +2342,31 @@ sub has_polyA_site_support {
 }
 
 
+
+=head2 has_polyAseq_support
+
+ Arg[1]    : Bio::Vega::Transcript object
+ Arg[1]    : integer (distance threshold)
+ Function  : Returns true if there are polyA-seq features from at lest four different tissues within the distance to the transcript 3' end indicated by the second argument
+ Returntype: none
+
+=cut
+
+sub has_polyAseq_support {
+  my ($transcript, $threshold) = @_;
+  my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
+  my $sa = $DBA{'polyAseq'}->get_SliceAdaptor();
+  my $ext_slice = $sa->fetch_by_region("chromosome", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
+  my @polyAseq_features = grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures()};
+  my %anames;
+  foreach my $feat (@polyAseq_features){
+    $anames{$feat->analysis->logic_name} = 1;
+  }
+  if (scalar keys %anames >= 4){
+    return 1;
+  }
+  return 0;
+}
 
 1;
 

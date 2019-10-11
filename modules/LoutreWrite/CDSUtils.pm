@@ -124,7 +124,7 @@ sub assign_cds_to_transcripts {
     print "TR_START=".$transcript->seq_region_start."; TR_END=".$transcript->seq_region_end."\n";
     
     #Find out if the transcript has polyA support - otherwise it can't be made coding
-    unless (has_polyA_site_support($transcript, 500)){ #TO DO: find polyA-seq support
+    unless (has_polyA_site_support($transcript, 500) or has_polyAseq_support($transcript, 500)){
       print "No polyA site support found\n";
       next TR;
     }
