@@ -248,7 +248,7 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_end > $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
                 #Check polyAs
-                unless (has_polyA_site_support($transcript, 500)){
+                unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500)){
                   return 1;
                 }
           }
@@ -257,7 +257,7 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_end <= $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
                 #Check polyAs
-                unless (has_polyA_site_support($transcript, 500)){
+                unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500)){
                   return 1;
                 }
           }
