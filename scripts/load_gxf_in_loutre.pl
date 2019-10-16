@@ -278,7 +278,12 @@ foreach my $gene_obj (@$gene_objects_2){
                 }
             }
             else{
-                print "\nRESULT: gene ".$new_gene_obj->stable_id." could not be unlocked\n";
+                if ($WRITE){
+                    print "\nRESULT: gene ".$new_gene_obj->stable_id." could not be unlocked\n";
+                }
+                else{
+                    print "\nRESULT: gene ".$new_gene_obj->stable_id." not modified (WRITE = 0)\n";
+                }
             }
         #}
     }
