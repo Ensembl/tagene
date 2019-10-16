@@ -19,7 +19,7 @@ use LoutreWrite::Config;
 use base 'Exporter';
 
 our @EXPORT = qw( $WRITE );
-our @EXPORT_OK = qw( exon_novelty intron_novelty can_be_merged merge_transcripts );
+our @EXPORT_OK = qw( exon_novelty intron_novelty can_be_merged merge_transcripts has_polyA_site_support has_polyAseq_support );
 our $WRITE = 0;
 our $CP_BIOTYPE = "comp_pipe";
 
@@ -2356,7 +2356,8 @@ sub has_polyAseq_support {
   my ($transcript, $threshold) = @_;
   my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
   my $sa = $DBA{'polyAseq'}->get_SliceAdaptor();
-  my $ext_slice = $sa->fetch_by_region("chromosome", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
+  (my $chr = $transcript->slice->seq_region_name) =~ s/^chr(.+)-38$/$1/; #Convert Otter chromosome name to Ensembl one
+  my $ext_slice = $sa->fetch_by_region("chromosome", $chr, $transcript_end - $threshold, $transcript_end + $threshold);
   my @polyAseq_features = grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures()};
   my %anames;
   foreach my $feat (@polyAseq_features){

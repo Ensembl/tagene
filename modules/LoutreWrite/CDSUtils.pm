@@ -9,7 +9,7 @@ use Bio::Vega::Translation;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptUtils qw(calculate_exon_phases);
 use Bio::EnsEMBL::Registry;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use LoutreWrite::Default;
+use LoutreWrite::Default qw( has_polyA_site_support has_polyAseq_support );
 use LoutreWrite::Config;
 
 our %HOST_CDS_SET;
@@ -124,7 +124,7 @@ sub assign_cds_to_transcripts {
     print "TR_START=".$transcript->seq_region_start."; TR_END=".$transcript->seq_region_end."\n";
     
     #Find out if the transcript has polyA support - otherwise it can't be made coding
-    unless (has_polyA_site_support($transcript, 500) or has_polyAseq_support($transcript, 500)){
+    unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or LoutreWrite::Default::has_polyAseq_support($transcript, 500)){
       print "No polyA site support found\n";
       next TR;
     }
