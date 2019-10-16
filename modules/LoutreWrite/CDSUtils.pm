@@ -25,16 +25,16 @@ our %HOST_START_CODON_SET;
 #my $core_gene_adaptor = $registry->get_adaptor( 'Human', 'Core', 'Gene' );
 
 
-my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-    -host   => 'mysql-ens-havana-prod-1',
-    -port   => '4581',
-    -user   => 'ensro',
-    -dbname => 'homo_sapiens_core_98_38_status',
-    -driver => 'mysql'
-  );
-$db->dbc->disconnect_when_inactive(1);
-my $core_slice_adaptor = $db->get_SliceAdaptor();
-my $core_gene_adaptor = $db->get_GeneAdaptor();
+# my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+#     -host   => 'mysql-ens-havana-prod-1',
+#     -port   => '4581',
+#     -user   => 'ensro',
+#     -dbname => 'homo_sapiens_core_98_38_status',
+#     -driver => 'mysql'
+#   );
+# $db->dbc->disconnect_when_inactive(1);
+# my $core_slice_adaptor = $db->get_SliceAdaptor();
+# my $core_gene_adaptor = $db->get_GeneAdaptor();
 
 
 #https://docs.google.com/document/d/17PIripFaSkGkHmZbwR1ZCRYQhyu5ov6dgBVNqVtDjt4/edit?ts=5b6b0748
@@ -631,7 +631,8 @@ sub get_core_transcript {
   my $transcript = shift;
   my $slice_name = $transcript->seq_region_name;
   $slice_name =~ s/chr|-38//g;
-  my $core_slice = $core_slice_adaptor->fetch_by_region("toplevel", $slice_name, $transcript->seq_region_start, $transcript->seq_region_end);
+  my $sa = $DBA{'core'}->get_SliceAdaptor();
+  my $core_slice = $sa->fetch_by_region("toplevel", $slice_name, $transcript->seq_region_start, $transcript->seq_region_end);
   if ($core_slice){
     foreach my $core_transcript (grep {$_->seq_region_strand == $transcript->seq_region_strand} @{$core_slice->get_all_Transcripts}){
       my $core_cds_exon_chain = cds_exon_chain($core_transcript);

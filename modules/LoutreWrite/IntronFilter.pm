@@ -71,60 +71,60 @@ sub exonerate_support {
 
 
 
-#Connect to the loutre database
-sub get_loutre_db_adaptor {
+# #Connect to the loutre database
+# sub get_loutre_db_adaptor {
+# #   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+# #     -host   => 'mysql-ens-havana-prod-1',
+# #     -port   => 4581,
+# #     -user   => 'ensro',
+# #     -pass   => undef,
+# #     -dbname => 'loutre_human_tagene_test_6', #this should point to the database being modified - CHANGE THIS!
+# #     -driver => 'mysql',
+# #   );
+#   my $db = $DBA{'otter'};
+#   $db->dbc->disconnect_when_inactive(1);
+#   return $db;
+# }
+# 
+# # my $l_db = get_loutre_db_adaptor();
+# # my $l_sa = $l_db->get_SliceAdaptor;
+# 
+# 
+# 
+# #Connect to the Otter pipeline database
+# sub get_pipe_db_adaptor { 
 #   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
 #     -host   => 'mysql-ens-havana-prod-1',
 #     -port   => 4581,
 #     -user   => 'ensro',
 #     -pass   => undef,
-#     -dbname => 'loutre_human_tagene_test_6', #this should point to the database being modified - CHANGE THIS!
+#     -dbname => 'pipe_human',
 #     -driver => 'mysql',
 #   );
-  my $db = $DBA{'otter'};
-  $db->dbc->disconnect_when_inactive(1);
-  return $db;
-}
-
-# my $l_db = get_loutre_db_adaptor();
-# my $l_sa = $l_db->get_SliceAdaptor;
-
-
-
-#Connect to the Otter pipeline database
-sub get_pipe_db_adaptor { 
-  my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-    -host   => 'mysql-ens-havana-prod-1',
-    -port   => 4581,
-    -user   => 'ensro',
-    -pass   => undef,
-    -dbname => 'pipe_human',
-    -driver => 'mysql',
-  );
-  $db->dbc->disconnect_when_inactive(1);
-  return $db;
-}
-
-my $p_db = get_pipe_db_adaptor();
-my $p_sa = $p_db->get_SliceAdaptor;
-
-
-#Connect to the Intropolis database
-sub get_intropolis_db_adaptor { 
-  my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-    -host   => 'mysql-ens-havana-prod-1',
-    -port   => 4581,
-    -user   => 'ensro',
-    -pass   => undef,
-    -dbname => 'gencode_sf5_human_introns',
-    -driver => 'mysql',
-  );
-  $db->dbc->disconnect_when_inactive(1);
-  return $db;
-}
-
-my $i_db = get_intropolis_db_adaptor();
-my $i_sa = $i_db->get_SliceAdaptor;
+#   $db->dbc->disconnect_when_inactive(1);
+#   return $db;
+# }
+# 
+# my $p_db = get_pipe_db_adaptor();
+# my $p_sa = $p_db->get_SliceAdaptor;
+# 
+# 
+# #Connect to the Intropolis database
+# sub get_intropolis_db_adaptor { 
+#   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+#     -host   => 'mysql-ens-havana-prod-1',
+#     -port   => 4581,
+#     -user   => 'ensro',
+#     -pass   => undef,
+#     -dbname => 'gencode_sf5_human_introns',
+#     -driver => 'mysql',
+#   );
+#   $db->dbc->disconnect_when_inactive(1);
+#   return $db;
+# }
+# 
+# my $i_db = get_intropolis_db_adaptor();
+# my $i_sa = $i_db->get_SliceAdaptor;
 
 
 
@@ -215,7 +215,8 @@ sub get_ss_antisense_overlap {
 sub get_ss_repeat_overlap {
   my $intron = shift;
   my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
-  my $intron_slice = $p_sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start-2, $intron->seq_region_end+2);
+  my $sa = $DBA{'pipe'}->get_SliceAdaptor();
+  my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start-2, $intron->seq_region_end+2);
   #Project slice to clone level as repeat features are stored in clone coordinates
   my @rfs;
   my @projs = @{$intron_slice->project("contig")};
@@ -253,7 +254,8 @@ sub get_intropolis_score {
   my $intron = shift;
   my $chr = $intron->seq_region_name;
   $chr =~ s/^chr(.+)-38$/$1/;
-  my $intron_slice = $i_sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
+  my $sa = $DBA{'intron'}->get_SliceAdaptor();
+  my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
   foreach my $sf (@{$intron_slice->get_all_SimpleFeatures}){
     if ($sf->seq_region_start==$intron->seq_region_start and $sf->seq_region_end==$intron->seq_region_end and $sf->seq_region_strand==$intron->seq_region_strand){
       return $sf->score;

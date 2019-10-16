@@ -19,7 +19,8 @@ my $core_db = get_core_db_adaptor();
 $DBA{'core'} = $core_db;
 my $intron_db = get_intropolis_db_adaptor();
 $DBA{'intron'} = $intron_db;
-
+my $polyAseq_db = get_polyAseq_db_adaptor();
+$DBA{'polyAseq'} = $polyAseq_db;
 
 
 
@@ -60,10 +61,19 @@ sub get_core_db_adaptor {
      -port   => 4581,
      -user   => 'ensro',
      -pass   => undef,
-     -dbname => 'homo_sapiens_core_98_38',
+     -dbname => 'homo_sapiens_core_98_38_status',
      -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);
+  #DNA db
+  my $dnadb = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+     -host   => 'mysql-ens-havana-prod-1',
+     -port   => 4581,
+     -user   => 'ensro',
+     -pass   => undef,
+     -dbname => 'homo_sapiens_core_98_38',
+  );
+  $db->dnadb($dnadb);
   return $db;
 }
 
@@ -81,6 +91,23 @@ sub get_intropolis_db_adaptor {
   $db->dbc->reconnect_when_lost(1);
   return $db;
 }
+
+
+#Connect to the (Merck) polyA-seq database
+sub get_polyAseq_db_adaptor { 
+  my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+    -host   => 'mysql-ens-havana-prod-1',
+    -port   => 4581,
+    -user   => 'ensro',
+    -pass   => undef,
+    -dbname => 'gencode_polyAseq',
+    -driver => 'mysql',
+  );
+  $db->dbc->reconnect_when_lost(1);
+  return $db;
+}
+
+
 
 
 
