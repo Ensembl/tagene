@@ -776,11 +776,16 @@ print "SUBMODE: $submode\n";
                     #######---------########------########
                 
                     #Compare coordinates: transcript's start/end vs. db transcript's internal exon
-                    
+                    #Search for a terminal exon matching an existing internal exon except for a small overhang at the end
                     #Trim transcript start/end if small overhang detected
+                    $tr = clip_ends($tr, $db_tr, 5, $slice_offset);
+                    
+
+                    #Loop over all transcripts in case a second db transcript support the transcript's start/end (exclude known retained introns?)
                     
                 }
                 #IDEALLY, CREATE A METHOD FOR CHECKING NOVELTY SO THAT IT IS EASIER TO RE-RUN IT IF A TRANSCRIPT IS CLIPPED
+
                 
                 ###
                 foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
@@ -2368,6 +2373,51 @@ sub has_polyAseq_support {
   }
   return 0;
 }
+
+
+####
+sub clip_ends {
+  my ($transcript, $db_tr, $max_overhang, $slice_offset) = @_;
+  $max_overhang ||= 1;
+  foreach my $db_exon (@{$db_tr->get_all_Exons}){
+    #  ref:  #####-----#######-------#######------######
+    #   tr:           ########-------########
+          
+    if ($db_exon != $db_tr->start_Exon and $db_exon != $db_tr->end_Exon){
+      if ($transcript->seq_region_strand == 1 and 
+          $transcript->start_Exon->seq_region_start < $db_exon->seq_region_start and
+          ($transcript->start_Exon->seq_region_start + $max_overhang) >= $db_exon->seq_region_start and
+          $transcript->start_Exon->seq_region_end == $db_exon->seq_region_end){
+            $transcript->start_Exon->start($db_exon->seq_region_start - $slice_offset);
+            print "Clipping transcript start to exon in ".$db_tr->stable_id."\n";
+      }
+      if ($transcript->seq_region_strand == -1 and 
+          $transcript->end_Exon->seq_region_start < $db_exon->seq_region_start and
+          ($transcript->end_Exon->seq_region_start + $max_overhang) >= $db_exon->seq_region_start and
+          $transcript->end_Exon->seq_region_end == $db_exon->seq_region_end){
+            $transcript->end_Exon->start($db_exon->seq_region_start - $slice_offset);
+            print "Clipping transcript end to exon in ".$db_tr->stable_id."\n";
+      }
+      if ($transcript->seq_region_strand == 1 and 
+          $transcript->end_Exon->seq_region_end > $db_exon->seq_region_end and
+          ($transcript->end_Exon->seq_region_end - $max_overhang) <= $db_exon->seq_region_end and
+          $transcript->end_Exon->seq_region_start == $db_exon->seq_region_start){
+            $transcript->end_Exon->end($db_exon->seq_region_end - $slice_offset);
+            print "Clipping transcript end to exon in ".$db_tr->stable_id."\n";
+      }
+      if ($transcript->seq_region_strand == -1 and 
+          $transcript->start_Exon->seq_region_end > $db_exon->seq_region_end and
+          ($transcript->start_Exon->seq_region_end - $max_overhang) <= $db_exon->seq_region_end and
+          $transcript->start_Exon->seq_region_start == $db_exon->seq_region_start){
+            $transcript->start_Exon->end($db_exon->seq_region_end - $slice_offset);
+            print "Clipping transcript start to exon in ".$db_tr->stable_id."\n";
+      }
+    }
+  }
+  return $transcript;
+}
+
+
 
 1;
 
