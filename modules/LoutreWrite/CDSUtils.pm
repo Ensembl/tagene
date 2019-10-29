@@ -14,6 +14,7 @@ use LoutreWrite::Config;
 
 our %HOST_CDS_SET;
 our %HOST_START_CODON_SET;
+our %CORE_TRANSCRIPTS;
 
 #my $registry = 'Bio::EnsEMBL::Registry';
 #$registry->load_registry_from_db(
@@ -628,17 +629,23 @@ sub intron_chain {
 =cut
 
 sub get_core_transcript {
-  my $transcript = shift;
-  my $slice_name = $transcript->seq_region_name;
-  $slice_name =~ s/chr|-38//g;
-  my $sa = $DBA{'core'}->get_SliceAdaptor();
-  my $core_slice = $sa->fetch_by_region("toplevel", $slice_name, $transcript->seq_region_start, $transcript->seq_region_end);
-  if ($core_slice){
-    foreach my $core_transcript (grep {$_->seq_region_strand == $transcript->seq_region_strand} @{$core_slice->get_all_Transcripts}){
-      my $core_cds_exon_chain = cds_exon_chain($core_transcript);
-      my $tr_cds_exon_chain = cds_exon_chain($transcript);
-      if ($core_cds_exon_chain and $tr_cds_exon_chain and $core_cds_exon_chain eq $tr_cds_exon_chain){
-        return $core_transcript;
+  my $transcript = shift; 
+  if ($CORE_TRANSCRIPTS{$transcript->stable_id}){
+    return $CORE_TRANSCRIPTS{$transcript->stable_id};
+  }
+  else{
+    my $slice_name = $transcript->seq_region_name; print "Finding a core transcript for ".$transcript->stable_id."\n";
+    $slice_name =~ s/chr|-38//g;
+    my $sa = $DBA{'core'}->get_SliceAdaptor();
+    my $core_slice = $sa->fetch_by_region("toplevel", $slice_name, $transcript->seq_region_start, $transcript->seq_region_end);
+    if ($core_slice){
+      foreach my $core_transcript (grep {$_->seq_region_strand == $transcript->seq_region_strand} @{$core_slice->get_all_Transcripts}){
+        my $core_cds_exon_chain = cds_exon_chain($core_transcript);
+        my $tr_cds_exon_chain = cds_exon_chain($transcript);
+        if ($core_cds_exon_chain and $tr_cds_exon_chain and $core_cds_exon_chain eq $tr_cds_exon_chain){
+          $CORE_TRANSCRIPTS{$transcript->stable_id} = $core_transcript;
+          return $core_transcript;
+        }
       }
     }
   }
