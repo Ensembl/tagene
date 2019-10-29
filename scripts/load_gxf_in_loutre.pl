@@ -92,7 +92,7 @@ _USAGE_
 
 die $usage unless ($file and $dataset_name and $author_name);
 
-
+my $time0 = time();
 
 #Connect to loutre database
 #DataSet interacts directly with an otter database
@@ -207,15 +207,17 @@ foreach my $gene_obj (@$gene_objects_2){
                 my $pass;
                 if ($PASSED_INTRONS{$intron->seq_region_start."-".$intron->seq_region_end}){
                   $pass = 1;
-                  #print "Using PASSED_INTRONS\n";
+print "Using PASSED_INTRONS for intron at ".$intron->seq_region_start."-".$intron->seq_region_end."\n";
                 }
                 else {
                   $pass = LoutreWrite::IntronFilter->predict_outcome($intron, $transcript, 1);
                   $PASSED_INTRONS{$intron->seq_region_start."-".$intron->seq_region_end} = $pass;
+print "Predicting outcome for intron at ".$intron->seq_region_start."-".$intron->seq_region_end."\n";
                 }
                 #Give another chance to HiSeq-supported introns
                 if (($file =~ /_HiSeq/ or $remark =~ /_HiSeq/) and $pass == 0){
                   $pass = LoutreWrite::IntronFilter->exonerate_support($intron, $transcript);
+print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$intron->seq_region_end."\n";
                 }
                 print "PASS: ".($pass ? "YES" : "NO")."\n";
                 if (!$pass){
@@ -289,6 +291,19 @@ foreach my $gene_obj (@$gene_objects_2){
     }
 }
 
+
+print "\nDONE - Elapsed time: ".format_time(time()-$time0)."\n\n";
+
+
+
+sub format_time {
+  my $time = shift; #Time in seconds
+  my $string = "";
+  $string .= int($time/3600)."h ";
+  $time = $time % 3600;
+  $string .= int($time/60)."m ".($time % 60)."s";
+  return $string;
+}
 
 
 
