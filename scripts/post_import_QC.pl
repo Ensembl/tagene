@@ -34,6 +34,7 @@ $only_chr ||= $ENV{LSB_JOBINDEX};
 if ($only_chr){
   $only_chr = "X" if $only_chr eq "23";
   $only_chr = "Y" if $only_chr eq "24";
+  $outfile = "$outfile.$only_chr";
 }
 
 #Connect to loutre database
