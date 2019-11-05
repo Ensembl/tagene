@@ -130,7 +130,7 @@ sub exonerate_support {
 
 sub is_novel {
   my $intron = shift;
-  my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
+  my $chr = $intron->seq_region_name;
   my $sa = $DBA{'otter'}->get_SliceAdaptor();
   my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
   foreach my $tr (@{$intron_slice->get_all_Transcripts}){
