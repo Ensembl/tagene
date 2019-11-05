@@ -123,59 +123,79 @@ sub assign_cds_to_transcripts {
     my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
     print "\nFinding a CDS for transcript $t_name\n";
     print "TR_START=".$transcript->seq_region_start."; TR_END=".$transcript->seq_region_end."\n";
-    
-    #Find out if the transcript has polyA support - otherwise it can't be made coding
-    unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or LoutreWrite::Default::has_polyAseq_support($transcript, 500)){
-      print "No polyA site support found\n";
-      next TR;
-    }
-    
+###
+    #Find out if the transcript has polyA support - otherwise it can't be made coding (unless CDS end not found)
+    if (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or LoutreWrite::Default::has_polyAseq_support($transcript, 500)){
+#       print "No polyA site support found\n";
+#       print "\nChecking for intron retention...\n";
+#       if (is_retained_intron ($transcript, $host_gene, 5)){
+#         $transcript->biotype("retained_intron");
+#         print "Found retained_intron\n";
+#       }
+#       next TR;
+#     }
+###
     print "\nAvailable CDSs:\n";
     foreach my $unique_cds_tr (@$cds_set){
       print "CDS_START=".$unique_cds_tr->coding_region_start."; CDS_END=".$unique_cds_tr->coding_region_end."\n";
     }
-    #Try to find a suitable CDS from the host gene
+    #Try to find a suitable full-length CDS from the host gene
     foreach my $unique_cds_tr (@$cds_set){
       if (cds_fits($transcript, $unique_cds_tr, $slice_offset)){
         print "CDS FITS: CDS_START=".$unique_cds_tr->coding_region_start."; CDS_END=".$unique_cds_tr->coding_region_end."\n";
+        #Get CDS start and end coordinates (corrected by the slice offset)
         my ($cds_start, $cds_end) = $transcript->seq_region_strand == 1 ? ($unique_cds_tr->coding_region_start, $unique_cds_tr->coding_region_end) : ($unique_cds_tr->coding_region_end, $unique_cds_tr->coding_region_start);
         $cds_start = $cds_start + $slice_offset;
         $cds_end = $cds_end + $slice_offset;
-        create_cds($transcript, $cds_start, $cds_end);
-        #Re-assign biotype and status
-        if (predicted_nmd_transcript($transcript, $cds_end)){
-          $transcript->biotype("nonsense_mediated_decay");
-        }
-        else{
-          if ($unique_cds_tr->biotype eq "nonsense_mediated_decay"){
-            $transcript->biotype("protein_coding");
-            $transcript->status("PUTATIVE");
-          }
-          else{
-            $transcript->biotype($unique_cds_tr->biotype);
-            $transcript->status($unique_cds_tr->status);
-          }
-        }
         print $unique_cds_tr->stable_id." CDS matches ".$transcript->stable_id." (".$transcript->biotype."-".$transcript->status.")\n";
+        #Check for polyA support - only create CDS if polyA support
+        #if (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or 
+         #   LoutreWrite::Default::has_polyAseq_support($transcript, 500)){
+          if (create_cds($transcript, $cds_start, $cds_end)){
+            #Re-assign biotype and status
+            if (predicted_nmd_transcript($transcript, $cds_end)){
+              $transcript->biotype("nonsense_mediated_decay");
+            }
+            else{ #Status assignment should meet HAVANA guidelines (TO DO)
+              #If CDS copied from NMD but this transcript is not NMD, call it putative_CDS
+              if ($unique_cds_tr->biotype eq "nonsense_mediated_decay"){
+                $transcript->biotype("protein_coding");
+                $transcript->status("PUTATIVE");
+              }
+              else{ #Copy status from the transcript providing the CDS
+                $transcript->biotype($unique_cds_tr->biotype);
+                $transcript->status($unique_cds_tr->status);
+              }
+            }
+          }
+        #}
+        #If suitable full-length CDS but no polyA support, leave it as non-coding transcript
+        #else{
+        #  print "No polyA site support found - not made coding\n";
+        #}
         next TR;
       }
     }
+    
+    
     #Else, try to create a CDS using a start codon from the host gene    
     #But first, check for intron retention
-    print "\nChecking for intron retention...\n";
-    if (is_retained_intron ($transcript, $host_gene, 5)){
-      $transcript->biotype("retained_intron");
-      print "Found retained_intron\n";
-      next TR;
-    }
+#     print "\nChecking for intron retention...\n";
+#     if (is_retained_intron ($transcript, $host_gene, 5)){
+#       $transcript->biotype("retained_intron"); #Made retained_intron for now
+#       print "Found retained_intron\n";
+#       #next TR; #DON'T STOP HERE - IT COULD BE A LAST CODING INTRON OR NMD!
+#     }
     print "\nChecking start codons...\n";
     foreach my $unique_start_codon (@$start_codon_set){
       #Start codon coordinates are relative to the region slice: convert to genomic
       print "start_codon=".($unique_start_codon+$slice_offset)."; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
+      #Get putative CDS start and end coordinates 
       my ($cds_start, $cds_end) = start_codon_fits($transcript, $unique_start_codon + $slice_offset); 
       if ($cds_start and $cds_end){
+        print "".($unique_start_codon + $slice_offset)." start codon matches ".$transcript->stable_id." (".$transcript->biotype."-".$transcript->status.")\n";
         if (create_cds($transcript, $cds_start, $cds_end)){
-          #Re-assign biotype and status
+          #Re-assign biotype and status - may be changed later, after polyA support check
           if (predicted_nmd_transcript($transcript, $cds_end)){
             $transcript->biotype("nonsense_mediated_decay");
           }
@@ -183,13 +203,71 @@ sub assign_cds_to_transcripts {
             $transcript->biotype("protein_coding");
             $transcript->status("PUTATIVE");
           }
+          #Check for 3' end incompleteness and add the corresponding attributes
           add_end_NF_attributes($transcript, $slice_offset);
-          print "".($unique_start_codon + $slice_offset)." start codon matches ".$transcript->stable_id." (".$transcript->biotype."-".$transcript->status.")\n";
-          next TR;
+          
+          #If retained_intron, make it non-coding unless last coding exon (and polyA support, but this will be checked later)
+          if (is_retained_intron($transcript, $host_gene, 5)){
+            #Look for exceptions:
+            #  NMD upstream of intron retention
+            #  Retained intron is last exon and has novel stop codon
+            #  Retained intron is UTR intron and does not affect CDS
+            #Check if last exon has CDS 
+            if (has_last_coding_exon($transcript, $slice_offset)){
+              #if (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or 
+              #    LoutreWrite::Default::has_polyAseq_support($transcript, 500)){
+                $transcript->biotype("protein_coding");
+                $transcript->status("PUTATIVE");
+              #}
+            }
+            elsif ($transcript->biotype eq "nonsense_mediated_decay"){
+              #if NMD stop codon is upstream of retained intron, leave it as NMD, otherwise make it retained_intron
+              my $retint_exon_rank = get_retained_intron_rank($transcript, $host_gene, 5);
+              unless ($transcript->translation and $transcript->translation->end_Exon < $retint_exon_rank){
+                $transcript->biotype("retained_intron");
+              }
+            }
+            else{
+              $transcript->biotype("retained_intron");
+              $transcript->status("UNKNOWN");
+            }
+          }
+          
+          #Check for polyA support - make it non-coding if there is no support unless 3' end incomplete
+          unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or 
+            LoutreWrite::Default::has_polyAseq_support($transcript, 500)){
+            #3' end incomplete coding transcripts do not require polyA support (CONFIRM)
+            unless (scalar grep {$_->value == 1} @{$transcript->get_all_Attributes('cds_end_NF')}){
+              $transcript->translation();
+              if (is_retained_intron ($transcript, $host_gene, 5)){
+                $transcript->biotype("retained_intron");
+                $transcript->status("UNKNOWN");
+              }
+              else{
+                $transcript->biotype("processed_transcript");
+                $transcript->status("UNKNOWN");
+              }
+              print "No polyA site support found - not made coding\n";
+            }
+          }
         }
+        next TR;
       }
     }
-    print "No match for transcript ".$transcript->stable_id."\t".$transcript->biotype."\n";
+    
+    }
+    else{
+      print "No polyA site support found\n";
+      #CHECK HERE FOR CDS_END_NOT_FOUND?
+      
+      print "\nChecking for intron retention...\n";
+      if (is_retained_intron ($transcript, $host_gene, 5)){
+        $transcript->biotype("retained_intron");
+        print "Found retained_intron\n";
+      }
+      next TR;
+    }
+    print "No CDS match for transcript ".$transcript->stable_id."\t".$transcript->biotype."\n";
   }
 }
 
@@ -248,7 +326,7 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_start >= $intron->seq_region_start and
               $transcript->end_Exon->seq_region_end > $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
-                #Check polyAs
+                #Check polyAs - if there is polyA support, annotate as coding
                 unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500)){
                   return 1;
                 }
@@ -257,7 +335,7 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_start < $intron->seq_region_start and
               $transcript->end_Exon->seq_region_end <= $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
-                #Check polyAs
+                #Check polyAs - if there is polyA support, annotate as coding
                 unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500)){
                   return 1;
                 }
@@ -880,6 +958,8 @@ print "create_cds => CDS_START: $cds_start ; CDS_END: $cds_end\n";
       $end_exon = $exon;
     }
   }
+  return 0 unless $start_exon and $end_exon;
+
   #Find positions within exons
   if ($transcript->seq_region_strand == 1){
     $seq_start = $cds_start - $start_exon->seq_region_start + 1;
@@ -910,6 +990,7 @@ print "create_cds => CDS_START: $cds_start ; CDS_END: $cds_end\n";
 =head2 add_end_NF_attributes
 
  Arg[1]    : Bio::Vega::Transcript object
+ Arg[2]    : Integer - slice offset that has to be added to the (local) translation coordinates to get the genomic coordinates
  Function  : Add 'cds_end_NF' and 'mRNA_end_NF' attributes if appropriate
  Returntype: none
 
@@ -931,6 +1012,95 @@ sub add_end_NF_attributes {
   }
 }
 
+
+
+=head2 has_last_coding_exon
+
+ Arg[1]    : Bio::Vega::Transcript object
+ Function  : returns true if the last exon contains part of the CDS
+ Returntype: boolean
+
+=cut
+
+sub has_last_coding_exon {
+  my ($transcript) = @_;
+  if ($transcript->translation){
+    if ($transcript->end_Exon == $transcript->translation->end_Exon){
+      return 1;
+    }
+  }
+  return 0;
+}
+
+
+
+=head2 get_retained_intron_rank
+
+ Arg[1]    : Bio::Vega::Transcript object
+ Arg[2]    : Bio::Vega::Gene object
+ Arg[3]    : integer (minimum overhang in partial intron retention)
+ Function  : returns rank of exon corresponding to intron retention (or 0 if no intron retention)
+ Returntype: integer
+
+=cut
+
+sub get_retained_intron_rank {
+  my ($transcript, $host_gene, $min_overhang) = @_;
+  #i) Full intron retention: the model fully transcribes the sequence between the splice donor site and acceptor site of adjacent coding exons (i.e. a ‘CDS intron’) of a model in loutre. This could include scenarios where the TAGENE model retains multiple CDS introns of the same loutre model. 
+  #ii) Partial intron retention: the model has a start or end coordinate within a CDS intron of a loutre model, but not (respectively) a splice donor site or splice acceptor site within that same intron. Do we need some kind of size cut-off here? I.e. for fuzzy edges that are misalignments rather than real retained introns. Should we clip these? 
+  my $slice_offset = $host_gene->seq_region_start - 1; #print "OFFSET=$slice_offset\n";
+  $min_overhang ||= 1;
+  foreach my $tr (@{$host_gene->get_all_Transcripts}){
+    if ($tr->translate){
+      my $cds_start = $tr->coding_region_start + $slice_offset;
+      my $cds_end = $tr->coding_region_end + $slice_offset;
+      if ($cds_start > $cds_end){
+        ($cds_start, $cds_end) = ($cds_end, $cds_start);
+      }
+      foreach my $intron (@{$tr->get_all_Introns}){
+        #Is CDS intron?
+        if ($intron->seq_region_start > $cds_start and $intron->seq_region_end < $cds_end){
+          #Full intron retention
+          #  ref: #######-------#######------######
+          #   tr:       #########
+          foreach my $exon (@{$transcript->get_all_Exons}){
+            if ($exon->seq_region_start < $intron->seq_region_start and $exon->seq_region_end > $intron->seq_region_end){
+              return $exon->rank($transcript);
+            }
+          }
+          #Partial intron retention
+          #  ref: #######-------#######------######
+          #   tr:          #######---####
+          if ($transcript->seq_region_strand == 1 and 
+              $transcript->start_Exon->seq_region_start >= $intron->seq_region_start and
+              $transcript->start_Exon->seq_region_end > $intron->seq_region_end and
+              ($transcript->start_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
+                return 1;
+          }
+          if ($transcript->seq_region_strand == -1 and 
+              $transcript->end_Exon->seq_region_start >= $intron->seq_region_start and
+              $transcript->end_Exon->seq_region_end > $intron->seq_region_end and
+              ($transcript->end_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
+                return $transcript->end_Exon->rank($transcript);
+          }
+          if ($transcript->seq_region_strand == 1 and 
+              $transcript->end_Exon->seq_region_start < $intron->seq_region_start and
+              $transcript->end_Exon->seq_region_end <= $intron->seq_region_end and
+              ($transcript->end_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
+                return $transcript->end_Exon->rank($transcript);
+          }
+          if ($transcript->seq_region_strand == -1 and 
+              $transcript->start_Exon->seq_region_start < $intron->seq_region_start and
+              $transcript->start_Exon->seq_region_end <= $intron->seq_region_end and
+              ($transcript->start_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
+                return 1;
+          }
+        }
+      }
+    }
+  }
+  return 0;
+}
 
 
 
