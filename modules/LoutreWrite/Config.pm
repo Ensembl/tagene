@@ -31,7 +31,7 @@ sub get_loutre_db_adaptor {
      -port   => 4581,
      -user   => 'ensro',
      -pass   => undef,
-     -dbname => 'loutre_human',
+     -dbname => 'nomerge_ensembl_loutre_homo_sapiens_38',
      -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);
@@ -46,7 +46,7 @@ sub get_pipe_db_adaptor {
     -port   => 4581,
     -user   => 'ensro',
     -pass   => undef,
-    -dbname => 'pipe_human',
+    -dbname => 'nomerge_ensembl_loutre_pipe_homo_sapiens_38',
     -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);
