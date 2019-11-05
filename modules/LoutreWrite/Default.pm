@@ -264,7 +264,7 @@ sub make_vega_objects {
                 $chr =~ s/^chr//;
                 next GENE if ($only_chr and $chr ne $only_chr);
                 if (!($slices{$chr})){
-                    my $slice = $sa->fetch_by_region("chromosome", "chr$chr-38");
+                    my $slice = $sa->fetch_by_region("chromosome", $chr);
                     $slices{$chr} = $slice;
                 }
                 $exon->slice($slices{$chr});
