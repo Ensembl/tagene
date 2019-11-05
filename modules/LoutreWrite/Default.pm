@@ -404,6 +404,10 @@ sub make_vega_objects {
 sub process_gene {
     my ($self, $gene, $mode, $dataset_name, $dba, $no_intron_check) = @_;
 
+    #Get default coordinate system
+    my $csa = $dba->get_CoordSystemAdaptor;
+    my $csver = $csa->fetch_top_level->version;
+
     #If in "update" mode, the region has to span the whole host gene to stop this from being "spliced out" as an incomplete gene. 
     #This would prevent the new annotation from being added to the host gene.
     my ($padded_start, $padded_end);
@@ -421,7 +425,7 @@ sub process_gene {
         start   => $padded_start || $gene->start,   
         end     => $padded_end || $gene->end,
         cs      => "chromosome",
-        csver   => "Otter"
+        csver   => $csver
     );
 
     my $region_action = Bio::Otter::ServerAction::Script::Region->new_with_slice($local_server);
@@ -686,6 +690,11 @@ sub process_gene_2 {
     my ($self, $gene, $mode, $submode, $dataset_name, $dba, $no_intron_check) = @_;
     my @log;
 print "SUBMODE: $submode\n";
+
+    #Get default coordinate system
+    my $csa = $dba->get_CoordSystemAdaptor;
+    my $csver = $csa->fetch_top_level->version;
+
     #If in "update" mode, the region has to span the whole host gene to stop this from being "spliced out" as an incomplete gene. 
     #That would prevent the new annotation from being added to the host gene.
     my ($padded_start, $padded_end);
@@ -703,7 +712,7 @@ print "SUBMODE: $submode\n";
         start   => $padded_start || $gene->start,   
         end     => $padded_end || $gene->end,
         cs      => "chromosome",
-        csver   => "Otter"
+        csver   => $csver
     );
 
     my $region_action = Bio::Otter::ServerAction::Script::Region->new_with_slice($local_server);
