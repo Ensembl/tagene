@@ -22,6 +22,8 @@ our @EXPORT = qw( $WRITE );
 our @EXPORT_OK = qw( exon_novelty intron_novelty can_be_merged merge_transcripts has_polyA_site_support has_polyAseq_support );
 our $WRITE = 0;
 our $CP_BIOTYPE = "comp_pipe";
+our $MAX_DIST_TO_POLYA_SITE = 500;
+our $MAX_CLIPPABLE_OVERHANG = 15;
 
 
 sub new {
@@ -778,7 +780,7 @@ print "SUBMODE: $submode\n";
                     #Compare coordinates: transcript's start/end vs. db transcript's internal exon
                     #Search for a terminal exon matching an existing internal exon except for a small overhang at the end
                     #Trim transcript start/end if small overhang detected
-                    $tr = clip_ends($tr, $db_tr, 5, $slice_offset);
+                    $tr = clip_ends($tr, $db_tr, $MAX_CLIPPABLE_OVERHANG, $slice_offset);
                     
 
                     #Loop over all transcripts in case a second db transcript support the transcript's start/end (exclude known retained introns?)
@@ -2329,7 +2331,7 @@ sub get_transcript_biotype {
 =head2 has_polyA_site_support
 
  Arg[1]    : Bio::Vega::Transcript object
- Arg[1]    : integer (distance threshold)
+ Arg[2]    : integer (distance threshold)
  Function  : Returns true if there is a Havana-annotated polyA site within the distance to the transcript 3' end indicated by the second argument
  Returntype: none
 
@@ -2337,6 +2339,7 @@ sub get_transcript_biotype {
 
 sub has_polyA_site_support {
   my ($transcript, $threshold) = @_;
+  $threshold ||= $MAX_DIST_TO_POLYA_SITE;
   my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
   my $sa = $DBA{'loutre'}->get_SliceAdaptor();
   my $ext_slice = $sa->fetch_by_region("chromosome", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
@@ -2351,7 +2354,7 @@ sub has_polyA_site_support {
 =head2 has_polyAseq_support
 
  Arg[1]    : Bio::Vega::Transcript object
- Arg[1]    : integer (distance threshold)
+ Arg[2]    : integer (distance threshold)
  Function  : Returns true if there are polyA-seq features from at lest four different tissues within the distance to the transcript 3' end indicated by the second argument
  Returntype: none
 
@@ -2359,6 +2362,7 @@ sub has_polyA_site_support {
 
 sub has_polyAseq_support {
   my ($transcript, $threshold) = @_;
+  $threshold ||= $MAX_DIST_TO_POLYA_SITE;
   my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
   my $sa = $DBA{'polyAseq'}->get_SliceAdaptor();
   (my $chr = $transcript->slice->seq_region_name) =~ s/^chr(.+)-38$/$1/; #Convert Otter chromosome name to Ensembl one
@@ -2375,7 +2379,19 @@ sub has_polyAseq_support {
 }
 
 
-####
+
+=head2 clip_ends
+
+ Arg[1]    : Bio::Vega::Transcript object
+ Arg[2]    : Bio::Vega::Transcript object
+ Arg[3]    : integer (exon overhang threshold)
+ Arg[4]    : integer (offset from start of Otter region)
+ Function  : Clips terminal exons of the first transcript to match internal exons of the second transcript,
+             provided that the exon overhang doesn't exceed the threshold
+ Returntype: none
+
+=cut
+
 sub clip_ends {
   my ($transcript, $db_tr, $max_overhang, $slice_offset) = @_;
   $max_overhang ||= 1;

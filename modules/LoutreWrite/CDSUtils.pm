@@ -15,6 +15,7 @@ use LoutreWrite::Config;
 our %HOST_CDS_SET;
 our %HOST_START_CODON_SET;
 our %CORE_TRANSCRIPTS;
+our $MIN_RETAINED_INTRON_OVERHANG = 15;
 
 #my $registry = 'Bio::EnsEMBL::Registry';
 #$registry->load_registry_from_db(
@@ -125,7 +126,7 @@ sub assign_cds_to_transcripts {
     print "TR_START=".$transcript->seq_region_start."; TR_END=".$transcript->seq_region_end."\n";
 ###
     #Find out if the transcript has polyA support - otherwise it can't be made coding (unless CDS end not found)
-    if (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or LoutreWrite::Default::has_polyAseq_support($transcript, 500)){
+    if (LoutreWrite::Default::has_polyA_site_support($transcript) or LoutreWrite::Default::has_polyAseq_support($transcript)){
 #       print "No polyA site support found\n";
 #       print "\nChecking for intron retention...\n";
 #       if (is_retained_intron ($transcript, $host_gene, 5)){
@@ -207,7 +208,7 @@ sub assign_cds_to_transcripts {
           add_end_NF_attributes($transcript, $slice_offset);
           
           #If retained_intron, make it non-coding unless last coding exon (and polyA support, but this will be checked later)
-          if (is_retained_intron($transcript, $host_gene, 5)){
+          if (is_retained_intron($transcript, $host_gene)){
             #Look for exceptions:
             #  NMD upstream of intron retention
             #  Retained intron is last exon and has novel stop codon
@@ -234,12 +235,12 @@ sub assign_cds_to_transcripts {
           }
           
           #Check for polyA support - make it non-coding if there is no support unless 3' end incomplete
-          unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or 
-            LoutreWrite::Default::has_polyAseq_support($transcript, 500)){
+          unless (LoutreWrite::Default::has_polyA_site_support($transcript) or 
+            LoutreWrite::Default::has_polyAseq_support($transcript)){
             #3' end incomplete coding transcripts do not require polyA support (CONFIRM)
             unless (scalar grep {$_->value == 1} @{$transcript->get_all_Attributes('cds_end_NF')}){
               $transcript->translation();
-              if (is_retained_intron ($transcript, $host_gene, 5)){
+              if (is_retained_intron($transcript, $host_gene)){
                 $transcript->biotype("retained_intron");
                 $transcript->status("UNKNOWN");
               }
@@ -261,7 +262,7 @@ sub assign_cds_to_transcripts {
       #CHECK HERE FOR CDS_END_NOT_FOUND?
       
       print "\nChecking for intron retention...\n";
-      if (is_retained_intron ($transcript, $host_gene, 5)){
+      if (is_retained_intron($transcript, $host_gene)){
         $transcript->biotype("retained_intron");
         print "Found retained_intron\n";
       }
@@ -285,10 +286,11 @@ sub assign_cds_to_transcripts {
 
 sub is_retained_intron {
   my ($transcript, $host_gene, $min_overhang) = @_;
+  $min_overhang ||= $MIN_RETAINED_INTRON_OVERHANG;
   #i) Full intron retention: the model fully transcribes the sequence between the splice donor site and acceptor site of adjacent coding exons (i.e. a ‘CDS intron’) of a model in loutre. This could include scenarios where the TAGENE model retains multiple CDS introns of the same loutre model. 
   #ii) Partial intron retention: the model has a start or end coordinate within a CDS intron of a loutre model, but not (respectively) a splice donor site or splice acceptor site within that same intron. Do we need some kind of size cut-off here? I.e. for fuzzy edges that are misalignments rather than real retained introns. Should we clip these? 
   my $slice_offset = $host_gene->seq_region_start - 1; #print "OFFSET=$slice_offset\n";
-  $min_overhang ||= 1;
+ #$min_overhang ||= 1;
   foreach my $tr (@{$host_gene->get_all_Transcripts}){
     if ($tr->translate){
       #print "TR:  ".$tr->stable_id." ".$tr->biotype."\n"; 
@@ -327,7 +329,7 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_end > $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
                 #Check polyAs - if there is polyA support, annotate as coding
-                unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500)){
+                unless (LoutreWrite::Default::has_polyA_site_support($transcript)){
                   return 1;
                 }
           }
@@ -336,7 +338,7 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_end <= $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
                 #Check polyAs - if there is polyA support, annotate as coding
-                unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500)){
+                unless (LoutreWrite::Default::has_polyA_site_support($transcript)){
                   return 1;
                 }
           }
