@@ -163,7 +163,7 @@ foreach my $gene_obj (@$gene_objects_2){
         print "HOST: ".($new_gene_obj->stable_id || "NONE")."\n";
 
         #Find biotype of host gene
-        if ($new_gene_obj->stable_id =~ /^OTT/){
+        if ($new_gene_obj->stable_id =~ /^ENS/){
             my $wrong_host;
             my $host_gene = $ga->fetch_by_stable_id($new_gene_obj->stable_id);
             if ($host_biotype and !($allowed_biotypes{$host_gene->biotype})){
@@ -252,7 +252,7 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
             #else{
             #    $mode = "add";
             #}
-            if ($new_gene_obj->stable_id =~ /^OTT/){
+            if ($new_gene_obj->stable_id =~ /^ENS/){
                 $mode = "update";
             }
             else{
