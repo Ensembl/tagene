@@ -992,19 +992,27 @@ print "SUBMODE: $submode\n";
                                         $ts->add_Attributes($att);
                                     }
                                 }
+
+                                #COVID-19 GENES
+                                #Force comp_pipe biotype and "not for VEGA" remark
+                                $ts->biotype = "comp_pipe";
+                                unless (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
+                                    $ts->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'remark', -value => 'not for VEGA' );
+                                }
+                                                           
                                 #If 'comp_pipe' transcript, change biotype and remove 'not for VEGA' attribute
                                 #unless 'comp_pipe_rejected' remark
-                                if ($ts->biotype eq "comp_pipe" and scalar(grep {$_->value eq "comp_pipe_rejected"} @{$ts->get_all_Attributes('remark')}) == 0){
-                                    my $t_biotype = get_transcript_biotype($db_gene);
-                                    $ts->biotype($t_biotype);
-                                    if (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
-                                       my $array = $ts->{'attributes'};
-                                       @$array = grep { $_->value ne "not for VEGA" } @$array;
-                                    }
-                                }
+#                                if ($ts->biotype eq "comp_pipe" and scalar(grep {$_->value eq "comp_pipe_rejected"} @{$ts->get_all_Attributes('remark')}) == 0){
+#                                    my $t_biotype = get_transcript_biotype($db_gene);
+#                                    $ts->biotype($t_biotype);
+#                                    if (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
+#                                       my $array = $ts->{'attributes'};
+#                                       @$array = grep { $_->value ne "not for VEGA" } @$array;
+#                                    }
+#                               }
 
                                 #If coding gene, try to assign a CDS and change the biotype accordingly
-                                assign_cds_to_transcripts($ts, $g, $slice_offset);
+#                                assign_cds_to_transcripts($ts, $g, $slice_offset);
                                 
                                 #Change authorship
                                 $ts->transcript_author($merged_transcript->transcript_author);
@@ -1039,15 +1047,22 @@ print "SUBMODE: $submode\n";
                     #    $exon->end(  $exon->end   - $slice_offset);
                     #    $exon->slice($region->slice);
                     #}
-                    #unless $use_comp_pipe_biotype, assign transcript biotype based on other transcripts
-                    my $use_comp_pipe_biotype = 0; #PASS THIS AS A PARAMETER!!!
-                    unless ($use_comp_pipe_biotype){
-                        my $t_biotype = get_transcript_biotype($db_gene);
-                        $tr->biotype($t_biotype);
+                    
+                    #COVID-19 GENES
+                    #Force comp_pipe biotype and "not for VEGA" remark
+                    $tr->biotype = "comp_pipe";
+                    unless (scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')})){
+                        $tr->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'remark', -value => 'not for VEGA' );
                     }
+                    #unless $use_comp_pipe_biotype, assign transcript biotype based on other transcripts
+#                    my $use_comp_pipe_biotype = 0; #PASS THIS AS A PARAMETER!!!
+#                    unless ($use_comp_pipe_biotype){
+#                        my $t_biotype = get_transcript_biotype($db_gene);
+#                        $tr->biotype($t_biotype);
+#                    }
                     #If coding gene, try to assign a CDS and change the biotype accordingly
                     print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."\n";
-                    assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
+#                    assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
                     $db_gene->add_Transcript($tr);
                     print "TR: $id: Will add transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id."\n";
                     push (@log, "TR2: $id: Added transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id." (".$db_gene->biotype.")");
