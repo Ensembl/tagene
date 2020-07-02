@@ -31,7 +31,7 @@ sub get_loutre_db_adaptor {
      -port   => 4581,
      -user   => 'ensro',
      -pass   => undef,
-     -dbname => 'nomerge_ensembl_loutre_homo_sapiens_38',
+     -dbname => 'havana_human',
      -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);
@@ -46,7 +46,7 @@ sub get_pipe_db_adaptor {
     -port   => 4581,
     -user   => 'ensro',
     -pass   => undef,
-    -dbname => 'nomerge_ensembl_loutre_pipe_homo_sapiens_38',
+    -dbname => 'pipe_human',
     -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);
@@ -61,7 +61,7 @@ sub get_core_db_adaptor {
      -port   => 4581,
      -user   => 'ensro',
      -pass   => undef,
-     -dbname => 'homo_sapiens_core_98_38_status',
+     -dbname => 'homo_sapiens_core_101_38',
      -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);
@@ -71,7 +71,7 @@ sub get_core_db_adaptor {
      -port   => 4581,
      -user   => 'ensro',
      -pass   => undef,
-     -dbname => 'homo_sapiens_core_98_38',
+     -dbname => 'homo_sapiens_core_101_38',
   );
   $db->dnadb($dnadb);
   return $db;
