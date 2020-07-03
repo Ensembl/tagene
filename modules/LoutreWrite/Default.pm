@@ -995,9 +995,9 @@ print "SUBMODE: $submode\n";
 
                                 #COVID-19 GENES
                                 #Force comp_pipe biotype and "not for VEGA" remark
-                                $ts->biotype = "comp_pipe";
+                                $ts->biotype("comp_pipe");
                                 unless (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
-                                    $ts->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'remark', -value => 'not for VEGA' );
+                                    $ts->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'remark', -value => 'not for VEGA') );
                                 }
                                                            
                                 #If 'comp_pipe' transcript, change biotype and remove 'not for VEGA' attribute
@@ -1050,9 +1050,9 @@ print "SUBMODE: $submode\n";
                     
                     #COVID-19 GENES
                     #Force comp_pipe biotype and "not for VEGA" remark
-                    $tr->biotype = "comp_pipe";
+                    $tr->biotype("comp_pipe");
                     unless (scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')})){
-                        $tr->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'remark', -value => 'not for VEGA' );
+                        $tr->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'remark', -value => 'not for VEGA') );
                     }
                     #unless $use_comp_pipe_biotype, assign transcript biotype based on other transcripts
 #                    my $use_comp_pipe_biotype = 0; #PASS THIS AS A PARAMETER!!!
