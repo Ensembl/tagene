@@ -149,9 +149,7 @@ my %real_outcome;
 #Fetch comp_pipe models
 foreach my $slice (@{$sa->fetch_all("chromosome")}){
   if ($only_chr){
-    next unless $slice->seq_region_name eq $only_chr or 
-                $slice->seq_region_name eq "chr".$only_chr or 
-                $slice->seq_region_name eq "chr".$only_chr."-38";
+    next unless $slice->seq_region_name eq $only_chr;
   }
   foreach my $gene (@{$slice->get_all_Genes($analysis_name, undef, 1)}){
     my $gene_name;
@@ -283,9 +281,8 @@ close (OUT);
 sub is_novel {
   my $intron = shift; 
   
-  my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
   #print "$chr\t".$intron->seq_region_start."\t".$intron->seq_region_end."\n";
-  my $intron_slice = $l_sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
+  my $intron_slice = $l_sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
           #if ($intron->seq_region_start == 1035981 and $intron->seq_region_end == 1036796){
           #  print "\nA - THIS\n";
           #}
@@ -311,8 +308,7 @@ sub is_novel {
 
 sub get_ss_seq {
   my $intron = shift;
-  my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
-  my $intron_slice = $l_sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
+  my $intron_slice = $l_sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
   my $donor = substr($intron_slice->seq, 0, 2);
   my $acceptor = substr($intron_slice->seq, -2);
   my $ssite = "$donor..$acceptor";
@@ -329,8 +325,7 @@ sub get_ss_antisense_overlap {
   my @as_exon_overlaps;
   my $padding = 10; #Number of nucleotides each side of the splice site that will define the slices 
   my $donor_as = 0;
-  my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
-  my $donor_slice = $l_sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start-$padding, $intron->seq_region_start+$padding-1);
+  my $donor_slice = $l_sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start-$padding, $intron->seq_region_start+$padding-1);
   if (scalar(grep {$_->seq_region_strand != $intron->seq_region_strand} @{$donor_slice->get_all_Exons})){
     $donor_as = 1;
     #Check that the same splice site does not exist in annotation
@@ -374,8 +369,7 @@ sub get_ss_antisense_overlap {
 
 sub get_ss_repeat_overlap {
   my $intron = shift;
-  my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
-  my $intron_slice = $p_sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start-2, $intron->seq_region_end+2);
+  my $intron_slice = $p_sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start-2, $intron->seq_region_end+2);
   #Project slice to clone level as repeat features are stored in clone coordinates
   my @rfs;
   my @projs = @{$intron_slice->project("contig")};
@@ -410,9 +404,7 @@ sub get_ss_repeat_overlap {
 
 sub get_intropolis_score {
   my $intron = shift;
-  my $chr = $intron->seq_region_name;
-  $chr =~ s/^chr(.+)-38$/$1/;
-  my $intron_slice = $i_sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
+  my $intron_slice = $i_sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
   foreach my $sf (@{$intron_slice->get_all_SimpleFeatures}){
     if ($sf->seq_region_start==$intron->seq_region_start and $sf->seq_region_end==$intron->seq_region_end and $sf->seq_region_strand==$intron->seq_region_strand){
       return $sf->score;
@@ -546,8 +538,7 @@ sub infer_intron_outcome {
   
   #Find other transcripts that may contain the intron
   my @otrs;
-  my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
-  my $intron_slice = $l_sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
+  my $intron_slice = $l_sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
   foreach my $otr (grep {$_->stable_id ne $tr->stable_id} @{$intron_slice->get_all_Transcripts}){
     if ($otr->source eq "havana" and $otr->biotype ne "artifact" and
         scalar(grep {$_->value eq "not for VEGA"} @{$otr->get_all_Attributes('remark')}) == 0){

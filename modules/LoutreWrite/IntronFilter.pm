@@ -149,9 +149,8 @@ sub is_novel {
 
 sub get_ss_seq {
   my $intron = shift;
-  my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
   my $sa = $DBA{'otter'}->get_SliceAdaptor();
-  my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
+  my $intron_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
   my $donor = substr($intron_slice->seq, 0, 2);
   my $acceptor = substr($intron_slice->seq, -2);
   my $ssite = "$donor..$acceptor";
@@ -168,9 +167,8 @@ sub get_ss_antisense_overlap {
   my @as_exon_overlaps;
   my $padding = 10; #Number of nucleotides each side of the splice site that will define the slices 
   my $donor_as = 0;
-  my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
   my $sa = $DBA{'otter'}->get_SliceAdaptor();
-  my $donor_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start-$padding, $intron->seq_region_start+$padding-1);
+  my $donor_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start-$padding, $intron->seq_region_start+$padding-1);
   if (scalar(grep {$_->seq_region_strand != $intron->seq_region_strand} @{$donor_slice->get_all_Exons})){
     $donor_as = 1;
     #Check that the same splice site does not exist in annotation
@@ -187,7 +185,7 @@ sub get_ss_antisense_overlap {
     }
   }
   my $acceptor_as = 0;
-  my $acceptor_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_end-$padding+1, $intron->seq_region_end+$padding);
+  my $acceptor_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_end-$padding+1, $intron->seq_region_end+$padding);
   if (scalar(grep {$_->seq_region_strand != $intron->seq_region_strand} @{$acceptor_slice->get_all_Exons})){
     $acceptor_as = 1;
     #Check that the same splice site does not exist in annotation
@@ -214,9 +212,8 @@ sub get_ss_antisense_overlap {
 
 sub get_ss_repeat_overlap {
   my $intron = shift;
-  my $chr = ($intron->seq_region_name =~ /^chr.+-38$/) ? $intron->seq_region_name : "chr".$intron->seq_region_name."-38";
   my $sa = $DBA{'loutre'}->get_SliceAdaptor();
-  my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start-2, $intron->seq_region_end+2);
+  my $intron_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start-2, $intron->seq_region_end+2);
   #Project slice to clone level as repeat features are stored in clone coordinates
   my @rfs;
   my @projs = @{$intron_slice->project("contig")};
@@ -252,10 +249,8 @@ sub get_ss_repeat_overlap {
 
 sub get_intropolis_score {
   my $intron = shift;
-  my $chr = $intron->seq_region_name;
-  $chr =~ s/^chr(.+)-38$/$1/;
   my $sa = $DBA{'intron'}->get_SliceAdaptor();
-  my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
+  my $intron_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
   foreach my $sf (@{$intron_slice->get_all_SimpleFeatures}){
     if ($sf->seq_region_start==$intron->seq_region_start and $sf->seq_region_end==$intron->seq_region_end and $sf->seq_region_strand==$intron->seq_region_strand){
       return $sf->score;

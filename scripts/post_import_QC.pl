@@ -49,9 +49,8 @@ my $ta = $otter_dba->get_TranscriptAdaptor();
 open (OUT, ">$outfile.$only_chr") or die "Can't open $outfile.$only_chr: $!";
 
 foreach my $slice (@{$sa->fetch_all("chromosome", "Otter")}){
-  next unless $slice->seq_region_name =~ /-38$/;
   if ($only_chr){
-    next unless $slice->seq_region_name eq "chr$only_chr-38";
+    next unless $slice->seq_region_name eq $only_chr;
   }
   print $slice->seq_region_name."\n";
   foreach my $gene (@{$slice->get_all_Genes}){

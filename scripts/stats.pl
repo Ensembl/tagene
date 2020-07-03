@@ -61,7 +61,6 @@ my $extended_tr_count = 0;
 my $multiple_tagene_ds_count = 0;
 my $multiple_tagene_ms_count = 0;
 foreach my $slice (@{$sa->fetch_all("chromosome")}){
-  next unless $slice->seq_region_name =~ /^chr.+-38$/;
   print $slice->seq_region_name."...";
   foreach my $gene (@{$slice->get_all_Genes}){
     next unless $gene->source eq "havana";
