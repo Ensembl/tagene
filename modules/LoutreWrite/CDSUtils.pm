@@ -634,10 +634,9 @@ sub get_core_transcript {
     return $CORE_TRANSCRIPTS{$transcript->stable_id};
   }
   else{
-    my $slice_name = $transcript->seq_region_name; print "Finding a core transcript for ".$transcript->stable_id."\n";
-    $slice_name =~ s/chr|-38//g;
+    print "Finding a core transcript for ".$transcript->stable_id."\n";
     my $sa = $DBA{'core'}->get_SliceAdaptor();
-    my $core_slice = $sa->fetch_by_region("toplevel", $slice_name, $transcript->seq_region_start, $transcript->seq_region_end);
+    my $core_slice = $sa->fetch_by_region("toplevel", $transcript->seq_region_name, $transcript->seq_region_start, $transcript->seq_region_end);
     if ($core_slice){
       foreach my $core_transcript (grep {$_->seq_region_strand == $transcript->seq_region_strand} @{$core_slice->get_all_Transcripts}){
         my $core_cds_exon_chain = cds_exon_chain($core_transcript);
