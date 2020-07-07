@@ -147,7 +147,7 @@ for (my $i=1; $i<=$number_of_files; $i++){
     $dependency = "-w 'ended(\"$tag.".($i-1)."[*]\")'";
   }
   my $command = <<COM;
-  bsub -M2000 -R"select[mem>2000] rusage[mem=2000]" $dependency -J "$tag.$i\[1-24\]" -oo $tmpdir/f.$tag.$i.\%I.out \\
+  bsub -M3000 -R"select[mem>3000] rusage[mem=3000]" $dependency -J "$tag.$i\[1-24\]" -oo $tmpdir/f.$tag.$i.\%I.out \\
     ~/software/loutre_write/scripts/load_gxf_in_loutre.pl \\
       -file $tmpdir/$tag.$i.$filetype \\
       -dataset $dataset_name \\
