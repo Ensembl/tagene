@@ -36,6 +36,9 @@ if ($only_chr){
   $only_chr = "Y" if $only_chr eq "24";
   $outfile = "$outfile.$only_chr";
 }
+else{
+  $only_chr = "all";
+}
 
 #Connect to loutre database
 #DataSet interacts directly with an otter database
@@ -48,8 +51,8 @@ my $ta = $otter_dba->get_TranscriptAdaptor();
 
 open (OUT, ">$outfile.$only_chr") or die "Can't open $outfile.$only_chr: $!";
 
-foreach my $slice (@{$sa->fetch_all("chromosome", "Otter")}){
-  if ($only_chr){
+foreach my $slice (@{$sa->fetch_all("chromosome", "GRCh38")}){
+  if ($only_chr and $only_chr ne "all"){
     next unless $slice->seq_region_name eq $only_chr;
   }
   print $slice->seq_region_name."\n";
