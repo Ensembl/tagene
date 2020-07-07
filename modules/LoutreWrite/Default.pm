@@ -1238,7 +1238,7 @@ print "\nZZZ ".$actual_cs->chromosome." ".$actual_cs->chr_start." ".$actual_cs->
         #Then, if we look at the gene names only, we might come up with a gene name that has been used previously in other locus,
         #and the transcripts of the new gene might be given names already in use in the other locus (this will make otter crash)
         foreach my $gene (@{$chr_slice->get_all_Genes}){
-            print "AAA ".$gene->stable_id."  ".$gene->get_all_Attributes('name')->[0]->value."\n\n";
+            print "AAA ".$gene->stable_id."\n\n"; #."  ".$gene->get_all_Attributes('name')->[0]->value."\n\n";
             foreach my $transcript (@{$gene->get_all_Transcripts}){
                 if (scalar @{$transcript->get_all_Attributes('name')}){
                     #$clone_name =~ s/\.\d+$//;
