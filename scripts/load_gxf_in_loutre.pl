@@ -166,6 +166,10 @@ foreach my $gene_obj (@$gene_objects_2){
         if ($new_gene_obj->stable_id =~ /^ENS/){
             my $wrong_host;
             my $host_gene = $ga->fetch_by_stable_id($new_gene_obj->stable_id);
+            if (!$host_gene){
+              print "Couldn't fetch host gene with stable_id ".$new_gene_obj->stable_id."\n";
+              $wrong_host = 1;
+            }
             if ($host_biotype and !($allowed_biotypes{$host_gene->biotype})){
                 print "Gene ".$host_gene->stable_id." will be ignored as its biotype (".$host_gene->biotype.") is not allowed\n";
                 $wrong_host = 1;
