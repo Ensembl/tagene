@@ -63,7 +63,7 @@ my $multiple_tagene_ms_count = 0;
 foreach my $slice (@{$sa->fetch_all("chromosome")}){
   print $slice->seq_region_name."...";
   foreach my $gene (@{$slice->get_all_Genes}){
-    next unless $gene->source eq "havana";
+    next unless $gene->source =~ /havana/;
     my $gene_modif_date = Bio::EnsEMBL::Utils::ConversionSupport->date_format($gene->modified_date, "%y-%m-%d");
     if ($date){
       next unless $gene_modif_date ge $date;
@@ -216,14 +216,14 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
     $added_tr_count += $added_c;
     $extended_tr_count += $extended_c;
     if (scalar keys %report){
-      print OUT join(", ", map {$_} grep {/OTTHUMG/} keys %report)."\t".
+      print OUT join(", ", map {$_} grep {/ENSG/} keys %report)."\t".
                 ($gene->get_all_Attributes('name')->[0]->value || " ")."\t".
                 $gene->biotype."\t".
                 $gene_modif_date."\t".
-                join(", ", map {$report{$_}} grep {/OTTHUMG/} keys %report)."\t".
+                join(", ", map {$report{$_}} grep {/ENSG/} keys %report)."\t".
                 scalar(grep {/novel/} values(%report))."\t". 
                 scalar(grep {/extended/} values(%report))."\t". 
-                join(", ", map {$_.":".$report{$_}} grep {/OTTHUMT/} keys %report)."\t". 
+                join(", ", map {$_.":".$report{$_}} grep {/ENST/} keys %report)."\t". 
                 join(", ", keys %{$report{'sources'}})."\n";
     }
   }
