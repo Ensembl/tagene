@@ -2368,7 +2368,7 @@ sub has_polyA_site_support {
   my ($transcript, $threshold) = @_;
   my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
   my $sa = $DBA{'loutre'}->get_SliceAdaptor();
-  my $ext_slice = $sa->fetch_by_region("chromosome", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
+  my $ext_slice = $sa->fetch_by_region("chromosome", "chr".$transcript->slice->seq_region_name."-38", $transcript_end - $threshold, $transcript_end + $threshold);
   if (scalar grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures('polyA_site')}){
     return 1;
   }
