@@ -31,7 +31,7 @@ sub get_loutre_db_adaptor {
      -port   => 4581,
      -user   => 'ensro',
      -pass   => undef,
-     -dbname => 'havana_human',
+     -dbname => 'loutre_human',
      -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);

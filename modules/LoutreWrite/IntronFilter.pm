@@ -213,7 +213,7 @@ sub get_ss_antisense_overlap {
 sub get_ss_repeat_overlap {
   my $intron = shift;
   my $sa = $DBA{'loutre'}->get_SliceAdaptor();
-  my $intron_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start-2, $intron->seq_region_end+2);
+  my $intron_slice = $sa->fetch_by_region("chromosome", "chr".$intron->seq_region_name."-38", $intron->seq_region_start-2, $intron->seq_region_end+2);
   #Project slice to clone level as repeat features are stored in clone coordinates
   my @rfs;
   my @projs = @{$intron_slice->project("contig")};
