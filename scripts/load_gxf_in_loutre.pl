@@ -263,7 +263,7 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
             }        
             my $novel_gene = $new_gene_obj->stable_id ? 0 : 1;
             print "\nMODE: $mode\n";
-            my ($msg, $log) = LoutreWrite::Default->process_gene_2($new_gene_obj, $mode, "aggr", $dataset_name, $otter_dba, $no_intron_check);
+            my ($msg, $log) = LoutreWrite::Default->process_gene_2($new_gene_obj, $mode, "aggr", $dataset_name, $otter_dba, $no_intron_check, $use_comp_pipe_biotype, $no_NFV);
         #print "HOST_CDS_SET_B=".scalar(keys %HOST_CDS_SET)."\n";
         #print "HOST_START_CODON_SET_B=".scalar(keys %HOST_START_CODON_SET)."\n";
             if ($msg =~ /lock ok,write ok,unlock ok(,(.+))?/){

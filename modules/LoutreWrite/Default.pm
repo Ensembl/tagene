@@ -151,7 +151,7 @@ sub parse_gxf_file {
  Arg[2]    : Bio::Vega::DBSQL::DBAdaptor
  Arg[3]    : author name
  Arg[4]    : remark to be added to all transcripts
- Arg[5]    : force 'computationally_generated' biotype
+ Arg[5]    : force 'comp_pipe' biotype
  Arg[6]    : gene and transcript analysis logic name
  Arg[7]    : gene and transcript source
  Arg[8]    : Boolean - if true, the "not for VEGA" remark will not be added
@@ -671,13 +671,15 @@ sub process_gene {
  Arg[4]    : Otter dataset name ('human', 'mouse', 'human_test', etc)
  Arg[5]    : Bio::Vega::DBSQL::DBAdaptor
  Arg[6]    : Boolean - if true, do not check for completely or partially identical intron chains in the annotation
+ Arg[7]    : force 'comp_pipe' biotype
+ Arg[8]    : Boolean - if true, the "not for VEGA" remark will not be added
  Function  : get region with the gene coordinates; 'add' the gene to the region or 'update' pre-existing gene annotation; store changes in the database 
  Returntype: String (message with the outcome)
 
 =cut
 
 sub process_gene_2 {
-    my ($self, $gene, $mode, $submode, $dataset_name, $dba, $no_intron_check) = @_;
+    my ($self, $gene, $mode, $submode, $dataset_name, $dba, $no_intron_check, $force_cp_biotype, $no_NFV) = @_;
     my @log;
 print "SUBMODE: $submode\n";
 
@@ -954,10 +956,12 @@ print "SUBMODE: $submode\n";
                                     $ts->add_Exon($exon);
                                 }
                 
-                                #Add remarks (except 'not for VEGA') and hidden remarks from the novel transcript
+                                #Add remarks and hidden remarks from the novel transcript
                                 foreach my $att (@{$merged_transcript->get_all_Attributes}){
-                                    #COMMENTING THIS OUT AS WE MAY WANT TO KEEP THE NOT FOR VEGA REMARK (NEEDS TO READ THE $no_NFV VARIABLE) - TO DO
-                                    #next if ($att->code eq "remark" and $att->value eq "not for VEGA");
+                                    #Do not add the 'not for VEGA' remark if the no_NFV flag is on
+                                    if ($no_NFV){
+                                      next if ($att->code eq "remark" and $att->value eq "not for VEGA");
+                                    }
                                     #Append read names to existing remark
                                     if ((($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq_\w+ : .+;/) or
                                         ($att->code eq "hidden_remark" and $att->value =~ /^SLR-seq_\w+ : .+;/) or
@@ -983,23 +987,28 @@ print "SUBMODE: $submode\n";
                                     }
                                 }
 
-                                #COVID-19 GENES
-                                #Force comp_pipe biotype and "not for VEGA" remark
-                                $ts->biotype("comp_pipe");
-                                unless (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
-                                    $ts->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'remark', -value => 'not for VEGA') );
+                                
+                                #If flag is on, force comp_pipe biotype and "not for VEGA" remark (they should normally be associated)
+                                if ($force_cp_biotype){
+                                    $ts->biotype($CP_BIOTYPE);
+                                    unless (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
+                                        $ts->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'remark', -value => 'not for VEGA') );
+                                    }
                                 }
-                                                           
-                                #If 'comp_pipe' transcript, change biotype and remove 'not for VEGA' attribute
-                                #unless 'comp_pipe_rejected' remark
-#                                if ($ts->biotype eq "comp_pipe" and scalar(grep {$_->value eq "comp_pipe_rejected"} @{$ts->get_all_Attributes('remark')}) == 0){
-#                                    my $t_biotype = get_transcript_biotype($db_gene);
-#                                    $ts->biotype($t_biotype);
-#                                    if (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
-#                                       my $array = $ts->{'attributes'};
-#                                       @$array = grep { $_->value ne "not for VEGA" } @$array;
-#                                    }
-#                               }
+                                else{
+                                    #If 'comp_pipe' transcript, change its biotype and remove the 'not for VEGA' attribute
+                                    if ($ts->biotype eq $CP_BIOTYPE){
+                                        my $t_biotype = get_transcript_biotype($db_gene);
+                                        $ts->biotype($t_biotype);
+                                        if ($no_NFV){
+                                            if (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
+                                                my $array = $ts->{'attributes'};
+                                                @$array = grep { $_->value ne "not for VEGA" } @$array;
+                                            }
+                                        }
+                                    }
+                                }
+                                 
 
                                 #If coding gene, try to assign a CDS and change the biotype accordingly
 #                                assign_cds_to_transcripts($ts, $g, $slice_offset);
@@ -1038,18 +1047,19 @@ print "SUBMODE: $submode\n";
                     #    $exon->slice($region->slice);
                     #}
                     
-                    #COVID-19 GENES
-                    #Force comp_pipe biotype and "not for VEGA" remark
-                    $tr->biotype("comp_pipe");
-                    unless (scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')})){
-                        $tr->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'remark', -value => 'not for VEGA') );
+
+                    #unless forced comp_pipe biotype, assign transcript biotype based on other transcripts
+                    unless ($force_cp_biotype){
+                        my $t_biotype = get_transcript_biotype($db_gene);
+                        $tr->biotype($t_biotype);                   
+                        if ($no_NFV){
+                            if (scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')})){
+                                my $array = $tr->{'attributes'};
+                                @$array = grep { $_->value ne "not for VEGA" } @$array;
+                            }
+                        }
                     }
-                    #unless $use_comp_pipe_biotype, assign transcript biotype based on other transcripts
-#                    my $use_comp_pipe_biotype = 0; #PASS THIS AS A PARAMETER!!!
-#                    unless ($use_comp_pipe_biotype){
-#                        my $t_biotype = get_transcript_biotype($db_gene);
-#                        $tr->biotype($t_biotype);
-#                    }
+
                     #If coding gene, try to assign a CDS and change the biotype accordingly
                     print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."\n";
 #                    assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
