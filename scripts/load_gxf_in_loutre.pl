@@ -28,6 +28,7 @@ my $analysis_name;
 my $tsource;
 my $no_NFV;
 my $no_comp_pipe;
+my $do_not_add_cds;
 my $no_intron_check;
 my $host_biotype;
 my $max_overlapped_loci;
@@ -46,6 +47,7 @@ my $only_chr;
             'no_check!'         => \$no_artifact_check,
             'no_NFV!'           => \$no_NFV,
             'no_comp_pipe!'     => \$no_comp_pipe,
+            'no_CDS!'           => \$do_not_add_cds,
             'no_intron_check!'  => \$no_intron_check,
             'host_biotype=s'    => \$host_biotype,
             'max_ov_loc=s'      => \$max_overlapped_loci,
@@ -78,7 +80,8 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -analysis       analysis logic name (default is "Otter")
  -tsource        transcript source (default is "havana")
  -no_check       do no check for transcripts spanning a large number of genes
- -no_NFV         do not add the 'not for VEGA' attributes
+ -no_NFV         do not add the 'not for VEGA' attribute
+ -no_CDS         do not try to add a CDS if the transcript falls in a coding gene
  -no_intron_check  allow transcripts with intron chains fully or partially identical to others in the database
  -host_biotype   restrict host genes by biotype (comma-separated list)
  -max_ov_loc     maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
@@ -263,7 +266,7 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
             }        
             my $novel_gene = $new_gene_obj->stable_id ? 0 : 1;
             print "\nMODE: $mode\n";
-            my ($msg, $log) = LoutreWrite::Default->process_gene_2($new_gene_obj, $mode, "aggr", $dataset_name, $otter_dba, $no_intron_check, $use_comp_pipe_biotype, $no_NFV);
+            my ($msg, $log) = LoutreWrite::Default->process_gene_2($new_gene_obj, $mode, "aggr", $dataset_name, $otter_dba, $no_intron_check, $use_comp_pipe_biotype, $no_NFV, $do_not_add_cds);
         #print "HOST_CDS_SET_B=".scalar(keys %HOST_CDS_SET)."\n";
         #print "HOST_START_CODON_SET_B=".scalar(keys %HOST_START_CODON_SET)."\n";
             if ($msg =~ /lock ok,write ok,unlock ok(,(.+))?/){

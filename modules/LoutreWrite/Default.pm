@@ -671,15 +671,16 @@ sub process_gene {
  Arg[4]    : Otter dataset name ('human', 'mouse', 'human_test', etc)
  Arg[5]    : Bio::Vega::DBSQL::DBAdaptor
  Arg[6]    : Boolean - if true, do not check for completely or partially identical intron chains in the annotation
- Arg[7]    : force 'comp_pipe' biotype
+ Arg[7]    : Boolean - force 'comp_pipe' biotype
  Arg[8]    : Boolean - if true, the "not for VEGA" remark will not be added
+ Arg[9]    : Boolean - if true, do not try to add a CDS
  Function  : get region with the gene coordinates; 'add' the gene to the region or 'update' pre-existing gene annotation; store changes in the database 
  Returntype: String (message with the outcome)
 
 =cut
 
 sub process_gene_2 {
-    my ($self, $gene, $mode, $submode, $dataset_name, $dba, $no_intron_check, $force_cp_biotype, $no_NFV) = @_;
+    my ($self, $gene, $mode, $submode, $dataset_name, $dba, $no_intron_check, $force_cp_biotype, $no_NFV, $do_not_add_cds) = @_;
     my @log;
 print "SUBMODE: $submode\n";
 
@@ -1011,7 +1012,9 @@ print "SUBMODE: $submode\n";
                                  
 
                                 #If coding gene, try to assign a CDS and change the biotype accordingly
-#                                assign_cds_to_transcripts($ts, $g, $slice_offset);
+                                unless ($do_not_add_cds){
+                                    assign_cds_to_transcripts($ts, $g, $slice_offset);
+                                }
                                 
                                 #Change authorship
                                 $ts->transcript_author($merged_transcript->transcript_author);
@@ -1062,7 +1065,9 @@ print "SUBMODE: $submode\n";
 
                     #If coding gene, try to assign a CDS and change the biotype accordingly
                     print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."\n";
-#                    assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
+                    unless ($do_not_add_cds){
+                        assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
+                    }
                     $db_gene->add_Transcript($tr);
                     print "TR: $id: Will add transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id."\n";
                     push (@log, "TR2: $id: Added transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id." (".$db_gene->biotype.")");
