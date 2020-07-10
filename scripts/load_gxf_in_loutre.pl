@@ -79,7 +79,6 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -tsource        transcript source (default is "havana")
  -no_check       do no check for transcripts spanning a large number of genes
  -no_NFV         do not add the 'not for VEGA' attributes
- -no_comp_pipe   do not add the comp_pipe attributes by default ('Assembled from ... reads', 'ID: ...' remarks)
  -no_intron_check  allow transcripts with intron chains fully or partially identical to others in the database
  -host_biotype   restrict host genes by biotype (comma-separated list)
  -max_ov_loc     maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
@@ -109,7 +108,7 @@ $DBA{'otter'} = $otter_dba;
 my $genes = LoutreWrite::Default->parse_gxf_file($file);
 
 #Make gene objects
-my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $tsource, $no_comp_pipe, $no_NFV, $only_chr);
+my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $tsource, $no_NFV, $only_chr);
 
 
 #Long artifact transcripts, spanning multiple real loci, make long artificial genes

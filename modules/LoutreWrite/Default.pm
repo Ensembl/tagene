@@ -154,16 +154,15 @@ sub parse_gxf_file {
  Arg[5]    : force 'computationally_generated' biotype
  Arg[6]    : gene and transcript analysis logic name
  Arg[7]    : gene and transcript source
- Arg[8]    : Boolean - true if the default transcript attributes used in the comp_pipe models must be ignored
- Arg[9]    : Boolean - if true, the "not for VEGA" remark will not be added
- Arg[10]   : String - chromosome
+ Arg[8]    : Boolean - if true, the "not for VEGA" remark will not be added
+ Arg[9]    : String - chromosome (ignore genes not on this chromosome)
  Function  : convert gene annotation into Vega gene, transcript and exon objects
  Returntype: list of Bio::Vega::Gene objects
 
 =cut
 
 sub make_vega_objects {
-    my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype, $analysis_name, $source, $no_comp_pipe, $no_NFV, $only_chr) = @_;
+    my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype, $analysis_name, $source, $no_NFV, $only_chr) = @_;
     
     #Some common features
     $source ||= "havana";
@@ -184,18 +183,13 @@ sub make_vega_objects {
                                 -value => 'TAGENE_transcript'
                         );
 
-    my $source_remark_string;
+    my $source_remark;
     if ($remark){
-        $source_remark_string = $remark;
-    }
-    else{
-        $source_remark_string = 'Assembled from SLR-seq (SRP049776) and PacBio Capture-seq (GSE93848) reads';
-    }
-    my $source_remark = Bio::EnsEMBL::Attribute->new(
+        $source_remark = Bio::EnsEMBL::Attribute->new(
                                 -code => 'remark',
-                                -value => $source_remark_string
+                                -value => $remark
                         );
-                
+    }            
     my $author = Bio::Vega::Author->new(
                                 -name   => $author_name,
                                 -email  => $author_name."\@ebi.ac.uk"
@@ -216,7 +210,7 @@ sub make_vega_objects {
                                         );
         #$gene->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'name', -value => $genes{$gid}{'gene_name'})); #Let the script generate a name if needed
         $gene->gene_author($author);
-        unless ($no_comp_pipe){
+        if ($source_remark){
             $gene->add_Attributes($source_remark);
         }
         unless ($no_NFV){
@@ -238,7 +232,8 @@ sub make_vega_objects {
                                                         );
             #$transcript->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'name', -value => $genes{$gid}{transcripts}{$tid}{'transcript_name'})); #Let the script generate a name if needed
             $transcript->transcript_author($author);
-            unless ($no_comp_pipe){
+            $transcript->add_Attributes($tagene_remark);
+            if ($source_remark){
               $transcript->add_Attributes($source_remark);
             }
             unless ($no_NFV){
@@ -246,12 +241,7 @@ sub make_vega_objects {
             }
             $transcript->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', 
                                                                      -value => "ID: ".$genes{$gid}{transcripts}{$tid}{'transcript_name'}));
-
-            if ($source_remark){
-              $transcript->add_Attributes($source_remark);
-            }
-            #$transcript->add_Attributes($tagene_attrib);
-            $transcript->add_Attributes($tagene_remark);
+         
 
             #Make exon objects
             foreach my $exid (keys %{$genes{$gid}{transcripts}{$tid}{exons}}){
