@@ -27,7 +27,6 @@ my $no_artifact_check;
 my $analysis_name;
 my $tsource;
 my $no_NFV;
-my $no_comp_pipe;
 my $do_not_add_cds;
 my $no_intron_check;
 my $host_biotype;
@@ -46,7 +45,6 @@ my $only_chr;
             'tsource=s'         => \$tsource,
             'no_check!'         => \$no_artifact_check,
             'no_NFV!'           => \$no_NFV,
-            'no_comp_pipe!'     => \$no_comp_pipe,
             'no_CDS!'           => \$do_not_add_cds,
             'no_intron_check!'  => \$no_intron_check,
             'host_biotype=s'    => \$host_biotype,

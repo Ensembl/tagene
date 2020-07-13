@@ -24,7 +24,7 @@ my $no_artifact_check;
 my $analysis_name;
 my $tsource;
 my $no_NFV;
-my $no_comp_pipe;
+my $do_not_add_cds;
 my $no_intron_check;
 my $host_biotype;
 my $max_overlapped_loci;
@@ -46,7 +46,7 @@ my $tmpdir;
             'tsource=s'         => \$tsource,
             'no_check!'         => \$no_artifact_check,
             'no_NFV!'           => \$no_NFV,
-            'no_comp_pipe!'     => \$no_comp_pipe,
+            'no_CDS!'           => \$do_not_add_cds,
             'no_intron_check!'  => \$no_intron_check,
             'host_biotype=s'    => \$host_biotype,
             'max_ov_loc=i'      => \$max_overlapped_loci,
@@ -160,7 +160,7 @@ COM
   $command .= " -tsource $tsource \\\n"                if $tsource;
   $command .= " -no_check \\\n"                        if $no_artifact_check;
   $command .= " -no_NFV \\\n"                          if $no_NFV;
-  $command .= " -no_comp_pipe \\\n"                    if $no_comp_pipe;
+  $command .= " -no_CDS \\\n"                          if $do_not_add_cds;
   $command .= " -no_intron_check \\\n"                 if $no_intron_check;
   $command .= " -host_biotype $host_biotype \\\n"      if $host_biotype;
   $command .= " -max_ov_loc $max_overlapped_loci \\\n" if $max_overlapped_loci;
