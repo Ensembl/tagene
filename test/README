@@ -1,0 +1,281 @@
+
+#Create a test database having a minimal annotation set
+
+HOST=
+PORT=
+USER=
+PASS=
+DBNAME=tagene_test
+
+mysql -h$HOST -P$PORT -u$USER -p$PASS -e "CREATE DATABASE IF NOT EXISTS $DBNAME"
+
+mysql -h$HOST -P$PORT -u$USER -p$PASS -D$DBNAME < db/havana_schema.sql
+
+zcat db/havana_human.meta.sql.gz | mysql -h$HOST -P$PORT -u$USER -p$PASS -D$DBNAME
+
+mysql -h$HOST -P$PORT -u$USER -p$PASS -D$DBNAME -e "LOAD DATA LOCAL INFILE 'db/gene.txt' INTO TABLE gene; LOAD DATA LOCAL INFILE 'db/gene_attrib.txt' INTO TABLE gene_attrib; LOAD DATA LOCAL INFILE 'db/transcript.txt' INTO TABLE transcript; LOAD DATA LOCAL INFILE 'db/transcript_attrib.txt' INTO TABLE transcript_attrib; LOAD DATA LOCAL INFILE 'db/translation.txt' INTO TABLE translation; LOAD DATA LOCAL INFILE 'db/translation_attrib.txt' INTO TABLE translation_attrib; LOAD DATA LOCAL INFILE 'db/exon_transcript.txt' INTO TABLE exon_transcript; LOAD DATA LOCAL INFILE 'db/exon.txt' INTO TABLE exon; LOAD DATA LOCAL INFILE 'db/gene_author.txt' INTO TABLE gene_author; LOAD DATA LOCAL INFILE 'db/transcript_author.txt' INTO TABLE transcript_author; LOAD DATA LOCAL INFILE 'db/author.txt' INTO TABLE author;"
+
+
+
+#Add the dataset name to your server-config/species.dat file
+#Note that the database server must be known to the server-config/databases.yaml
+#For instance:
+
+[tagene_test]
+DBNAME      tagene_test
+DBSPEC      havana_db
+DNA_DBNAME  havana_human
+DNA_DBSPEC  havana_db
+ALIAS       human
+
+
+
+#Run the script that imports the gene annotation using the desired parameters
+#For instance:
+
+bsub -M2000 -R"select[mem>2000] rusage[mem=2000]" -oo f.test.out \
+  perl ../scripts/load_gxf_in_loutre.pl \
+      -file SLRseq.GRCh38.sel.gtf \
+      -source SLRseq_source_info.sel.txt \
+      -dataset tagene_test \
+      -author tagene \
+      -comp_pipe \
+      -no_CDS \
+      -remark "Assembled from SLRseq reads (SRP049776)" \
+      -no_check \
+      -host_biotype protein_coding \
+      -max_ov_loc 1 \
+      -filter_introns \
+      -write
+
+
+
+
+###
+
+#NOTE: the current test database contains the annotation of the human IL16 gene (ENSG00000172349) in the havana database as of July 2020 (equivalent to Ensembl 101)
+
+
+
+mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript where is_current;
++-----------------+-------------------------+---------------------+---------------------+
+| stable_id       | biotype                 | created_date        | modified_date       |
++-----------------+-------------------------+---------------------+---------------------+
+| ENST00000560989 | processed_transcript    | 2011-06-16 11:59:42 | 2014-02-28 07:31:02 |
+| ENST00000560241 | nonsense_mediated_decay | 2011-06-16 11:59:42 | 2014-02-28 07:31:02 |
+| ENST00000360547 | nonsense_mediated_decay | 2011-06-16 11:59:42 | 2014-02-28 07:31:02 |
+| ENST00000559383 | protein_coding          | 2011-06-14 12:11:24 | 2015-07-09 17:23:48 |
+| ENST00000394660 | protein_coding          | 2006-10-23 17:31:58 | 2014-02-28 07:31:02 |
+| ENST00000302987 | protein_coding          | 2006-10-24 16:35:01 | 2015-07-09 17:23:48 |
+| ENST00000560115 | nonsense_mediated_decay | 2011-06-16 11:59:42 | 2014-02-28 07:31:02 |
+| ENST00000394652 | protein_coding          | 2006-10-24 16:35:01 | 2014-02-28 07:31:02 |
+| ENST00000558857 | nonsense_mediated_decay | 2011-06-14 12:11:24 | 2014-02-28 07:31:02 |
+| ENST00000558332 | protein_coding          | 2011-06-14 12:11:24 | 2014-02-28 07:31:02 |
++-----------------+-------------------------+---------------------+---------------------+
+10 rows in set (0.00 sec)
+
+
+
+#TEST EXAMPLES
+
+#Example 1: force comp_pipe biotype, no CDS
+
+bsub -M2000 -R"select[mem>2000] rusage[mem=2000]" -oo f.test.out \
+  perl  ~/software/loutre_write/scripts/load_gxf_in_loutre.pl \
+      -file SLRseq.GRCh38.sel.gtf \
+      -source SLRseq_source_info.sel.txt \
+      -dataset tagene_test \
+      -author tagene \
+      -comp_pipe \
+      -no_CDS \
+      -remark "Assembled from SLRseq reads (SRP049776)" \
+      -no_check \
+      -host_biotype protein_coding \
+      -max_ov_loc 1 \
+      -filter_introns \
+      -write
+
+
+
+mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript where is_current;
++-----------------+-------------------------+---------------------+---------------------+
+| stable_id       | biotype                 | created_date        | modified_date       |
++-----------------+-------------------------+---------------------+---------------------+
+| ENST00000560989 | processed_transcript    | 2011-06-16 11:59:42 | 2014-02-28 07:31:02 |
+| ENST00000560241 | nonsense_mediated_decay | 2011-06-16 11:59:42 | 2014-02-28 07:31:02 |
+| ENST00000360547 | nonsense_mediated_decay | 2011-06-16 11:59:42 | 2014-02-28 07:31:02 |
+| ENST00000559383 | protein_coding          | 2011-06-14 12:11:24 | 2015-07-09 17:23:48 |
+| ENST00000394660 | protein_coding          | 2006-10-23 17:31:58 | 2014-02-28 07:31:02 |
+| ENST00000302987 | protein_coding          | 2006-10-24 16:35:01 | 2015-07-09 17:23:48 |
+| ENST00000560115 | nonsense_mediated_decay | 2011-06-16 11:59:42 | 2014-02-28 07:31:02 |
+| ENST00000394652 | protein_coding          | 2006-10-24 16:35:01 | 2014-02-28 07:31:02 |
+| ENST00000558857 | nonsense_mediated_decay | 2011-06-14 12:11:24 | 2014-02-28 07:31:02 |
+| ENST00000558332 | protein_coding          | 2011-06-14 12:11:24 | 2014-02-28 07:31:02 |
+| ENST00000681524 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681525 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681526 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681527 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681528 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681529 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681530 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681531 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681532 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681533 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681534 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681535 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681536 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681537 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681538 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681539 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681540 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681541 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681542 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681543 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681544 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681545 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681546 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681547 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681548 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681549 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681550 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681551 | comp_pipe               | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
++-----------------+-------------------------+---------------------+---------------------+
+38 rows in set (0.00 sec)
+
+
+mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript t, transcript_attrib ta where t.transcript_id=ta.transcript_id and t.is_current and ta.value="not for VEGA";
++-----------------+-----------+---------------------+---------------------+
+| stable_id       | biotype   | created_date        | modified_date       |
++-----------------+-----------+---------------------+---------------------+
+| ENST00000681524 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681525 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681526 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681527 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681528 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681529 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681530 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681531 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681532 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681533 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681534 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681535 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681536 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681537 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681538 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681539 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681540 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681541 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681542 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681543 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681544 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681545 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681546 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681547 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681548 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681549 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681550 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
+| ENST00000681551 | comp_pipe | 2020-07-13 16:49:06 | 2020-07-13 16:49:06 |
++-----------------+-----------+---------------------+---------------------+
+28 rows in set (0.00 sec)
+
+
+
+#Example 2: add CDS and let the code find the best biotype
+
+bsub -M2000 -R"select[mem>2000] rusage[mem=2000]" -oo f.test.2.out \
+  perl  ~/software/loutre_write/scripts/load_gxf_in_loutre.pl \
+      -file SLRseq.GRCh38.sel.gtf \
+      -source SLRseq_source_info.sel.txt \
+      -dataset tagene_test \
+      -author tagene \
+      -remark "Assembled from SLRseq reads (SRP049776)" \
+      -no_check \
+      -host_biotype protein_coding \
+      -max_ov_loc 1 \
+      -filter_introns \
+      -write
+
+
+
+mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript where is_current;
++-----------------+-------------------------+---------------------+---------------------+
+| stable_id       | biotype                 | created_date        | modified_date       |
++-----------------+-------------------------+---------------------+---------------------+
+| ENST00000560989 | processed_transcript    | 2011-06-16 11:59:42 | 2014-02-28 07:31:02 |
+| ENST00000560241 | nonsense_mediated_decay | 2011-06-16 11:59:42 | 2014-02-28 07:31:02 |
+| ENST00000360547 | nonsense_mediated_decay | 2011-06-16 11:59:42 | 2014-02-28 07:31:02 |
+| ENST00000559383 | protein_coding          | 2011-06-14 12:11:24 | 2015-07-09 17:23:48 |
+| ENST00000394660 | protein_coding          | 2006-10-23 17:31:58 | 2014-02-28 07:31:02 |
+| ENST00000302987 | protein_coding          | 2006-10-24 16:35:01 | 2015-07-09 17:23:48 |
+| ENST00000560115 | nonsense_mediated_decay | 2011-06-16 11:59:42 | 2014-02-28 07:31:02 |
+| ENST00000394652 | protein_coding          | 2006-10-24 16:35:01 | 2014-02-28 07:31:02 |
+| ENST00000558857 | nonsense_mediated_decay | 2011-06-14 12:11:24 | 2014-02-28 07:31:02 |
+| ENST00000558332 | protein_coding          | 2011-06-14 12:11:24 | 2014-02-28 07:31:02 |
+| ENST00000681244 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681245 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681246 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681247 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681248 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681249 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681250 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681251 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681252 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681253 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681254 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681255 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681256 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681257 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681258 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681259 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681260 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681261 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681262 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681263 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681264 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681265 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681266 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681267 | retained_intron         | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681268 | retained_intron         | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681269 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681270 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681271 | retained_intron         | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
++-----------------+-------------------------+---------------------+---------------------+
+38 rows in set (0.00 sec)
+
+
+
+mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript t, transcript_attrib ta where t.transcript_id=ta.transcript_id and t.is_current and ta.value="not for VEGA";
++-----------------+-------------------------+---------------------+---------------------+
+| stable_id       | biotype                 | created_date        | modified_date       |
++-----------------+-------------------------+---------------------+---------------------+
+| ENST00000681244 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681245 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681246 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681247 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681248 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681249 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681250 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681251 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681252 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681253 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681254 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681255 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681256 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681257 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681258 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681259 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681260 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681261 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681262 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681263 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681264 | nonsense_mediated_decay | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681265 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681266 | protein_coding          | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681267 | retained_intron         | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681268 | retained_intron         | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681269 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681270 | processed_transcript    | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
+| ENST00000681271 | retained_intron         | 2020-07-13 18:56:30 | 2020-07-13 18:56:30 |
++-----------------+-------------------------+---------------------+---------------------+
+28 rows in set (0.00 sec)
+

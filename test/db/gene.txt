@@ -1,0 +1,1 @@
+166711	protein_coding	9921	131558	81159575	81314058	1	NULL	ensembl_havana	interleukin 16 (lymphocyte chemoattractant factor)	1	0	ENSG00000172349	17	2006-10-23 17:31:58	2015-07-09 17:23:48
