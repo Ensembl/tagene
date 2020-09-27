@@ -1718,7 +1718,7 @@ sub assign_host_gene {
         my $max_n_introns = 0;
         foreach my $db_gene (@db_genes){
             #Exclude undesired host genes
-            if ($db_gene->source ne "havana" or
+            if (!($db_gene->source =~ /(ensembl|havana)/) or
                 $db_gene->biotype eq "artifact" or
                 scalar (grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) == 1
             ){
