@@ -134,7 +134,7 @@ sub is_novel {
   my $sa = $DBA{'otter'}->get_SliceAdaptor();
   my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
   foreach my $tr (@{$intron_slice->get_all_Transcripts}){
-    if ($tr->source eq "havana" and $tr->biotype ne "artifact" and
+    if ($tr->source =~ /(ensembl|havana)/ and $tr->biotype ne "artifact" and
         scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')}) == 0){
       foreach my $int (@{$tr->get_all_Introns}){
         if ($intron->seq_region_start == $int->seq_region_start and $intron->seq_region_end == $int->seq_region_end and $intron->seq_region_strand == $int->seq_region_strand){
@@ -173,7 +173,7 @@ sub get_ss_antisense_overlap {
     $donor_as = 1;
     #Check that the same splice site does not exist in annotation
     TR:foreach my $tr (grep {$_->seq_region_strand == $intron->seq_region_strand} @{$donor_slice->get_all_Transcripts}){
-      next unless $tr->source eq "havana";
+      next unless $tr->source =~ /(ensembl|havana)/;
       next if scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')}) == 1;
       next if $tr->biotype eq "artifact";
       foreach my $int (@{$tr->get_all_Introns}){
@@ -190,7 +190,7 @@ sub get_ss_antisense_overlap {
     $acceptor_as = 1;
     #Check that the same splice site does not exist in annotation
     TR:foreach my $tr (grep {$_->seq_region_strand == $intron->seq_region_strand} @{$acceptor_slice->get_all_Transcripts}){
-      next unless $tr->source eq "havana";
+      next unless $tr->source =~ /(ensembl|havana)/;
       next if scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')}) == 1;
       next if $tr->biotype eq "artifact";
       foreach my $int (@{$tr->get_all_Introns}){
