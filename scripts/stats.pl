@@ -88,7 +88,8 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
       my %tsources;
       foreach my $att (@{$transcript->get_all_Attributes}){
         #Was the transcript created or extended by the TAGENE pipeline?
-        if ($att->code eq "remark" and $att->value eq "TAGENE_transcript"){
+        if ($att->code eq "remark" and $att->value eq "TAGENE_transcript"
+            and $transcript->transcript_author->name eq "tagene"){
           $is_tagene = 1;
           if ($date and 
               Bio::EnsEMBL::Utils::ConversionSupport->date_format($transcript->modified_date, "%y-%m-%d") lt $date){
@@ -243,10 +244,16 @@ close (EXT);
 
 sub previous_biotype {
   my $transcript = shift;
-  my $v = $transcript->version;
   my $prev_biotype;
-  my $sth = $otter_dba->dbc->prepare("select biotype from transcript where stable_id=? and version=?");
-  $sth->execute($transcript->stable_id, $transcript->version - 1);
+  my $sth;
+  if ($date){
+    $sth = $otter_dba->dbc->prepare("select biotype from transcript where stable_id=? and modified_date < ? order by modified_date desc limit 1");
+    $sth->execute($transcript->stable_id, $date);
+  }
+  else{
+    $sth = $otter_dba->dbc->prepare("select biotype from transcript where stable_id=? and version=?");
+    $sth->execute($transcript->stable_id, $transcript->version - 1);
+  }
   while (my @cols = $sth->fetchrow_array()) {
     $prev_biotype = $cols[0];
   }
