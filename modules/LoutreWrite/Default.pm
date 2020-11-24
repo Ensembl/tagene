@@ -55,6 +55,7 @@ sub parse_gxf_file {
         next if (!$chr or $chr =~ /_/ or $chr eq "chrM");
         my %attribs;
         foreach my $att (split(/;/, $attributes)){
+            next unless $att =~ /\w/;
             my ($name, $value);
             if ($file =~ /\.gff3(.gz)?$/){
                 ($name, $value) = split(/=/, $att);
@@ -83,7 +84,7 @@ sub parse_gxf_file {
                                                             };
         }
         elsif ($type eq "exon"){
-            my $exon_id = $attribs{'exon_id'} || $.; #gtf line number as default exon id
+            my $exon_id = $attribs{'exon_id'} || $attribs{'exon_number'} || $.; #gtf line number as default exon id
             $data{$gene_id}{transcripts}{$transcript_id}{exons}{$exon_id} = { 
                                                                                 'chr'    => $chr,
                                                                                 'start'  => $start,
@@ -118,17 +119,17 @@ sub parse_gxf_file {
             #$data{$gene_id}{transcripts}{$transcript_id}{'transcript_status'} ||= $attribs{'transcript_status'};
         }
         elsif ($type eq "CDS"){
-            my $exon_id = $attribs{'exon_id'} || $.; #gtf line number as default exon id
+            my $exon_id = $attribs{'exon_id'} || $attribs{'exon_number'} || $.; #gtf line number as default exon id
             $data{$gene_id}{transcripts}{$transcript_id}{cds}{$exon_id} = { 
                                                                                 'chr'    => $chr,
                                                                                 'start'  => $start,
                                                                                 'end'    => $end,
                                                                                 'strand' => $strand,
                                                                                 'phase'  => "p".$phase,
-                                                                            };
+                                                                           }; print "B: ".$exon_id." ".$start."\n";
         }
         elsif ($type eq "stop_codon"){ #Relevant for GENCODE gtf type files, where stop codon is not included in CDS
-            my $exon_id = $attribs{'exon_id'} || $.; #gtf line number as default exon id
+            my $exon_id = $attribs{'exon_id'} || $attribs{'exon_number'} || $.; #gtf line number as default exon id
             $data{$gene_id}{transcripts}{$transcript_id}{stop_codon}{$exon_id} = { 
                                                                                 'chr'    => $chr,
                                                                                 'start'  => $start,
@@ -241,10 +242,9 @@ sub make_vega_objects {
             }
             $transcript->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', 
                                                                      -value => "ID: ".$genes{$gid}{transcripts}{$tid}{'transcript_name'}));
-         
-
+        
             #Make exon objects
-            foreach my $exid (keys %{$genes{$gid}{transcripts}{$tid}{exons}}){
+            foreach my $exid (sort keys %{$genes{$gid}{transcripts}{$tid}{exons}}){
                 my $exon = Bio::Vega::Exon->new(
                                                 -start   => $genes{$gid}{transcripts}{$tid}{exons}{$exid}{'start'},
                                                 -end     => $genes{$gid}{transcripts}{$tid}{exons}{$exid}{'end'},
@@ -260,101 +260,156 @@ sub make_vega_objects {
                 $exon->slice($slices{$chr});
                 $exon->phase(-1);
                 $exon->end_phase(-1);
-                
+#foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{cds}}){
+#  print "B$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{cds}{$exonid}{'start'}."\n";
+#} 
+foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+    print "d$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+}                
                 #Assign exon phases from gxf file if exon starts within CDS
                 #Compare also with stop_codon coordinates as stop codon is not included in CDS in GENCODE gtf files
-                my $gtf_phase = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'phase'} || $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'phase'};
+                my $gtf_phase; 
+                if ($genes{$gid}{transcripts}{$tid}{cds}{$exid}){
+                    $gtf_phase = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'phase'};
+                }
+                elsif ($genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}){
+                    $gtf_phase = $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'phase'};
+                }
+                
+# foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{cds}}){
+#  print "C$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{cds}{$exonid}{'start'}."\n";
+#} 
+                 
                 print "\n$gtf_phase \n" if $gtf_phase;
                 if ($gtf_phase and ($gtf_phase eq "p0" or $gtf_phase eq "p1" or $gtf_phase eq "p2")){
                 #if ($gtf_phase){
-                  print "\nA\n";
-                  if ((($exon->start == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} or $exon->start == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'}) and $exon->strand == 1) or 
-                      (($exon->end == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} or $exon->end == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'}) and $exon->strand == -1)
-                     ){
-                    $exon->phase(0) if $gtf_phase eq "p0";
-                    $exon->phase(1) if $gtf_phase eq "p2";
-                    $exon->phase(2) if $gtf_phase eq "p1"; print "\nB".$exon->phase."\n";
-                    if ((($exon->end == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} or $exon->end == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'}) and $exon->strand == 1) or 
-                        (($exon->start == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} or $exon->start == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'}) and $exon->strand == -1)
-                       ){
-                       $exon->end_phase(($exon->phase + $exon->length) % 3); print "\nC".$exon->end_phase."\n";
+                    print "\nA\n";
+foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+    print "e$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+}  
+                    if ((($exon->start == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} or 
+                          defined($genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}) and 
+                          $exon->start == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'})                        
+                          and $exon->strand == 1) or 
+                        (($exon->end == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} or 
+                          defined($genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}) and 
+                          $exon->end == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'})                     
+                          and $exon->strand == -1)
+                    ){
+                        $exon->phase(0) if $gtf_phase eq "p0";
+                        $exon->phase(1) if $gtf_phase eq "p2";
+                        $exon->phase(2) if $gtf_phase eq "p1"; print "\nB".$exon->phase."\n";
+foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+    print "f$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+} 
+                  
+                        if ((($exon->end == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} or 
+                              $exon->end == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'}) 
+                              and $exon->strand == 1) or 
+                            (($exon->start == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} or 
+                              $exon->start == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'}) 
+                              and $exon->strand == -1)
+                         ){
+                           $exon->end_phase(($exon->phase + $exon->length) % 3); print "\nC".$exon->end_phase."\n";
+foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+    print "g$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+}                        
+                          }
                     }
-                  }
-                  else{
-                    #Half-coding start codon: no phase but end_phase
-                    if ($exon->end == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} and $exon->strand == 1){
-                      $exon->end_phase(($exon->end - $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} + 1) % 3); print "\nD".$exon->end_phase."\n";
-                    }
-                    elsif ($exon->start == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} and $exon->strand == -1){
-                      $exon->end_phase(($genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} - $exon->start + 1) % 3); print "\nE".$exon->end_phase."\n";
-                    }
-                  }
+                    else{
+foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+    print "h$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+}                    
+                        #Half-coding start codon: no phase but end_phase
+                        if ($exon->end == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} and $exon->strand == 1){
+                            $exon->end_phase(($exon->end - $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} + 1) % 3); print "\nD".$exon->end_phase."\n";
+                        }
+                        elsif ($exon->start == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} and $exon->strand == -1){
+                            $exon->end_phase(($genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} - $exon->start + 1) % 3); print "\nE".$exon->end_phase."\n";
+                        }
+foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+    print "i$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+}
+                    } 
                 }
+foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+    print "j$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+} 
                 $transcript->add_Exon($exon);
             }
-            
+           
             #Make translation object
-            my $cds_start;
-            my $cds_end;
-            foreach my $exid (keys %{$genes{$gid}{transcripts}{$tid}{cds}}){
-                if (!($cds_start) or $cds_start > $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'}){
-                    $cds_start = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'};
-                }
-                if (!($cds_end) or $cds_end < $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'}){
-                    $cds_end = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'};
-                }
-            }
-            foreach my $exid (keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
-                if ($cds_end and $transcript->strand==1){
-                  if ($cds_end < $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'}){
-                    $cds_end = $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'};
-                  }
-                }
-                elsif ($cds_start and $transcript->strand==-1){
-                  if ($cds_start > $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'}){
-                    $cds_start = $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'};
-                  }
-                }
-            }
-            if ($cds_start and $cds_end){
-                my $start_exon;
-                my $end_exon;
-                my $seq_start;
-                my $seq_end;
-                foreach my $exon (@{$transcript->get_all_Exons}){
-                  if ($exon->start <= $cds_start and $exon->end >= $cds_start){
-                    if ($transcript->strand==1){
-                      $start_exon = $exon;
-                      $seq_start = $cds_start - $start_exon->start + 1;
+            if ($genes{$gid}{transcripts}{$tid}{cds}){
+                my $cds_start = $transcript->end;
+                my $cds_end = $transcript->start;
+                foreach my $exid (sort keys %{$genes{$gid}{transcripts}{$tid}{cds}}){
+ print "B: ".$exid."  ".$genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'}."\n";
+                    if ($genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} < $cds_start){
+                        $cds_start = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'};
                     }
-                    else{
-                      $end_exon = $exon;
-                      $seq_end = $end_exon->end - $cds_start + 1;
+                    if ($genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} > $cds_end){
+                        $cds_end = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'};
                     }
-                  }
-                  if ($exon->start <= $cds_end and $exon->end >= $cds_end){
-                    if ($transcript->strand==1){
-                      $end_exon = $exon;
-                      $seq_end = $cds_end - $end_exon->start + 1;
-                    }
-                    else{
-                      $start_exon = $exon;
-                      $seq_start = $start_exon->end - $cds_end + 1;
-                    }
-                  }
                 }
+                print "CDS_START=$cds_start\nCDS_END=$cds_end\n";
+#                foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+#  print "D:".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+#}
+                #Include stop codon coordinates in the CDS 
+                if ($genes{$gid}{transcripts}{$tid}{stop_codon}){
+                    foreach my $exid (keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+                        if ($cds_end and $transcript->strand==1){
+                            if ($cds_end < $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'}){
+                                $cds_end = $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'};
+                            }
+                        }
+                        elsif ($cds_start and $transcript->strand==-1){
+                            if ($cds_start > $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'}){
+                                $cds_start = $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'};
+                            }
+                        }
+                    }
+                }
+                if ($cds_start and $cds_end){
+                print "CDS_START=$cds_start\nCDS_END=$cds_end\n";
+                    my $start_exon;
+                    my $end_exon;
+                    my $seq_start;
+                    my $seq_end;
+                    foreach my $exon (@{$transcript->get_all_Exons}){
+                        if ($exon->start <= $cds_start and $exon->end >= $cds_start){
+                            if ($transcript->strand==1){
+                                $start_exon = $exon;
+                                $seq_start = $cds_start - $start_exon->start + 1;
+                            }
+                            else{
+                                $end_exon = $exon;
+                                $seq_end = $end_exon->end - $cds_start + 1;
+                            }
+                        }
+                        if ($exon->start <= $cds_end and $exon->end >= $cds_end){
+                            if ($transcript->strand==1){
+                                $end_exon = $exon;
+                                $seq_end = $cds_end - $end_exon->start + 1;
+                            }
+                            else{
+                                $start_exon = $exon;
+                                $seq_start = $start_exon->end - $cds_end + 1;
+                            }
+                        }
+                    }
                
-                my $translation = Bio::Vega::Translation->new(
+                    my $translation = Bio::Vega::Translation->new(
                                                               -start_exon => $start_exon,
                                                               -end_exon   => $end_exon,
                                                               -seq_start  => $seq_start,
                                                               -seq_end    => $seq_end
                                                               );
-                $transcript->translation($translation);
-                
-                #Re-check exon phases
-                my $check_message = $self->check_exon_phases($transcript);
-                print $check_message."\n";
+                    $transcript->translation($translation);
+               } 
+               #Re-check exon phases
+               my $check_message = $self->check_exon_phases($transcript);
+               print $check_message."\n";
             }
 
             #Add transcript to gene
@@ -2080,10 +2135,10 @@ sub check_exon_phases {
                 }
             }
             if ($phase != $exon->phase){
-                $message .= "Expected phase ($phase) does not match database phase (".$exon->phase.") for exon ".$exon->stable_id." ".$exon->start."-".$exon->end." on strand ".$exon->strand."\n";
+                $message .= "Expected phase ($phase) does not match database phase (".$exon->phase.") for exon ".($exon->stable_id || "")." ".$exon->start."-".$exon->end." on strand ".$exon->strand."\n";
             }
             if ($end_phase != $exon->end_phase){
-                $message .= "Expected end phase ($end_phase) does not match database end phase (".$exon->end_phase.") for exon ".$exon->stable_id." ".$exon->start."-".$exon->end." on strand ".$exon->strand."\n";
+                $message .= "Expected end phase ($end_phase) does not match database end phase (".$exon->end_phase.") for exon ".($exon->stable_id || "")." ".$exon->start."-".$exon->end." on strand ".$exon->strand."\n";
             }
         }
     }
