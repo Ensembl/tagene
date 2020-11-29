@@ -416,13 +416,14 @@ foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
             $gene->add_Transcript($transcript);
         }
         
-        
-
+print "ZZZ".$gene->biotype."\n";        
+print "ZZZ".join(", ", map {$_->biotype} @{$gene->get_all_Transcripts})."\n"; 
         #Update gene and transcript biotypes
         if (!($gene->biotype) or $gene->biotype eq "missing_biotype"){
             $gene = $self->assign_biotypes($gene); #This also updates description if appropriate 
         }
-        
+print "ZZZ".$gene->biotype."\n"; 
+print "ZZZ".join(", ", map {$_->biotype} @{$gene->get_all_Transcripts})."\n";          
         #Update gene and transcript status - only lncRNA genes for now
         $gene = $self->assign_status($gene);
         
@@ -1061,8 +1062,13 @@ print "SUBMODE: $submode\n";
                                 else{
                                     #If 'comp_pipe' transcript, change its biotype and remove the 'not for VEGA' attribute
                                     if ($ts->biotype eq $CP_BIOTYPE){
-                                        my $t_biotype = get_transcript_biotype($db_gene);
-                                        $ts->biotype($t_biotype);
+                                        if ($ts->translation){ #CDS from the gtf/gff3 file
+                                            $ts->biotype("protein_coding"); #should look for NMD too!
+                                        }
+                                        else{
+                                            my $t_biotype = get_transcript_biotype($db_gene);
+                                            $ts->biotype($t_biotype);
+                                        }
                                         if ($no_NFV){
                                             if (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
                                                 my $array = $ts->{'attributes'};
@@ -1115,8 +1121,14 @@ print "SUBMODE: $submode\n";
 
                     #unless forced comp_pipe biotype, assign transcript biotype based on other transcripts
                     unless ($force_cp_biotype){
-                        my $t_biotype = get_transcript_biotype($db_gene);
-                        $tr->biotype($t_biotype);                   
+                    print "XXX".$tr->biotype."\n";
+                        if ($tr->translation){ #CDS from the gtf/gff3 file
+                       #     $tr->biotype("protein_coding"); #should look for NMD too!
+                        }
+                        else{
+                            my $t_biotype = get_transcript_biotype($db_gene);
+                            $tr->biotype($t_biotype);
+                        }                  
                         if ($no_NFV){
                             if (scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')})){
                                 my $array = $tr->{'attributes'};
@@ -2412,6 +2424,7 @@ sub get_transcript_biotype {
             }
         }
     }
+
     return "processed_transcript";
 }
 
