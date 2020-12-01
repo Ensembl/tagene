@@ -126,7 +126,7 @@ sub parse_gxf_file {
                                                                                 'end'    => $end,
                                                                                 'strand' => $strand,
                                                                                 'phase'  => "p".$phase,
-                                                                           }; print "B: ".$exon_id." ".$start."\n";
+                                                                           };
         }
         elsif ($type eq "stop_codon"){ #Relevant for GENCODE gtf type files, where stop codon is not included in CDS
             my $exon_id = $attribs{'exon_id'} || $attribs{'exon_number'} || $.; #gtf line number as default exon id
@@ -263,9 +263,9 @@ sub make_vega_objects {
 #foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{cds}}){
 #  print "B$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{cds}{$exonid}{'start'}."\n";
 #} 
-foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
-    print "d$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
-}                
+#foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+#    print "d$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+#}                
                 #Assign exon phases from gxf file if exon starts within CDS
                 #Compare also with stop_codon coordinates as stop codon is not included in CDS in GENCODE gtf files
                 my $gtf_phase; 
@@ -280,13 +280,13 @@ foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
 #  print "C$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{cds}{$exonid}{'start'}."\n";
 #} 
                  
-                print "\n$gtf_phase \n" if $gtf_phase;
+                #print "\n$gtf_phase \n" if $gtf_phase;
                 if ($gtf_phase and ($gtf_phase eq "p0" or $gtf_phase eq "p1" or $gtf_phase eq "p2")){
                 #if ($gtf_phase){
-                    print "\nA\n";
-foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
-    print "e$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
-}  
+                    #print "\nA\n";
+#foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+#    print "e$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+#}  
                     if ((($exon->start == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} or 
                           defined($genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}) and 
                           $exon->start == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'})                        
@@ -298,10 +298,10 @@ foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
                     ){
                         $exon->phase(0) if $gtf_phase eq "p0";
                         $exon->phase(1) if $gtf_phase eq "p2";
-                        $exon->phase(2) if $gtf_phase eq "p1"; print "\nB".$exon->phase."\n";
-foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
-    print "f$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
-} 
+                        $exon->phase(2) if $gtf_phase eq "p1"; #print "\nB".$exon->phase."\n";
+#foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+#    print "f$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+#} 
                   
                         if ((($exon->end == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} or 
                               $exon->end == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'end'}) 
@@ -310,31 +310,31 @@ foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
                               $exon->start == $genes{$gid}{transcripts}{$tid}{stop_codon}{$exid}{'start'}) 
                               and $exon->strand == -1)
                          ){
-                           $exon->end_phase(($exon->phase + $exon->length) % 3); print "\nC".$exon->end_phase."\n";
-foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
-    print "g$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
-}                        
+                           $exon->end_phase(($exon->phase + $exon->length) % 3); #print "\nC".$exon->end_phase."\n";
+#foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+#    print "g$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+#}                        
                           }
                     }
                     else{
-foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
-    print "h$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
-}                    
+#foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+#    print "h$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+#}                    
                         #Half-coding start codon: no phase but end_phase
                         if ($exon->end == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} and $exon->strand == 1){
-                            $exon->end_phase(($exon->end - $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} + 1) % 3); print "\nD".$exon->end_phase."\n";
+                            $exon->end_phase(($exon->end - $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} + 1) % 3); #print "\nD".$exon->end_phase."\n";
                         }
                         elsif ($exon->start == $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} and $exon->strand == -1){
-                            $exon->end_phase(($genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} - $exon->start + 1) % 3); print "\nE".$exon->end_phase."\n";
+                            $exon->end_phase(($genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'} - $exon->start + 1) % 3); #print "\nE".$exon->end_phase."\n";
                         }
-foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
-    print "i$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
-}
+#foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+#    print "i$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+#}
                     } 
                 }
-foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
-    print "j$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
-} 
+#foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
+#    print "j$exid: ".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
+#} 
                 $transcript->add_Exon($exon);
             }
            
@@ -343,7 +343,7 @@ foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
                 my $cds_start = $transcript->end;
                 my $cds_end = $transcript->start;
                 foreach my $exid (sort keys %{$genes{$gid}{transcripts}{$tid}{cds}}){
- print "B: ".$exid."  ".$genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'}."\n";
+ #print "B: ".$exid."  ".$genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'}."\n";
                     if ($genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'} < $cds_start){
                         $cds_start = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'start'};
                     }
@@ -351,7 +351,7 @@ foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
                         $cds_end = $genes{$gid}{transcripts}{$tid}{cds}{$exid}{'end'};
                     }
                 }
-                print "CDS_START=$cds_start\nCDS_END=$cds_end\n";
+                #print "CDS_START=$cds_start\nCDS_END=$cds_end\n";
 #                foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
 #  print "D:".$exonid."  ".$genes{$gid}{transcripts}{$tid}{stop_codon}{$exonid}{'start'}."\n";
 #}
@@ -371,7 +371,7 @@ foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
                     }
                 }
                 if ($cds_start and $cds_end){
-                print "CDS_START=$cds_start\nCDS_END=$cds_end\n";
+                #print "CDS_START=$cds_start\nCDS_END=$cds_end\n";
                     my $start_exon;
                     my $end_exon;
                     my $seq_start;
@@ -408,22 +408,23 @@ foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
                     $transcript->translation($translation);
                } 
                #Re-check exon phases
-               my $check_message = $self->check_exon_phases($transcript);
-               print $check_message."\n";
+               if (my $check_message = $self->check_exon_phases($transcript)){             
+                 print $check_message."\n";
+               }
             }
 
             #Add transcript to gene
             $gene->add_Transcript($transcript);
         }
         
-print "ZZZ".$gene->biotype."\n";        
-print "ZZZ".join(", ", map {$_->biotype} @{$gene->get_all_Transcripts})."\n"; 
+#print "ZZZ".$gene->biotype."\n";        
+#print "ZZZ".join(", ", map {$_->biotype} @{$gene->get_all_Transcripts})."\n"; 
         #Update gene and transcript biotypes
         if (!($gene->biotype) or $gene->biotype eq "missing_biotype"){
             $gene = $self->assign_biotypes($gene); #This also updates description if appropriate 
         }
-print "ZZZ".$gene->biotype."\n"; 
-print "ZZZ".join(", ", map {$_->biotype} @{$gene->get_all_Transcripts})."\n";          
+#print "ZZZ".$gene->biotype."\n"; 
+#print "ZZZ".join(", ", map {$_->biotype} @{$gene->get_all_Transcripts})."\n";          
         #Update gene and transcript status - only lncRNA genes for now
         $gene = $self->assign_status($gene);
         
@@ -1005,9 +1006,10 @@ print "SUBMODE: $submode\n";
 #     $db_gene->add_Transcript($merged_transcript);    
                     #$slice_offset = $region->slice->start - 1;
 #     foreach my $tr2 (@{$db_gene->get_all_Transcripts}){
+print "\nSLICE OFFSET = $slice_offset\n";
                     foreach my $exon (@{$merged_transcript->get_all_Exons}){
-                        $exon->start($exon->start - $slice_offset);
-                        $exon->end(  $exon->end   - $slice_offset);
+                        $exon->start($exon->start - $slice_offset); print "START=".($exon->start - $slice_offset)."\n";
+                        $exon->end(  $exon->end   - $slice_offset); print "END=".($exon->end - $slice_offset)."\n";
                         $exon->slice($region->slice);
                     }
 #     }
@@ -1177,6 +1179,282 @@ print "SUBMODE: $submode\n";
     return ($g_msg, \@log);
 }
 
+
+
+
+=head2 process_gene_3
+
+ Arg[1]    : Vega gene object to be written
+ Arg[2]    : mode - either 'add' or 'update'
+ Arg[3]    : submode - either 'cons' or 'aggr'
+ Arg[4]    : Otter dataset name ('human', 'mouse', 'human_test', etc)
+ Arg[5]    : Bio::Vega::DBSQL::DBAdaptor
+ Arg[6]    : Boolean - if true, do not check for completely or partially identical intron chains in the annotation
+ Arg[7]    : Boolean - force 'comp_pipe' biotype
+ Arg[8]    : Boolean - if true, the "not for VEGA" remark will not be added
+ Arg[9]    : Boolean - if true, do not try to add a CDS
+ Arg[10]   : target transcript stable id
+ Function  : get region with the gene coordinates; 'add' the gene to the region or 'update' pre-existing gene annotation; store changes in the database 
+ Returntype: String (message with the outcome)
+
+=cut
+
+sub process_gene_3 {
+    my ($self, $gene, $mode, $submode, $dataset_name, $dba, $no_intron_check, $force_cp_biotype, $no_NFV, $do_not_add_cds, $target) = @_;
+    my @log;
+print "SUBMODE: $submode\n";
+
+    #Get default coordinate system
+    my $csa = $dba->get_CoordSystemAdaptor;
+    my $csver = $csa->fetch_top_level->version;
+
+    #If in "update" mode, the region has to span the whole host gene to stop this from being "spliced out" as an incomplete gene. 
+    #That would prevent the new annotation from being added to the host gene.
+    my ($padded_start, $padded_end);
+    if ($mode eq "update"){
+        my $host_gene = $dba->get_GeneAdaptor->fetch_by_stable_id($gene->stable_id);
+        $padded_start = min($gene->start, $host_gene->start);
+        $padded_end = max($gene->end, $host_gene->end);
+    }
+
+    #Get Otter region for the gene
+    my $local_server = Bio::Otter::Server::Support::Local->new( otter_dba => $dba );
+    $local_server->set_params(
+        dataset => $dataset_name,
+        chr     => $gene->seq_region_name,
+        start   => $padded_start || $gene->start,   
+        end     => $padded_end || $gene->end,
+        cs      => "chromosome",
+        csver   => $csver
+    );
+
+    my $region_action = Bio::Otter::ServerAction::Script::Region->new_with_slice($local_server);
+    my $region = $region_action->get_region; #Bio::Vega::Region
+    print "\nFOUND ".scalar($region->genes)." GENES IN REGION ".$gene->seq_region_name.":".$gene->start."\n";
+
+    #Reset gene coordinates to the start of the region slice,
+    #otherwise the gene coordinates in loutre will be wrong
+    my $slice_offset = $region->slice->start - 1;
+    print "OFFSET=$slice_offset\n";
+    foreach my $tr (@{$gene->get_all_Transcripts}){
+        foreach my $exon (@{$tr->get_all_Exons}){
+            $exon->start($exon->start - $slice_offset);
+            $exon->end(  $exon->end   - $slice_offset);
+            $exon->slice($region->slice);
+        }
+    }
+
+    if ($mode eq "add"){
+        #Create a new gene name
+        my $new_gene_name = $self->get_new_gene_name($region, $gene, $dataset_name, $dba) or return " ";
+        my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_gene_name);
+        $gene->add_Attributes($name_att);
+        foreach my $tr (@{$gene->get_all_Transcripts}){
+            #Create a new transcript name
+            my $new_tr_name = $self->get_new_transcript_name($gene, $dba);
+            my $tr_name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
+            $tr->add_Attributes($tr_name_att);
+            my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+            print "TR: $id: Will add transcript $new_tr_name to novel gene $new_gene_name\n";
+            push (@log, "TR2: $id: Added transcript $new_tr_name to novel gene $new_gene_name");
+        }
+        $gene = $self->assign_biotypes($gene);
+        #Add new gene to region
+        $region->add_genes($gene);
+    }
+
+    elsif ($mode eq "update"){
+        #Update existing gene: host gene that provided its stable id to the gene being stored
+        if (scalar(grep {$_->stable_id eq $gene->stable_id} $region->genes) == 1){
+            my ($db_gene) = grep {$_->stable_id eq $gene->stable_id} $region->genes;
+            
+            
+            TR:foreach my $tr (@{$gene->get_all_Transcripts}){
+                my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+                print "\n\n#Looking at transcript $id\n";
+                my $add_transcript = 0;
+                my @merge_candidates = ();
+
+                
+                ###
+ 
+                #Conservative mode: a new transcript model is only stored if it has a novel intron structure or an existing intron structure with novel sequence in its terminal exons; existing transcripts are never updated.
+                if ($submode eq "cons"){
+                    #Add RefSeq transcript
+                    $add_transcript = 1;
+                }
+                #Aggressive mode: existing transcripts can be modified by merging them with new models if they are compatible.
+                elsif ($submode eq "aggr"){
+                    #Merge RefSeq transcript with target transcript, always keeping the exact coordinates and CDS of the RefSeq transcript
+                    if ($target){
+                        my ($db_tr) = grep {$_->stable_id eq $target} @{$db_gene->get_all_Transcripts};
+                        unless ($db_tr){
+                            warn "\n\nNO $target TRANSCRIPT FOUND!!!\n\n";
+                            return;
+                        }
+                        @merge_candidates = ($db_tr);
+                    }
+                }
+
+         
+                #Take action
+                #my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+                if (scalar @merge_candidates > 0){
+                    my $sel_db_tr = $merge_candidates[0];
+                    my $merged_transcript = merge_transcripts_2($tr, $sel_db_tr );
+print "\nSLICE OFFSET = $slice_offset\n";
+                    foreach my $exon (@{$merged_transcript->get_all_Exons}){
+                        $exon->start($exon->start - $slice_offset); print "START=".($exon->start - $slice_offset)."\n";
+                        $exon->end(  $exon->end   - $slice_offset); print "END=".($exon->end - $slice_offset)."\n";
+                        $exon->slice($region->slice);
+                    }
+#     }
+                    foreach my $g ($region->genes) {
+                        foreach my $ts (@{$g->get_all_Transcripts}) {
+                            if ($ts->stable_id eq $merged_transcript->stable_id){
+                                $ts->flush_Exons; #This empties the exon list. If the same exons are added again, 
+                                                  #those that are not associated with other transcripts will get a new stable id
+                                foreach my $exon (@{$merged_transcript->get_all_Exons}){
+                                    $ts->add_Exon($exon);
+                                }
+                                
+                                #Add translation from the novel transcript
+                                $ts->translation($merged_transcript->translation);
+                                
+                                #Remove attributes indicating incompleteness
+                                my $atts = $ts->{'attributes'};            
+                                @$atts = grep {$_->code ne "cds_start_NF" and $_->code ne "cds_end_NF" and $_->code ne "mRNA_start_NF" and $_->code ne "mRNA_end_NF"} @$atts;
+                                                               
+                                #Add remarks and hidden remarks from the novel transcript
+                                foreach my $att (@{$merged_transcript->get_all_Attributes}){
+                                    $ts->add_Attributes($att);
+                                }
+                                
+                                                                
+                                #If flag is on, force comp_pipe biotype and "not for VEGA" remark (they should normally be associated)
+                                if ($force_cp_biotype){
+                                    $ts->biotype($CP_BIOTYPE);
+                                    unless (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
+                                        $ts->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'remark', -value => 'not for VEGA') );
+                                    }
+                                }
+                                else{
+                                    #If 'comp_pipe' transcript, change its biotype and remove the 'not for VEGA' attribute
+                                    if ($ts->biotype eq $CP_BIOTYPE){
+                                        if ($ts->translation){ #CDS from the gtf/gff3 file
+                                            $ts->biotype("protein_coding"); #should look for NMD too!
+                                        }
+                                        else{
+                                            my $t_biotype = get_transcript_biotype($db_gene);
+                                            $ts->biotype($t_biotype);
+                                        }
+                                        if ($no_NFV){
+                                            if (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
+                                                my $array = $ts->{'attributes'};
+                                                @$array = grep { $_->value ne "not for VEGA" } @$array;
+                                            }
+                                        }
+                                    }
+                                }
+                                 
+
+                                #If coding gene, try to assign a CDS and change the biotype accordingly
+                                unless ($do_not_add_cds){
+                                    assign_cds_to_transcripts($ts, $g, $slice_offset);
+                                }
+                                
+                                #Change authorship
+                                $ts->transcript_author($merged_transcript->transcript_author);
+                                
+                                print "TR: $id: Will extend transcript ".$ts->stable_id." (".$ts->biotype.") in gene ".$g->stable_id."\n";
+                                push (@log, "TR2: $id: Extended transcript ".$ts->stable_id." (".$ts->biotype.") in gene ".$g->stable_id." (".$g->biotype.")");
+                            }
+                        }
+                    }
+    
+                    #Update transcript
+                    #$sel_db_tr->flush_Exons;   #This empties the exon list. If the same exons are added again, 
+                                                #those that are not associated with other transcripts will get a new stable id
+                    #foreach my $exon (@{$merged_transcript->get_all_Exons}){
+                    #    $sel_db_tr->add_Exon($exon);
+                    #}
+                    #$db_gene->add_Transcript($sel_db_tr);
+              #      print "TR: $id: Will extend transcript ".$merged_transcript->stable_id." in gene ".$db_gene->stable_id."\n";
+              #      push (@log, "TR2: $id: Extended transcript ".$merged_transcript->stable_id." (".$tr->biotype.") in gene ".$db_gene->stable_id." (".$db_gene->biotype.")");
+                }
+                elsif ($add_transcript == 1){
+                    #Create a name for the new transcript
+                    my $new_tr_name = $self->get_new_transcript_name($db_gene, $dba);
+                    my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
+                    $tr->add_Attributes($name_att);
+                    print "TR0_START=".$tr->seq_region_start."; TR0_END=".$tr->seq_region_end."\n";
+                    $tr->slice($region->slice);
+                    $tr->start($tr->start - $slice_offset);
+                    $tr->end($tr->end - $slice_offset);
+                    #foreach my $exon (@{$tr->get_all_Exons}){
+                    #    $exon->start($exon->start - $slice_offset);
+                    #    $exon->end(  $exon->end   - $slice_offset);
+                    #    $exon->slice($region->slice);
+                    #}
+                    
+
+                    #unless forced comp_pipe biotype, assign transcript biotype based on other transcripts
+                    unless ($force_cp_biotype){
+                    print "XXX".$tr->biotype."\n";
+                        if ($tr->translation){ #CDS from the gtf/gff3 file
+                            $tr->biotype("protein_coding"); #should look for NMD too!
+                        }
+                        else{
+                            my $t_biotype = get_transcript_biotype($db_gene);
+                            $tr->biotype($t_biotype);
+                        }                  
+                        if ($no_NFV){
+                            if (scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')})){
+                                my $array = $tr->{'attributes'};
+                                @$array = grep { $_->value ne "not for VEGA" } @$array;
+                            }
+                        }
+                    }
+
+                    #If coding gene, try to assign a CDS and change the biotype accordingly
+                    print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."\n";
+                    unless ($do_not_add_cds){
+                        assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
+                    }
+                    $db_gene->add_Transcript($tr);
+                    print "TR: $id: Will add transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id."\n";
+                    push (@log, "TR2: $id: Added transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id." (".$db_gene->biotype.")");
+                }
+                else{
+                    print "TR: $id: Will reject transcript in host gene ".$db_gene->stable_id." as intron chain exists\n";
+                    push (@log, "TR2: $id: Rejected transcript in host gene ".$db_gene->stable_id." as intron chain exists");
+                }
+            }
+        }
+        else{
+            warn "More than one gene with stable id ".$gene->stable_id."!!!\n";
+        }
+    }
+
+    #Gene biotype
+    #Check Bio::Vega::Gene->set_biotype_status_from_transcripts
+
+
+    #Write region
+    my $g_msg = " ";
+    if ($WRITE){
+        $local_server->authorized_user($gene->gene_author->name); # preserve authorship
+        my $n = 0;
+        while (($g_msg eq " " or $g_msg =~ /write failed/) and $n<10){
+            $g_msg = write_gene_region($region_action, $region);
+            sleep(int(rand(3)));
+            $n++;
+        }
+        print $g_msg."\n";
+    }
+
+    return ($g_msg, \@log);
+}
 
 
 
@@ -2403,6 +2681,81 @@ sub merge_transcripts {
 
     return $db_tr;
 }
+
+
+
+
+
+=head2 merge_transcripts_2
+
+ Arg[1]    : Bio::Vega::Transcript object (novel transcript)
+ Arg[2]    : Bio::Vega::Transcript object (database transcript)
+ Function  : Returns a transcript resulting from merging the two input transcripts - the first one will always keep its exon coordinates and CDS
+ Returntype: Bio::Vega::Transcript
+
+=cut
+
+sub merge_transcripts_2 {
+    my ($tr, $db_tr) = @_;
+    print "BEFORE: ".join('+', map {$_->vega_hashkey} @{$db_tr->get_all_Exons})."\n";
+    print "BEFORE2: ".join('+', map {$_->vega_hashkey} @{$tr->get_all_Exons})."\n";
+    EX:foreach my $exon (@{$tr->get_all_Exons}){
+        #Check if exon is completely new or overlaps an existing exon
+        my $seen = 0;
+        foreach my $db_exon (@{$db_tr->get_all_Exons}){
+            if ($exon->seq_region_start == $db_exon->seq_region_start and $exon->seq_region_end == $db_exon->seq_region_end){
+                $seen = 1;
+                next EX;
+            }
+            elsif ($exon->seq_region_start <= $db_exon->seq_region_end and $exon->seq_region_end >= $db_exon->seq_region_start){
+                $seen = 1;
+                #If exons overlap, merge them, remove the old exon and add the merged exon to the database transcript.
+                #NOTE: not checking if there is exon-intron overlap or if an exon overlaps two exons of the other transcript. 
+                #It has been checked elsewhere.
+                my $new_start = $exon->seq_region_start;
+                my $new_end = $exon->seq_region_end;
+                my $novel_exon = new Bio::Vega::Exon ( -start => $new_start, 
+                                                       -end => $new_end,
+                                                       -strand => $db_tr->seq_region_strand,
+                                                       -slice => $db_tr->slice
+                                                      );
+                $novel_exon->phase($exon->phase);
+                $novel_exon->end_phase($exon->end_phase);
+                $db_tr->swap_exons($db_exon, $novel_exon);
+                next EX;
+            }
+        }
+        #If novel, make new Exon object and add it to the database transcript
+        if ($seen == 0){
+            my $novel_exon = new Bio::Vega::Exon ( -start => $exon->seq_region_start, 
+                                                   -end => $exon->seq_region_end,
+                                                   -strand => $db_tr->seq_region_strand,
+                                                   -slice => $db_tr->slice
+                                                  );
+            $novel_exon->phase($exon->phase);
+            $novel_exon->end_phase($exon->end_phase);
+            $db_tr->add_Exon($novel_exon);
+        }
+    }
+    print "AFTER: ".join('+', map {$_->vega_hashkey} @{$db_tr->get_all_Exons})."\n";
+    
+    #Add translation
+    $db_tr->translation($tr->translation);
+
+    #Add remarks (except 'not for VEGA') and hidden remarks from the novel transcript
+    foreach my $att (@{$tr->get_all_Attributes}){
+        $db_tr->add_Attributes($att);
+    }
+    
+    #Change authorship
+    $db_tr->transcript_author($tr->transcript_author);
+
+    return $db_tr;
+}
+
+
+
+
 
 
 
