@@ -409,7 +409,7 @@ sub make_vega_objects {
                } 
                #Re-check exon phases
                if (my $check_message = $self->check_exon_phases($transcript)){             
-                 print $check_message."\n";
+                 print $check_message."\n" if $check_message =~ /\w+/;
                }
             }
 
@@ -1008,8 +1008,8 @@ print "SUBMODE: $submode\n";
 #     foreach my $tr2 (@{$db_gene->get_all_Transcripts}){
 print "\nSLICE OFFSET = $slice_offset\n";
                     foreach my $exon (@{$merged_transcript->get_all_Exons}){
-                        $exon->start($exon->start - $slice_offset); print "START=".($exon->start - $slice_offset)."\n";
-                        $exon->end(  $exon->end   - $slice_offset); print "END=".($exon->end - $slice_offset)."\n";
+                        $exon->start($exon->start - $slice_offset); print "START=".$exon->start."\n";
+                        $exon->end(  $exon->end   - $slice_offset); print "END=".$exon->end."\n";
                         $exon->slice($region->slice);
                     }
 #     }
@@ -1238,8 +1238,8 @@ print "SUBMODE: $submode\n";
     print "OFFSET=$slice_offset\n";
     foreach my $tr (@{$gene->get_all_Transcripts}){
         foreach my $exon (@{$tr->get_all_Exons}){
-            $exon->start($exon->start - $slice_offset);
-            $exon->end(  $exon->end   - $slice_offset);
+            $exon->start($exon->start - $slice_offset); #print "START0=".$exon->start."\n";
+            $exon->end(  $exon->end   - $slice_offset); #print "END0=".$exon->end."\n";
             $exon->slice($region->slice);
         }
     }
@@ -1254,7 +1254,10 @@ print "SUBMODE: $submode\n";
             my $new_tr_name = $self->get_new_transcript_name($gene, $dba);
             my $tr_name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
             $tr->add_Attributes($tr_name_att);
-            my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+            my $id;
+            if ($tr->get_all_Attributes('hidden_remark')->[0]->value =~ /Matches RefSeq (NM_.+)/){
+                $id = $1;
+            } 
             print "TR: $id: Will add transcript $new_tr_name to novel gene $new_gene_name\n";
             push (@log, "TR2: $id: Added transcript $new_tr_name to novel gene $new_gene_name");
         }
@@ -1270,12 +1273,14 @@ print "SUBMODE: $submode\n";
             
             
             TR:foreach my $tr (@{$gene->get_all_Transcripts}){
-                my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+                my $id;
+                if ($tr->get_all_Attributes('hidden_remark')->[0]->value =~ /Matches RefSeq (NM_.+)/){
+                    $id = $1;
+                }                
                 print "\n\n#Looking at transcript $id\n";
                 my $add_transcript = 0;
-                my @merge_candidates = ();
-
-                
+                my @merge_candidates = (); 
+                              
                 ###
  
                 #Conservative mode: a new transcript model is only stored if it has a novel intron structure or an existing intron structure with novel sequence in its terminal exons; existing transcripts are never updated.
@@ -1300,37 +1305,69 @@ print "SUBMODE: $submode\n";
                 #Take action
                 #my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
                 if (scalar @merge_candidates > 0){
-                    my $sel_db_tr = $merge_candidates[0];
-                    my $merged_transcript = merge_transcripts_2($tr, $sel_db_tr );
-print "\nSLICE OFFSET = $slice_offset\n";
+                    my $sel_db_tr = $merge_candidates[0]; 
+                    my $merged_transcript = merge_transcripts_2($tr, $sel_db_tr, $slice_offset);
+#print "TR:".scalar(@{$tr->get_all_Attributes})." DBTR:".scalar(@{$sel_db_tr->get_all_Attributes})." MERGED:".scalar(@{$merged_transcript->get_all_Attributes})."\n";
+#print "\nSLICE OFFSET = $slice_offset\n";
                     foreach my $exon (@{$merged_transcript->get_all_Exons}){
-                        $exon->start($exon->start - $slice_offset); print "START=".($exon->start - $slice_offset)."\n";
-                        $exon->end(  $exon->end   - $slice_offset); print "END=".($exon->end - $slice_offset)."\n";
+                        #$exon->start($exon->start - $slice_offset); 
+                     #   print "START=".$exon->start."\n";
+                        #$exon->end(  $exon->end   - $slice_offset); 
+                     #   print "END=".$exon->end."\n";
                         $exon->slice($region->slice);
                     }
 #     }
-                    foreach my $g ($region->genes) {
-                        foreach my $ts (@{$g->get_all_Transcripts}) {
+                    foreach my $g ($region->genes){
+                        foreach my $ts (@{$g->get_all_Transcripts}){
                             if ($ts->stable_id eq $merged_transcript->stable_id){
-                                $ts->flush_Exons; #This empties the exon list. If the same exons are added again, 
+                        #        $ts->flush_Exons; #This empties the exon list. If the same exons are added again, 
                                                   #those that are not associated with other transcripts will get a new stable id
                                 foreach my $exon (@{$merged_transcript->get_all_Exons}){
-                                    $ts->add_Exon($exon);
+                        #            $ts->add_Exon($exon);
                                 }
+                 #print "N1=".scalar(@{$merged_transcript->get_all_Exons})."\n";               
+                 #print "N2=".scalar(@{$ts->get_all_Exons})."\n";      
+                        
+                                #Modify/add translation from the novel transcript
+                                my ($tn_start_exon, $tn_end_exon);
+                                foreach my $exon (@{$ts->get_all_Exons}){
+                                #print "E_START=".$exon->start."\n";
+                                    if ($exon->start == $tr->translation->start_Exon->start and $exon->end == $tr->translation->start_Exon->end){
+                                        $tn_start_exon = $exon;
+                                    }
+                                    if ($exon->start == $tr->translation->end_Exon->start and $exon->end == $tr->translation->end_Exon->end){
+                                        $tn_end_exon = $exon;
+                                    }
+                                }
+                                if ($ts->translation){
+                                    $ts->translation->start_Exon($tn_start_exon);
+                                    $ts->translation->end_Exon($tn_end_exon); #print "AAAA\n";
+                                    $ts->translation->start($tr->translation->start);
+                                    $ts->translation->end($tr->translation->end);
+                                }
+                                else{
+                                    my $translation = new Bio::Vega::Translation;
+                                    $translation->start_Exon($tn_start_exon); 
+                                    $translation->end_Exon($tn_end_exon);  #print "BBBB\n";
+                                    $translation->start($tr->translation->start);
+                                    $translation->end($tr->translation->end);
+                                    $ts->translation($translation);
+                                }
+          
+                 print " ".($tr->translation->seq eq $ts->translation->seq ? "SAME TRANSLATION SEQ":"DIFFERENT TRANSLATION SEQ")."\n".$tr->translation->seq."\n".$ts->translation->seq."\n";
                                 
-                                #Add translation from the novel transcript
-                                $ts->translation($merged_transcript->translation);
-                                
-                                #Remove attributes indicating incompleteness
+                               
+                                #Remove attributes indicating incompleteness (RefSeq transcript is full length)
                                 my $atts = $ts->{'attributes'};            
                                 @$atts = grep {$_->code ne "cds_start_NF" and $_->code ne "cds_end_NF" and $_->code ne "mRNA_start_NF" and $_->code ne "mRNA_end_NF"} @$atts;
-                                                               
+                 #print "MERGED2:".scalar(@{$merged_transcript->get_all_Attributes})."\n";  print "TS:".scalar(@{$ts->get_all_Attributes})."\n";                                           
                                 #Add remarks and hidden remarks from the novel transcript
                                 foreach my $att (@{$merged_transcript->get_all_Attributes}){
-                                    $ts->add_Attributes($att);
+                           #     print $att->code."\n";
+                                #    $ts->add_Attributes($att);
                                 }
-                                
-                                                                
+                              
+                                                                 
                                 #If flag is on, force comp_pipe biotype and "not for VEGA" remark (they should normally be associated)
                                 if ($force_cp_biotype){
                                     $ts->biotype($CP_BIOTYPE);
@@ -1344,23 +1381,34 @@ print "\nSLICE OFFSET = $slice_offset\n";
                                         if ($ts->translation){ #CDS from the gtf/gff3 file
                                             $ts->biotype("protein_coding"); #should look for NMD too!
                                         }
-                                        else{
+                                        else{ 
                                             my $t_biotype = get_transcript_biotype($db_gene);
                                             $ts->biotype($t_biotype);
-                                        }
-                                        if ($no_NFV){
-                                            if (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
-                                                my $array = $ts->{'attributes'};
-                                                @$array = grep { $_->value ne "not for VEGA" } @$array;
-                                            }
-                                        }
+                                        }                                        
                                     }
                                 }
                                  
-
+                                if ($no_NFV){
+                                    if (scalar(grep {$_->value eq "not for VEGA"} @{$ts->get_all_Attributes('remark')})){
+                                        my $array = $ts->{'attributes'};
+                                        @$array = grep { $_->value ne "not for VEGA" } @$array;
+                                    }
+                                }
+                                
                                 #If coding gene, try to assign a CDS and change the biotype accordingly
                                 unless ($do_not_add_cds){
                                     assign_cds_to_transcripts($ts, $g, $slice_offset);
+                                }
+                                
+                                #Assign status based on other transcripts
+                                assign_transcript_status($ts, $g); 
+                                
+                                #Update source if Ensembl
+                                if ($ts->source eq "ensembl"){
+                                    $ts->source("ensembl_havana");
+                                }
+                                if ($g->source eq "ensembl"){
+                                    $g->source("ensembl_havana");
                                 }
                                 
                                 #Change authorship
@@ -1387,7 +1435,7 @@ print "\nSLICE OFFSET = $slice_offset\n";
                     my $new_tr_name = $self->get_new_transcript_name($db_gene, $dba);
                     my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
                     $tr->add_Attributes($name_att);
-                    print "TR0_START=".$tr->seq_region_start."; TR0_END=".$tr->seq_region_end."\n";
+                    #print "TR0_START=".$tr->seq_region_start."; TR0_END=".$tr->seq_region_end."\n";
                     $tr->slice($region->slice);
                     $tr->start($tr->start - $slice_offset);
                     $tr->end($tr->end - $slice_offset);
@@ -1417,10 +1465,21 @@ print "\nSLICE OFFSET = $slice_offset\n";
                     }
 
                     #If coding gene, try to assign a CDS and change the biotype accordingly
-                    print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."\n";
+                    #print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."\n";
                     unless ($do_not_add_cds){
                         assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
                     }
+                    #Assign status based on other transcripts
+                    assign_transcript_status($tr, $db_gene);
+                    
+                    #Update source if Ensembl
+                    if ($tr->source eq "ensembl"){
+                      $tr->source("ensembl_havana");
+                    }
+                    if ($gene->source eq "ensembl"){
+                      $gene->source("ensembl_havana");
+                    }
+                     
                     $db_gene->add_Transcript($tr);
                     print "TR: $id: Will add transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id."\n";
                     push (@log, "TR2: $id: Added transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id." (".$db_gene->biotype.")");
@@ -1429,12 +1488,13 @@ print "\nSLICE OFFSET = $slice_offset\n";
                     print "TR: $id: Will reject transcript in host gene ".$db_gene->stable_id." as intron chain exists\n";
                     push (@log, "TR2: $id: Rejected transcript in host gene ".$db_gene->stable_id." as intron chain exists");
                 }
-            }
+            } 
         }
         else{
             warn "More than one gene with stable id ".$gene->stable_id."!!!\n";
         }
     }
+   
 
     #Gene biotype
     #Check Bio::Vega::Gene->set_biotype_status_from_transcripts
@@ -1443,6 +1503,7 @@ print "\nSLICE OFFSET = $slice_offset\n";
     #Write region
     my $g_msg = " ";
     if ($WRITE){
+    print "WRITING\n";
         $local_server->authorized_user($gene->gene_author->name); # preserve authorship
         my $n = 0;
         while (($g_msg eq " " or $g_msg =~ /write failed/) and $n<10){
@@ -2631,6 +2692,7 @@ sub pick_db_tr {
 sub merge_transcripts {
     my ($tr, $db_tr) = @_;
     print "BEFORE: ".join('+', map {$_->vega_hashkey} @{$db_tr->get_all_Exons})."\n";
+    print "BEFORE2: ".join('+', map {$_->vega_hashkey} @{$tr->get_all_Exons})."\n";
     EX:foreach my $exon (@{$tr->get_all_Exons}){
         #Check if exon is completely new or overlaps an existing exon
         my $seen = 0;
@@ -2696,7 +2758,7 @@ sub merge_transcripts {
 =cut
 
 sub merge_transcripts_2 {
-    my ($tr, $db_tr) = @_;
+    my ($tr, $db_tr, $slice_offset) = @_;
     print "BEFORE: ".join('+', map {$_->vega_hashkey} @{$db_tr->get_all_Exons})."\n";
     print "BEFORE2: ".join('+', map {$_->vega_hashkey} @{$tr->get_all_Exons})."\n";
     EX:foreach my $exon (@{$tr->get_all_Exons}){
@@ -2712,8 +2774,8 @@ sub merge_transcripts_2 {
                 #If exons overlap, merge them, remove the old exon and add the merged exon to the database transcript.
                 #NOTE: not checking if there is exon-intron overlap or if an exon overlaps two exons of the other transcript. 
                 #It has been checked elsewhere.
-                my $new_start = $exon->seq_region_start;
-                my $new_end = $exon->seq_region_end;
+                my $new_start = $exon->seq_region_start - $slice_offset;
+                my $new_end = $exon->seq_region_end - $slice_offset;
                 my $novel_exon = new Bio::Vega::Exon ( -start => $new_start, 
                                                        -end => $new_end,
                                                        -strand => $db_tr->seq_region_strand,
@@ -2727,8 +2789,8 @@ sub merge_transcripts_2 {
         }
         #If novel, make new Exon object and add it to the database transcript
         if ($seen == 0){
-            my $novel_exon = new Bio::Vega::Exon ( -start => $exon->seq_region_start, 
-                                                   -end => $exon->seq_region_end,
+            my $novel_exon = new Bio::Vega::Exon ( -start => $exon->seq_region_start - $slice_offset, 
+                                                   -end => $exon->seq_region_end - $slice_offset,
                                                    -strand => $db_tr->seq_region_strand,
                                                    -slice => $db_tr->slice
                                                   );
@@ -2739,11 +2801,10 @@ sub merge_transcripts_2 {
     }
     print "AFTER: ".join('+', map {$_->vega_hashkey} @{$db_tr->get_all_Exons})."\n";
     
-    #Add translation
-    $db_tr->translation($tr->translation);
 
     #Add remarks (except 'not for VEGA') and hidden remarks from the novel transcript
     foreach my $att (@{$tr->get_all_Attributes}){
+        next if $att->code eq "status" and scalar(@{$db_tr->get_all_Attributes("status")});
         $db_tr->add_Attributes($att);
     }
     
@@ -2874,6 +2935,18 @@ sub clip_ends {
 }
 
 
+sub assign_transcript_status {
+  my ($tr, $db_gene) = @_;
+  if ($tr->translation){
+    foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
+      if ($db_tr->translation){
+        if ($db_tr->translation->seq eq $tr->translation->seq){
+          $tr->status($db_tr->status);
+        }
+      }
+    }
+  }
+}
 
 1;
 
