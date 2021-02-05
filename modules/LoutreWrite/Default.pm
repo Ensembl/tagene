@@ -339,7 +339,7 @@ foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
             }
            
             #Make translation object
-            if ($genes{$gid}{transcripts}{$tid}{cds}){
+            if (scalar(keys %{$genes{$gid}{transcripts}{$tid}{cds}})){
                 my $cds_start = $transcript->end;
                 my $cds_end = $transcript->start;
                 foreach my $exid (sort keys %{$genes{$gid}{transcripts}{$tid}{cds}}){
