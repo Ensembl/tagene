@@ -2456,7 +2456,7 @@ sub has_polyA_site_support {
 
  Arg[1]    : Bio::Vega::Transcript object
  Arg[1]    : integer (distance threshold)
- Function  : Returns true if there are polyA-seq features from at lest four different tissues within the distance to the transcript 3' end indicated by the second argument
+ Function  : Returns true if there are polyA-seq features from at least four different tissues within the distance to the transcript 3' end indicated by the second argument
  Returntype: none
 
 =cut
@@ -2464,15 +2464,23 @@ sub has_polyA_site_support {
 sub has_polyAseq_support {
   my ($transcript, $threshold) = @_;
   my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
-  my $sa = $DBA{'polyAseq'}->get_SliceAdaptor();
-  my $ext_slice = $sa->fetch_by_region("chromosome", $transcript->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
-  my @polyAseq_features = grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures()};
-  my %anames;
-  foreach my $feat (@polyAseq_features){
-    $anames{$feat->analysis->logic_name} = 1;
-  }
-  if (scalar keys %anames >= 4){
-    return 1;
+  my $sa = $DBA{'core'}->get_SliceAdaptor();
+  my $slice = $sa->fetch_by_region("chromosome", $transcript->seq_region_name, $transcript_end, $transcript_end);
+  #Project slice to GRCh37 
+  my $projection = $slice->project("chromosome", "GRCh37");
+  if ($projection){
+    my $segment = $projection->[0];
+    my $proj_transcript_end = $segment->from_start;
+    my $psa = $DBA{'polyAseq'}->get_SliceAdaptor();    
+    my $ext_slice = $psa->fetch_by_region("chromosome", $segment->to_Slice->seq_region_name, $proj_transcript_end - $threshold, $proj_transcript_end + $threshold);  
+    my @polyAseq_features = grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures()};
+    my %anames;
+    foreach my $feat (@polyAseq_features){
+      $anames{$feat->analysis->logic_name} = 1;
+    }
+    if (scalar keys %anames >= 4){
+      return 1;
+    }
   }
   return 0;
 }
