@@ -1012,7 +1012,7 @@ print "SUBMODE: $submode\n";
                     }
 #     }
                     foreach my $g ($region->genes) {
-                        foreach my $ts (@{$g->get_all_Transcripts}) {
+                        foreach my $ts (@{$g->get_all_Transcripts}){
                             if ($ts->stable_id eq $merged_transcript->stable_id){
                                 $ts->flush_Exons; #This empties the exon list. If the same exons are added again, 
                                                   #those that are not associated with other transcripts will get a new stable id
@@ -1079,9 +1079,15 @@ print "SUBMODE: $submode\n";
                                 }
                                  
 
-                                #If coding gene, try to assign a CDS and change the biotype accordingly
-                                unless ($do_not_add_cds){
-                                    assign_cds_to_transcripts($ts, $g, $slice_offset);
+                                #Firstly, check for intron retention
+                                #Else, if allowed, try to assign a CDS and change the biotype accordingly
+                                if (LoutreWrite::CDSUtils::is_retained_intron($ts, $g, 5)){
+                                    $ts->biotype("retained_intron");
+                                }
+                                else{
+                                    unless ($do_not_add_cds){
+                                        assign_cds_to_transcripts($ts, $g, $slice_offset);
+                                    }
                                 }
                                 
                                 #Change authorship
@@ -1121,7 +1127,7 @@ print "SUBMODE: $submode\n";
 
                     #unless forced comp_pipe biotype, assign transcript biotype based on other transcripts
                     unless ($force_cp_biotype){
-                    print "XXX".$tr->biotype."\n";
+                        print "XXX".$tr->biotype."\n";
                         if ($tr->translation){ #CDS from the gtf/gff3 file
                        #     $tr->biotype("protein_coding"); #should look for NMD too!
                         }
@@ -1137,10 +1143,16 @@ print "SUBMODE: $submode\n";
                         }
                     }
 
-                    #If coding gene, try to assign a CDS and change the biotype accordingly
                     print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."\n";
-                    unless ($do_not_add_cds){
-                        assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
+                    #Firstly, check for intron retention
+                    #Else, if allowed, try to assign a CDS and change the biotype accordingly
+                    if (LoutreWrite::CDSUtils::is_retained_intron($tr, $db_gene, 5)){
+                        $tr->biotype("retained_intron");
+                    }
+                    else{
+                        unless ($do_not_add_cds){
+                            assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
+                        }
                     }
                     $db_gene->add_Transcript($tr);
                     print "TR: $id: Will add transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id."\n";
