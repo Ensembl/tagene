@@ -161,13 +161,13 @@ sub assign_cds_to_transcripts {
       }
     }
     #Else, try to create a CDS using a start codon from the host gene    
-    #But first, check for intron retention
-    print "\nChecking for intron retention...\n";
-    if (is_retained_intron ($transcript, $host_gene, 5)){
-      $transcript->biotype("retained_intron");
-      print "Found retained_intron\n";
-      next TR;
-    }
+#    #But first, check for intron retention - SKIP THIS: DONE EARLIER
+#    print "\nChecking for intron retention...\n";
+#    if (is_retained_intron ($transcript, $host_gene, 5)){
+#      $transcript->biotype("retained_intron");
+#      print "Found retained_intron\n";
+#      next TR;
+#    }
     print "\nChecking start codons...\n";
     foreach my $unique_start_codon (@$start_codon_set){
       #Start codon coordinates are relative to the region slice: convert to genomic
