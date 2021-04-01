@@ -11,8 +11,8 @@ our @EXPORT = qw(%DBA);
 
 our %DBA;
 
-my $loutre_db = get_loutre_db_adaptor();
-$DBA{'loutre'} = $loutre_db;
+my $havana_db = get_havana_db_adaptor();
+$DBA{'havana'} = $havana_db;
 my $pipe_db = get_pipe_db_adaptor();
 $DBA{'pipe'} = $pipe_db;
 my $core_db = get_core_db_adaptor();
@@ -24,14 +24,14 @@ $DBA{'polyAseq'} = $polyAseq_db;
 
 
 
-#Connect to the loutre database (the live/production one, not necessarily the otter database that is being edited)
-sub get_loutre_db_adaptor {
+#Connect to the havana database (the live/production one, not necessarily the otter database that is being edited)
+sub get_havana_db_adaptor {
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
      -host   => 'mysql-ens-havana-prod-1',
      -port   => 4581,
      -user   => 'ensro',
      -pass   => undef,
-     -dbname => 'loutre_human',
+     -dbname => 'havana_human',
      -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);
