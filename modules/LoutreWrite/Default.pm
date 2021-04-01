@@ -2482,9 +2482,8 @@ sub has_polyAseq_support {
   my $projection = $slice->project("chromosome", "GRCh37");
   if ($projection){
     my $segment = $projection->[0];
-    my $proj_transcript_end = $segment->from_start;
     my $psa = $DBA{'polyAseq'}->get_SliceAdaptor();    
-    my $ext_slice = $psa->fetch_by_region("chromosome", $segment->to_Slice->seq_region_name, $proj_transcript_end - $threshold, $proj_transcript_end + $threshold);  
+    my $ext_slice = $psa->fetch_by_region("chromosome", $segment->to_Slice->seq_region_name, $segment->to_Slice->seq_region_end - $threshold, $segment->to_Slice->seq_region_end + $threshold); 
     my @polyAseq_features = grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures()};
     my %anames;
     foreach my $feat (@polyAseq_features){
