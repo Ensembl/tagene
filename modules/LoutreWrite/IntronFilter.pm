@@ -212,28 +212,17 @@ sub get_ss_antisense_overlap {
 
 sub get_ss_repeat_overlap {
   my $intron = shift;
-  my $sa = $DBA{'loutre'}->get_SliceAdaptor();
-  my $intron_slice = $sa->fetch_by_region("chromosome", "chr".$intron->seq_region_name."-38", $intron->seq_region_start-2, $intron->seq_region_end+2);
-  #Project slice to clone level as repeat features are stored in clone coordinates
-  my @rfs;
-  my @projs = @{$intron_slice->project("contig")};
-  foreach my $proj (@projs){
-    my $clone_slice = $proj->to_Slice();
-    push(@rfs, @{$clone_slice->get_all_RepeatFeatures('RepeatMasker')}, @{$clone_slice->get_all_RepeatFeatures('trf')});
-  }
-  if (scalar(@projs==0)){
-    print "NO PROJ\t".$intron->seq_region_name.":".$intron->seq_region_start."-".$intron->seq_region_end."\n";
-  }
+  my $sa = $DBA{'core'}->get_SliceAdaptor();
+  my $intron_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start-2, $intron->seq_region_end+2);
+  my @rfs = (@{$intron_slice->get_all_RepeatFeatures('RepeatMasker')}, @{$clone_slice->get_all_RepeatFeatures('trf')});
   my $overlaps_repeat;
   my %intron_repeat_overlaps;
   foreach my $rf (@rfs){
-    $rf = $rf->transform("chromosome", "Otter", $intron_slice);
-    next unless $rf;
     #overlap with splice site: -2/+2 nt
     if (($rf->seq_region_start <= $intron->seq_region_start + 1 and $rf->seq_region_end >= $intron->seq_region_start - 2) or
         ($rf->seq_region_start <= $intron->seq_region_end + 2 and $rf->seq_region_end >= $intron->seq_region_end - 1)){
       $overlaps_repeat = 1;
-      my $repeat_type = get_repeat_type($rf); #pipe_human does not store repeat types, unlike ensembl_core
+      my $repeat_type = $rf->repeat_consensus->repeat_type;
       $repeat_type =~ s/ /_/g;
       $intron_repeat_overlaps{$repeat_type}++;
     }
@@ -297,46 +286,10 @@ sub get_relative_intron_score {
 }
 
 
-sub get_repeat_type {
-  my $rf = shift;
-  my $type;
-  my $class = $rf->repeat_consensus->repeat_class;
-  if ($class =~ /^DNA/){
-    $type = "Type II Transposons";
-  }
-  elsif ($class =~ /^LINE/){
-    $type = "Type I Transposons/LINE";
-  }
-  elsif ($class =~ /^Low_complexity/){
-    $type = "Low complexity regions";
-  }
-  elsif ($class =~ /^LTR/){
-    $type = "LTRs";
-  }
-  elsif ($class =~ /^SINE/){
-    $type = "Type I Transposons/SINE";
-  }
-  elsif ($class =~ /^Satellite/){
-    $type = "Satellite repeats";
-  }
-  elsif ($class =~ /RNA/){
-    $type = "RNA repeats";
-  }
-  elsif ($class eq "trf"){
-    $type = "Tandem repeats";
-  }
-  else{
-    $type = "Unknown";
-  }
-  return $type;
-}
-
-
 sub get_intron_length {
   my $intron = shift;
   return $intron->length;
 }
-
 
 
 sub get_exonerate_alignment_support {
