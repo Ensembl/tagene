@@ -17,7 +17,7 @@ my $pipe_db = get_pipe_db_adaptor();
 $DBA{'pipe'} = $pipe_db;
 my $core_db = get_core_db_adaptor();
 $DBA{'core'} = $core_db;
-my $intron_db = get_intropolis_db_adaptor();
+my $intron_db = get_intron_db_adaptor();
 $DBA{'intron'} = $intron_db;
 my $polyAseq_db = get_polyAseq_db_adaptor();
 $DBA{'polyAseq'} = $polyAseq_db;
@@ -78,14 +78,14 @@ sub get_core_db_adaptor {
 }
 
 
-#Connect to the Intropolis database
-sub get_intropolis_db_adaptor { 
+#Connect to the intron database
+sub get_intron_db_adaptor { 
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
     -host   => 'mysql-ens-havana-prod-1',
     -port   => 4581,
     -user   => 'ensro',
     -pass   => undef,
-    -dbname => 'gencode_sf5_human_introns',
+    -dbname => 'gencode_snaptron',
     -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);

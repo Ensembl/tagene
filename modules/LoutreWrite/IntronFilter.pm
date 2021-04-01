@@ -36,17 +36,17 @@ sub predict_outcome {
     my $ss_sequence = get_ss_seq($intron);
     my $antisense_ovlp = get_ss_antisense_overlap($intron);
     my $repeat_ovlp = get_ss_repeat_overlap($intron);
-    my $intropolis_score = get_intropolis_score($intron);
+    my $intron_score = get_intron_score($intron);
     my $rel_score = get_relative_intron_score($intron, $transcript);
     my $intron_length = get_intron_length($intron);
     my $exonerate_ali = get_exonerate_alignment_support($intron, $transcript);
-    print "INTRON: ".$intron->seq_region_start."-".$intron->seq_region_end."  NOV=$is_novel SS=$ss_sequence AS=$antisense_ovlp REP=$repeat_ovlp IP=$intropolis_score REL=$rel_score LEN=$intron_length EX=$exonerate_ali\n";
+    print "INTRON: ".$intron->seq_region_start."-".$intron->seq_region_end."  NOV=$is_novel SS=$ss_sequence AS=$antisense_ovlp REP=$repeat_ovlp IP=$intron_score REL=$rel_score LEN=$intron_length EX=$exonerate_ali\n";
 
     if ($is_novel eq "yes" and
         ($ss_sequence ne "GT..AG" or
         $antisense_ovlp eq "yes" or
         $repeat_ovlp =~ /SINE|Tandem_repeats/ or
-        $intropolis_score == 0 or
+        $intron_score == 0 or
         ($rel_score ne "NA" and $rel_score < $rel_score_cutoff) or
         $intron_length < $length_cutoff)){
         return 0;
@@ -236,11 +236,12 @@ sub get_ss_repeat_overlap {
 }
 
 
-sub get_intropolis_score {
+sub get_intron_score {
   my $intron = shift;
   my $sa = $DBA{'intron'}->get_SliceAdaptor();
   my $intron_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
   foreach my $sf (@{$intron_slice->get_all_SimpleFeatures}){
+    next unless $sf->logic_name =~ /^recount3_pass1/;
     if ($sf->seq_region_start==$intron->seq_region_start and $sf->seq_region_end==$intron->seq_region_end and $sf->seq_region_strand==$intron->seq_region_strand){
       return $sf->score;
     }
@@ -254,7 +255,7 @@ sub get_relative_intron_score {
   my (@scores, $pos, @novel);
   my $n = 0;
   foreach my $int (@{$tr->get_all_Introns}){
-    my $score = get_intropolis_score($intron);
+    my $score = get_intron_score($intron);
     push(@scores, $score);
     my $is_novel = is_novel($intron);
     push(@novel, $is_novel);
