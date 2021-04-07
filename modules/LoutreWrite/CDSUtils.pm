@@ -4,7 +4,7 @@ package LoutreWrite::CDSUtils;
 use strict;
 use warnings;
 use base 'Exporter';
-our @EXPORT = qw( sort_by_categ get_host_gene_cds_set assign_cds_to_transcripts get_appris_tag get_ccds_tag cds_exon_chain start_codon_fits has_complete_cds get_host_gene_start_codon_set is_retained_intron %HOST_CDS_SET %HOST_START_CODON_SET );
+our @EXPORT = qw( sort_by_categ get_host_gene_cds_set assign_cds_to_transcripts get_appris_tag get_ccds_tag cds_exon_chain start_codon_fits has_complete_cds get_host_gene_start_codon_set is_retained_intron %HOST_CDS_SET %HOST_START_CODON_SET %HOST_STOP_CODON_SET );
 use Bio::Vega::Translation;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptUtils qw(calculate_exon_phases);
 use Bio::EnsEMBL::Registry;
@@ -14,6 +14,7 @@ use LoutreWrite::Config;
 
 our %HOST_CDS_SET;
 our %HOST_START_CODON_SET;
+our %HOST_STOP_CODON_SET;
 our %CORE_TRANSCRIPTS;
 
 #my $registry = 'Bio::EnsEMBL::Registry';
@@ -116,6 +117,16 @@ sub assign_cds_to_transcripts {
     $start_codon_set = get_host_gene_start_codon_set($host_gene);
     $HOST_START_CODON_SET{$host_gene->stable_id} = $start_codon_set;
   }
+  my $stop_codon_set;
+  if ($HOST_STOP_CODON_SET{$host_gene->stable_id}){
+    $stop_codon_set = $HOST_STOP_CODON_SET{$host_gene->stable_id};
+    #print "Using HOST_STOP_CODON_SET\n";
+  }
+  else{
+    $stop_codon_set = get_host_gene_stop_codon_set($host_gene);
+    $HOST_STOP_CODON_SET{$host_gene->stable_id} = $stop_codon_set;
+  }  
+  
         #print "HOST_CDS_SET=".scalar(keys %HOST_CDS_SET)."\n";
         #print "HOST_START_CODON_SET=".scalar(keys %HOST_START_CODON_SET)."\n";
   print "HOST GENE START = ".$host_gene->seq_region_start." HOST GENE END = ".$host_gene->seq_region_end."\n";
@@ -125,10 +136,10 @@ sub assign_cds_to_transcripts {
     print "TR_START=".$transcript->seq_region_start."; TR_END=".$transcript->seq_region_end."\n";
     
     #Find out if the transcript has polyA support - otherwise it can't be made coding
-    unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or LoutreWrite::Default::has_polyAseq_support($transcript, 500)){
-      print "No polyA site support found\n";
-      next TR;
-    }
+#    unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or LoutreWrite::Default::has_polyAseq_support($transcript, 500)){
+#      print "No polyA site support found\n";
+#      next TR;
+#    }
     
     print "\nAvailable CDSs:\n";
     foreach my $unique_cds_tr (@$cds_set){
@@ -172,8 +183,16 @@ sub assign_cds_to_transcripts {
     foreach my $unique_start_codon (@$start_codon_set){
       #Start codon coordinates are relative to the region slice: convert to genomic
       print "start_codon=".($unique_start_codon+$slice_offset)."; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
-      my ($cds_start, $cds_end) = start_codon_fits($transcript, $unique_start_codon + $slice_offset); 
+      my ($cds_start, $cds_end, $fl_cds) = start_codon_fits($transcript, $unique_start_codon + $slice_offset); 
       if ($cds_start and $cds_end){
+        if ($fl_cds){
+          #PolyA support or know stop codon required if full-length CDS
+          unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or LoutreWrite::Default::has_polyAseq_support($transcript, 500) or is_known_stop_codon($cds_end, $slice_offset, $host_gene)){
+            print "Stop codon at $cds_end has no polyA site support nor has been annotated before\n";
+            next TR;
+          }
+        }
+          
         if (create_cds($transcript, $cds_start, $cds_end)){
           #Re-assign biotype and status
           if (predicted_nmd_transcript($transcript, $cds_end)){
@@ -183,6 +202,7 @@ sub assign_cds_to_transcripts {
             $transcript->biotype("protein_coding");
             $transcript->status("PUTATIVE");
           }
+          #Add end_NF attributes if 3'-incomplete CDS
           add_end_NF_attributes($transcript, $slice_offset);
           print "".($unique_start_codon + $slice_offset)." start codon matches ".$transcript->stable_id." (".$transcript->biotype."-".$transcript->status.")\n";
           next TR;
@@ -521,6 +541,28 @@ sub has_cds_start {
 }
 
 
+=head2 has_cds_end
+
+ Arg[1]    : Bio::Vega::Transcript object
+ Function  : returns true if transcript has no 'cds end not found' attribute
+ Returntype: boolean
+
+=cut
+
+sub has_cds_end {
+  my $transcript = shift;
+  if (!($transcript->translate)){
+    return 0;
+  }
+  foreach my $attribute (@{$transcript->get_all_Attributes('cds_end_NF')}){
+    if ($attribute->value == 1){
+      return 0;
+    }
+  }
+  return 1;
+}
+
+
 
 =head2 get_appris_tag
 
@@ -786,7 +828,7 @@ sub start_codon_fits {
         #Avoid making an NMD transcript with a CDS smaller than 35 aa
         unless (predicted_nmd_transcript($transcript, $cds_end) and ($cds_length-3)/3  <= 35){
           print $transcript->stable_id.": complete CDS of $cds_length bp $3\n";
-          return ($cds_start, $cds_end);
+          return ($cds_start, $cds_end, 1);
         }
       }
       #Or an open-ended ORF?
@@ -794,7 +836,7 @@ sub start_codon_fits {
         my $cds_length = length($1);
         print $transcript->stable_id.": end-NF-CDS of $cds_length bp\n";
         my $cds_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
-        return ($cds_start, $cds_end);
+        return ($cds_start, $cds_end, 0);
       }
     }
   }
@@ -904,6 +946,56 @@ print "create_cds => CDS_START: $cds_start ; CDS_END: $cds_end\n";
   return 1;
 }
 
+
+=head2 get_host_gene_stop_codon_set
+
+ Arg[1]    : Bio::Vega::Gene object
+ Function  : returns the set of unique CDS end positions (except for cds_end_NF transcripts) in the host gene
+ Returntype: arrayref of integers
+
+=cut
+
+sub get_host_gene_stop_codon_set {
+  my $gene = shift;
+  #print "G_START=".$gene->seq_region_start."; G_END=".$gene->seq_region_end."\n";
+  #print "G_START=".$gene->start."; G_END=".$gene->end."\n";
+  my @stop_codon_set;
+  my %seen_sc;
+  my @filtered_transcripts = grep {has_cds_end($_)} @{$gene->get_all_Transcripts};
+  foreach my $transcript (@filtered_transcripts){
+    #$transcript = $transcript->transform("chromosome");
+    #print "T_START=".$transcript->seq_region_start."; T_END=".$transcript->seq_region_end."\n";
+    my $cds_end = $transcript->seq_region_strand == 1 ? $transcript->coding_region_end : $transcript->coding_region_start;
+    #print "CDS_START=$cds_start\n";
+    unless ($seen_sc{$cds_end}){
+      push(@stop_codon_set, $cds_end);
+      $seen_sc{$cds_end} = 1;
+    }
+  }
+  return \@stop_codon_set;
+}
+
+
+=head2 is_known_stop_codon
+
+ Arg[1]    : integer (CDS end in genomic coordinates)
+ Arg[2]    : integer (offset)
+ Arg[3]    : Bio::Vega::Gene object (host gene)
+ Function  : returns true if the stop codon ending at that position has been annotated before
+ Returntype: boolean
+
+=cut
+
+sub is_known_stop_codon {
+  my ($cds_end, $slice_offset, $gene) = @_;
+  foreach my $stop_codon (@{$HOST_STOP_CODON_SET{$gene->stable_id}}){
+    print "FFF=$stop_codon + $slice_offset = ".($stop_codon + $slice_offset)."; GGG=$cds_end\n";
+    if ($cds_end == $stop_codon+$slice_offset){
+      return 1;
+    }
+  }
+  return 0;
+}
 
 
 =head2 add_end_NF_attributes
