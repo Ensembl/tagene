@@ -166,7 +166,7 @@ sub make_vega_objects {
     my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype, $analysis_name, $source, $no_NFV, $only_chr) = @_;
     
     #Some common features
-    $source ||= "havana";
+    $source ||= "tagene";
     $analysis_name ||= "Otter";
     my $analysis = Bio::EnsEMBL::Analysis->new( -logic_name => $analysis_name );
     
