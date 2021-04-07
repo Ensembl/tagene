@@ -2085,6 +2085,7 @@ sub check_overlapped_loci {
                 next unless $db_gene->source =~ /(ensembl|havana)/;
                 next if $db_gene->biotype eq "artifact";
                 next if scalar(grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) > 0;
+                next if $db_gene->biotype =~ /^(rRNA|snRNA|misc_RNA|snoRNA|rRNA_pseudogene|miRNA|scaRNA|ribozyme|sRNA)$/;  #Ignore small RNA genes
                 foreach my $db_exon (@{$db_gene->get_all_Exons}){
                     foreach my $exon (@{$transcript->get_all_Exons}){
                         if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
