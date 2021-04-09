@@ -2457,7 +2457,7 @@ sub has_polyA_site_support {
   my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
   my $sa = $DBA{'havana'}->get_SliceAdaptor();
   my $ext_slice = $sa->fetch_by_region("chromosome", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
-  if (scalar grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures('polyA_site')}){
+  if (scalar grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures('polya_site')}){
     return 1;
   }
   return 0;
