@@ -268,8 +268,9 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_start >= $intron->seq_region_start and
               $transcript->end_Exon->seq_region_end > $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
-                #Check polyAs
-                unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500)){
+                #Check polyA site support
+                unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or LoutreWrite::Default::has_polyAseq_support($transcript, 500)){
+                  print "No polyA site support - will make a retained_intron\n";
                   return 1;
                 }
           }
@@ -277,8 +278,9 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_start < $intron->seq_region_start and
               $transcript->end_Exon->seq_region_end <= $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
-                #Check polyAs
-                unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500)){
+                #Check polyA site support
+                unless (LoutreWrite::Default::has_polyA_site_support($transcript, 500) or LoutreWrite::Default::has_polyAseq_support($transcript, 500)){
+                  print "No polyA site support - will make a retained_intron\n";
                   return 1;
                 }
           }
