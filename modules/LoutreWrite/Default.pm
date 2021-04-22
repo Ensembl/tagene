@@ -173,8 +173,12 @@ sub make_vega_objects {
     my $nfv_remark = Bio::EnsEMBL::Attribute->new(
                                 -code => 'remark',
                                 -value => 'not for VEGA'
-                    );
+                     );
 
+    my $tagene_gene_attrib = Bio::EnsEMBL::Attribute->new(
+                                -code => 'TAGENE_gene',
+                                -value => '1'
+                             );
     my $tagene_attrib = Bio::EnsEMBL::Attribute->new(
                                 -code => 'TAGENE_transcript',
                                 -value => '1'
@@ -189,7 +193,7 @@ sub make_vega_objects {
         $source_remark = Bio::EnsEMBL::Attribute->new(
                                 -code => 'remark',
                                 -value => $remark
-                        );
+                         );
     }            
     my $author = Bio::Vega::Author->new(
                                 -name   => $author_name,
@@ -217,7 +221,7 @@ sub make_vega_objects {
         unless ($no_NFV){
             $gene->add_Attributes($nfv_remark);
         }
-        #$gene->add_Attributes($tagene_attrib);
+        $gene->add_Attributes($tagene_gene_attrib);
         $gene->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => $genes{$gid}{'gene_name'}));
         
         #Add biotype-status combination sanity check!!!
