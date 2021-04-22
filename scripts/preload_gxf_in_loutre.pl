@@ -29,6 +29,7 @@ my $no_intron_check;
 my $host_biotype;
 my $max_overlapped_loci;
 my $filter_introns;
+my $platinum;
 my $only_chr;
 my $max_n_tr;
 my $tag;
@@ -51,6 +52,7 @@ my $tmpdir;
             'host_biotype=s'    => \$host_biotype,
             'max_ov_loc=i'      => \$max_overlapped_loci,
             'filter_introns!'   => \$filter_introns,
+            'platinum!'         => \$platinum,
             'chr=s'             => \$only_chr,
             'write!'            => \$write,
             'max=i'             => \$max_n_tr,
@@ -165,6 +167,7 @@ COM
   $command .= " -host_biotype $host_biotype \\\n"      if $host_biotype;
   $command .= " -max_ov_loc $max_overlapped_loci \\\n" if $max_overlapped_loci;
   $command .= " -filter_introns \\\n"                  if $filter_introns;
+  $command .= " -platinum \\\n"                        if $platinum;
   $command .= " -chr $only_chr \\\n"                   if $only_chr;
   $command .= " -write \\\n"                           if $write;
 
