@@ -730,13 +730,14 @@ sub process_gene {
  Arg[7]    : Boolean - force 'comp_pipe' biotype
  Arg[8]    : Boolean - if true, the "not for VEGA" remark will not be added
  Arg[9]    : Boolean - if true, do not try to add a CDS
+ Arg[10]   : Boolean - if true, add a "platinum" hidden remark
  Function  : get region with the gene coordinates; 'add' the gene to the region or 'update' pre-existing gene annotation; store changes in the database 
  Returntype: String (message with the outcome)
 
 =cut
 
 sub process_gene_2 {
-    my ($self, $gene, $mode, $submode, $dataset_name, $dba, $no_intron_check, $force_cp_biotype, $no_NFV, $do_not_add_cds) = @_;
+    my ($self, $gene, $mode, $submode, $dataset_name, $dba, $no_intron_check, $force_cp_biotype, $no_NFV, $do_not_add_cds, $platinum) = @_;
     my @log;
 print "SUBMODE: $submode\n";
 
@@ -791,6 +792,9 @@ print "SUBMODE: $submode\n";
             my $tr_name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
             $tr->add_Attributes($tr_name_att);
             my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+            if ($platinum){
+              $tr->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => 'Platinum set') );
+            }
             print "TR: $id: Will add transcript $new_tr_name to novel gene $new_gene_name\n";
             push (@log, "TR2: $id: Added transcript $new_tr_name to novel gene $new_gene_name");
         }
@@ -839,7 +843,7 @@ print "SUBMODE: $submode\n";
                     $tr = clip_ends($tr, $db_tr, 5, $slice_offset);
                     
 
-                    #Loop over all transcripts in case a second db transcript support the transcript's start/end (exclude known retained introns?)
+                    #Loop over all transcripts in case a second db transcript supports the transcript's start/end (exclude known retained introns?)
                     
                 }
                 #IDEALLY, CREATE A METHOD FOR CHECKING NOVELTY SO THAT IT IS EASIER TO RE-RUN IT IF A TRANSCRIPT IS CLIPPED
@@ -914,6 +918,13 @@ print "SUBMODE: $submode\n";
                                       @merge_candidates = ();
                                       last DBTR;
                                     }
+                                    #Do not merge with Platinum transcripts
+                                    elsif (scalar grep {$_->value eq "Platinum set"} @{$db_tr->get_all_Attributes('hidden_remark')}){
+                                      print "Skipping transcript as partially redundant with a Platinum transcript\n";
+                                      $add_transcript = 0;
+                                      @merge_candidates = ();
+                                      last DBTR;
+                                    }
                                     else{
                                       push(@merge_candidates, $db_tr);
                                     }
@@ -942,8 +953,22 @@ print "SUBMODE: $submode\n";
                     DBTR:foreach my $db_tr_id (keys %tr_comp){
                         if ($tr_comp{$db_tr_id}->{'exon'} == 1 and $tr_comp{$db_tr_id}->{'merge'} == 1){
                             my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
-                            if (scalar(@{$db_tr->get_all_Exons}) == 1 and !($db_tr->translate())){
-                                if ($tr->start <= $db_tr->start and $tr->end => $db_tr->end and
+                            #Do not merge with MANE_select transcripts
+                            if (scalar grep {$_->value eq "MANE_select"} @{$db_tr->get_all_Attributes('remark')}){
+                                print "Skipping transcript as partially redundant with a MANE Select transcript\n";
+                                $add_transcript = 0;
+                                @merge_candidates = ();
+                                last DBTR;
+                            }
+                            if (scalar(@{$db_tr->get_all_Exons}) == 1 and !($db_tr->translate())){                              
+                                #Do not merge with Platinum transcripts
+                                if (scalar grep {$_->value eq "Platinum set"} @{$db_tr->get_all_Attributes('hidden_remark')}){
+                                    print "Skipping transcript as partially redundant with a Platinum transcript\n";
+                                    $add_transcript = 0;
+                                    @merge_candidates = ();
+                                    last DBTR;
+                                }
+                                elsif ($tr->start <= $db_tr->start and $tr->end => $db_tr->end and
                                     !($tr->start == $db_tr->start and $tr->end == $db_tr->end)){
                                     push(@merge_candidates, $db_tr);
                                 }
@@ -1077,6 +1102,11 @@ print "SUBMODE: $submode\n";
                                         }
                                     }
                                 }
+                                
+                                #Add 'Platinum set' hidden remark if indicated
+                                if ($platinum){
+                                    $ts->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => 'Platinum set') );
+                                }
                                  
 
                                 #Firstly, check for intron retention
@@ -1123,7 +1153,9 @@ print "SUBMODE: $submode\n";
                     #    $exon->end(  $exon->end   - $slice_offset);
                     #    $exon->slice($region->slice);
                     #}
-                    
+                    if ($platinum){
+                        $tr->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => 'Platinum set') );
+                    }
 
                     #unless forced comp_pipe biotype, assign transcript biotype based on other transcripts
                     unless ($force_cp_biotype){
