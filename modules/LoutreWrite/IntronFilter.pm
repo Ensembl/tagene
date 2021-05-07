@@ -314,7 +314,7 @@ sub get_exonerate_alignment_support {
       #my $cmd = "exonerate -q query.fa -t target.fa -m est2genome --refine region --geneseed 250 -n 1 > z_ex_out";
       #my $cmd = "exonerate -q query.fa -t target.fa -m est2genome --geneseed 250 -n 1 --forcegtag yes > z_ex_out";
   
-  my $exonerate = $host eq "havana-06" ? "exonerate" : "/nfs/ensembl/bin/exonerate-2.2.0/exonerate";
+  my $exonerate = $host eq "havana-06" ? "exonerate" : "/nfs/ensembl/deprecated/bin/exonerate-2.2.0/exonerate";
   my $pssm_dir = "/homes/jmgonzalez/work/long_read_pipeline/annotation_exercise_results/third_round/exonerate";
   my $dir = "/tmp";
   if (`wc -l $dir/$filename.query.fa | cut -d' ' -f1` < 2){
