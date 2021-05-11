@@ -22,12 +22,12 @@ sub predict_outcome {
     my ($self, $intron, $transcript, $only_novel) = @_;
     my $rel_score_cutoff = -7;
     my $length_cutoff = 50;
-    my $source;
-    foreach my $att (@{$transcript->get_all_Attributes('remark')}){
-        if ($att->value =~ /^Assembled from PacBio CLS reads - (\w+)$/){
-            $source = $1;
-        }
-    }
+    #my $source;
+    #foreach my $att (@{$transcript->get_all_Attributes('remark')}){
+    #    if ($att->value =~ /^Assembled from PacBio CLS reads - (\w+)$/){
+    #        $source = $1;
+    #    }
+    #}
 
     my $is_novel = is_novel($intron);
     if ($only_novel and $is_novel eq "no"){
@@ -298,7 +298,9 @@ sub get_exonerate_alignment_support {
   my ($intron, $tr) = @_;
   my $read_seq = "";
   foreach my $att (@{$tr->get_all_Attributes('hidden_remark')}){
-    if ($att->value =~ /^(pacbio_capture_seq|pacbio_raceseq|SLR-seq|postfilter)_\w+/){ #TO DO: COVER OTHER CASES!
+    if ($att->value =~ /^(pacbio_capture_seq|pacbio_raceseq|SLR-seq|postfilter)_\w+/ or
+        $att->value =~ /^pacBio(SII)?:Cshl:/
+    ){
       $read_seq .= get_read_sequences($att->value);
       last;
     }
@@ -350,6 +352,7 @@ sub get_read_sequences {
             'CLS'     => Bio::DB::Fasta->new("$fasta_dir/Captureseq_merged.fasta"),
             'RACEseq' => Bio::DB::Fasta->new("$fasta_dir/RACEseq_merged.fasta"),
             'PB_test' => Bio::DB::Fasta->new("$fasta_dir/PB_test.fasta"),
+            'CLS3'    => Bio::DB::Fasta->new("$fasta_dir/CLS3.fasta"),
            );
   my %fasta_seqs;
   my @warnings;
@@ -378,6 +381,9 @@ sub get_read_sequences {
       }
       elsif ($sample_name =~ /postfilter/){
         $seq = $db{'PB_test'}->seq($read_name);
+      }
+      elsif ($sample_name =~ /pacBio(SII)?:Cshl:/){
+        $seq = $db{'CLS3'}->seq($read_name);
       }
       elsif ($sample_name eq "none"){
         foreach my $dataset (qw(SLRseq CLS RACEseq)){

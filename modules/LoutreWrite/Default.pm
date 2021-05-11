@@ -1058,13 +1058,16 @@ print "SUBMODE: $submode\n";
                                     #Append read names to existing remark
                                     if ((($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq_\w+ : .+;/) or
                                         ($att->code eq "hidden_remark" and $att->value =~ /^SLR-seq_\w+ : .+;/) or
-                                        ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_raceseq_\w+ : .+;/)) and
+                                        ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_raceseq_\w+ : .+;/)
+                                        ($att->code eq "hidden_remark" and $att->value =~ /^pacBio(SII):Cshl:\S+ : .+;/)
+                                        ) and
                                         (scalar(@{$ts->get_all_Attributes('TAGENE_transcript')}) > 0)){
                                         my $appended = 0;
                                         foreach my $att2 (@{$ts->get_all_Attributes('hidden_remark')}){
                                             if ($att2->value =~ /^pacbio_capture_seq_\w+ : .+;/ or
                                                 $att2->value =~ /^SLR-seq_\w+ : .+;/ or
-                                                $att2->value =~ /^pacbio_raceseq_\w+ : .+;/){
+                                                $att2->value =~ /^pacbio_raceseq_\w+ : .+;/ or
+                                                $att2->value =~ /^pacBio(SII):Cshl:\S+ : .+;/){
                                                 $att2->value($att2->value." ".$att->value);
                                                 $appended = 1;
                                                 last;
