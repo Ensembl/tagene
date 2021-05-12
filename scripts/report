@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+
+
+echo -e "\nNumber of genes"
+cat $@ | grep ^LOOKING | wc -l
+
+echo -e "\nTranscripts ignored as overlapping multiple loci"
+cat $@ | grep ^TR2 | grep "max allowed number" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as host gene biotype not allowed"
+cat $@ | grep ^TR2 | grep "host gene biotype not allowed" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts rejected as intron didn't pass the filter"
+cat $@ | grep ^TR2 | grep "intron did not pass the filter" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts rejected as intron chain exists in annotation"
+cat $@ | grep ^TR2 | grep "Rejected" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts skipped as clones could not be unlocked"
+cat $@ | grep "could not be unlocked" | wc -l
+
+echo -e "\nTranscripts added (novel)"
+cat $@ | grep ^TR2 | grep "Added" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts extended"
+cat $@ | grep ^TR2 | grep "Extended" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nNovel genes"
+cat $@ | grep -P "RESULT: novel gene .+ was created" | wc -l
+
+echo -e "\nModified genes"
+cat $@ | grep -P "RESULT: gene .+ was modified" | sort -u | wc -l 
+
