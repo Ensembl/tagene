@@ -186,6 +186,7 @@ foreach my $gene_obj (@$gene_objects_2){
             #There are a few cases in loutre_human
             else{
                 foreach my $tr (@{$host_gene->get_all_Transcripts}){
+                    next if scalar (grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')});
                     if ($tr->translate and $host_biotype and !($host_biotype =~ /protein_coding/)){
                         print "Gene ".$host_gene->stable_id." will be ignored as it has a coding transcript\n";
                         $wrong_host = 1;
