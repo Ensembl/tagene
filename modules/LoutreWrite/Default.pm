@@ -71,14 +71,14 @@ sub parse_gxf_file {
         my $transcript_id = $attribs{'transcript_id'};
         if ($type eq "gene"){
             $data{$gene_id} = {
-                                'gene_type'   => $attribs{'gene_type'},
+                                'gene_type'   => $attribs{'gene_type'} || "missing_biotype",
                                 'gene_name'   => $attribs{'gene_name'},
                                 'gene_status' => $attribs{'gene_status'}
                                 };
         }
         elsif ($type eq "transcript"){
             $data{$gene_id}{transcripts}{$transcript_id} = {
-                                                            'transcript_type'   => $attribs{'transcript_type'},
+                                                            'transcript_type'   => $attribs{'transcript_type'} || "missing_biotype",
                                                             'transcript_name'   => $attribs{'transcript_name'},
                                                             'transcript_status' => $attribs{'transcript_status'}
                                                             };
@@ -212,7 +212,7 @@ sub make_vega_objects {
     GENE:foreach my $gid (keys %genes){
         my $gene = Bio::Vega::Gene->new(
                                         -stable_id  => ($gid =~ /^OTT/ ? $gid : ""),
-                                        -biotype    => ($force_cp_biotype ? $CP_BIOTYPE : $genes{$gid}{'gene_type'}),
+                                        -biotype    => ($force_cp_biotype ? $CP_BIOTYPE : ($genes{$gid}{'gene_type'} || "missing_biotype")),
                                         -analysis   => $analysis,
                                         -source     => $source,
                                         -status     => $genes{$gid}{'gene_status'} || "UNKNOWN"
@@ -227,14 +227,14 @@ sub make_vega_objects {
         }
         $gene->add_Attributes($tagene_gene_remark);
         $gene->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => $genes{$gid}{'gene_name'}));
-print "ZZZ0".$CP_BIOTYPE."\n";         
+        
         #Add biotype-status combination sanity check!!!
 
         #Make transcript objects
         foreach my $tid (keys %{$genes{$gid}{transcripts}}){
             my $transcript = Bio::Vega::Transcript->new(
                                                         -stable_id  => ($tid =~ /^OTT/ ? $tid : ""),
-                                                        -biotype    => ($force_cp_biotype ? $CP_BIOTYPE : $genes{$gid}{transcripts}{$tid}{'transcript_type'}),
+                                                        -biotype    => ($force_cp_biotype ? $CP_BIOTYPE : ($genes{$gid}{transcripts}{$tid}{'transcript_type'} || "missing_biotype")),
                                                         -analysis   => $analysis,
                                                         -source     => $source,
                                                         -status     => $genes{$gid}{transcripts}{$tid}{'transcript_status'} || "UNKNOWN"
@@ -1475,6 +1475,9 @@ sub get_new_transcript_name {
 sub assign_biotypes {
     my ($self, $gene) = @_;
     
+    #Default gene biotype in the Ensembl API is protein_coding
+    #Let this biotype be assigned if the gene has transcripts with translations
+    $gene->biotype("processed_transcript");
     #Initial hypothesis: coding
     foreach my $transcript (@{$gene->get_all_Transcripts}){
         if ($transcript->translation){
