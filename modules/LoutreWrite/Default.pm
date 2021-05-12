@@ -60,7 +60,7 @@ sub parse_gxf_file {
             if ($file =~ /\.gff3(.gz)?$/){
                 ($name, $value) = split(/=/, $att);
             }
-            elsif ($file =~ /\.gtf(.gz)?$/){
+            elsif ($file =~ /\.g(t|f)f(.gz)?$/){
                 $att =~ s/^\s*//g;
                 ($name, $value) = split(/\s+/, $att);
                 $value =~ s/\"//g;
@@ -220,7 +220,7 @@ sub make_vega_objects {
         #$gene->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'name', -value => $genes{$gid}{'gene_name'})); #Let the script generate a name if needed
         $gene->gene_author($author);
         if ($source_remark){
-            #$gene->add_Attributes($source_remark);
+            $gene->add_Attributes($source_remark);
         }
         unless ($no_NFV){
             $gene->add_Attributes($nfv_remark);
