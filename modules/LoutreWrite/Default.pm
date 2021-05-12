@@ -179,6 +179,10 @@ sub make_vega_objects {
                                 -code => 'TAGENE_gene',
                                 -value => '1'
                              );
+    my $tagene_gene_remark = Bio::EnsEMBL::Attribute->new(
+                                -code => 'remark',
+                                -value => 'TAGENE_gene'
+                        );                             
     my $tagene_attrib = Bio::EnsEMBL::Attribute->new(
                                 -code => 'TAGENE_transcript',
                                 -value => '1'
@@ -216,14 +220,14 @@ sub make_vega_objects {
         #$gene->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'name', -value => $genes{$gid}{'gene_name'})); #Let the script generate a name if needed
         $gene->gene_author($author);
         if ($source_remark){
-            $gene->add_Attributes($source_remark);
+            #$gene->add_Attributes($source_remark);
         }
         unless ($no_NFV){
             $gene->add_Attributes($nfv_remark);
         }
-        $gene->add_Attributes($tagene_gene_attrib);
+        $gene->add_Attributes($tagene_gene_remark);
         $gene->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => $genes{$gid}{'gene_name'}));
-        
+print "ZZZ0".$CP_BIOTYPE."\n";         
         #Add biotype-status combination sanity check!!!
 
         #Make transcript objects
@@ -844,8 +848,10 @@ print "SUBMODE: $submode\n";
                     #Compare coordinates: transcript's start/end vs. db transcript's internal exon
                     #Search for a terminal exon matching an existing internal exon except for a small overhang at the end
                     #Trim transcript start/end if small overhang detected
-                    $tr = clip_ends($tr, $db_tr, 5, $slice_offset);
-                    
+                    #Skip this if Platinum
+                    unless ($platinum){
+                      $tr = clip_ends($tr, $db_tr, 5, $slice_offset);
+                    }
 
                     #Loop over all transcripts in case a second db transcript supports the transcript's start/end (exclude known retained introns?)
                     
@@ -906,10 +912,10 @@ print "SUBMODE: $submode\n";
                                     my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
                                     #Do not merge with MANE_select transcripts
                                     if (scalar grep {$_->value eq "MANE_select"} @{$db_tr->get_all_Attributes('remark')}){
-                                     print "Skipping transcript as partially redundant with a MANE Select transcript\n";
-                                      $add_transcript = 0;
-                                      @merge_candidates = ();
-                                      last DBTR;
+                                        print "Skipping transcript as partially redundant with a MANE Select transcript\n";
+                                        $add_transcript = 0;
+                                        @merge_candidates = ();
+                                        last DBTR;
                                     }
                                     #Do not merge with full-length CDS transcripts (TO DO)
                                     #unless ($db_tr->translate and has_complete_cds($db_tr)){ 
@@ -917,17 +923,19 @@ print "SUBMODE: $submode\n";
                                     #Skip transcript if it could be merged with a coding transcript,
                                     # so as not to make a partially redundant transcript
                                     elsif ($db_tr->translate()){
-                                      print "Skipping transcript as partially redundant with a coding transcript\n";
-                                      $add_transcript = 0;
-                                      @merge_candidates = ();
-                                      last DBTR;
+                                        print "Skipping transcript as partially redundant with a coding transcript\n";
+                                        $add_transcript = 0;
+                                        @merge_candidates = ();
+                                        last DBTR;
                                     }
-                                    #Do not merge with Platinum transcripts
+                                    #Do not merge with Platinum transcripts unless this transcript is also Platinum
                                     elsif (scalar grep {$_->value eq "Platinum set"} @{$db_tr->get_all_Attributes('hidden_remark')}){
-                                      print "Skipping transcript as partially redundant with a Platinum transcript\n";
-                                      $add_transcript = 0;
-                                      @merge_candidates = ();
-                                      last DBTR;
+                                        unless ($platinum){
+                                            print "Skipping transcript as partially redundant with a Platinum transcript\n";
+                                            $add_transcript = 0;
+                                            @merge_candidates = ();
+                                            last DBTR;
+                                        }
                                     }
                                     else{
                                       push(@merge_candidates, $db_tr);
@@ -965,12 +973,14 @@ print "SUBMODE: $submode\n";
                                 last DBTR;
                             }
                             if (scalar(@{$db_tr->get_all_Exons}) == 1 and !($db_tr->translate())){                              
-                                #Do not merge with Platinum transcripts
+                                #Do not merge with Platinum transcripts unless this transcript is also Platinum
                                 if (scalar grep {$_->value eq "Platinum set"} @{$db_tr->get_all_Attributes('hidden_remark')}){
-                                    print "Skipping transcript as partially redundant with a Platinum transcript\n";
-                                    $add_transcript = 0;
-                                    @merge_candidates = ();
-                                    last DBTR;
+                                    unless ($platinum){
+                                        print "Skipping transcript as partially redundant with a Platinum transcript\n";
+                                        $add_transcript = 0;
+                                        @merge_candidates = ();
+                                        last DBTR;
+                                    }
                                 }
                                 elsif ($tr->start <= $db_tr->start and $tr->end => $db_tr->end and
                                     !($tr->start == $db_tr->start and $tr->end == $db_tr->end)){
@@ -1058,7 +1068,7 @@ print "SUBMODE: $submode\n";
                                     #Append read names to existing remark
                                     if ((($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq_\w+ : .+;/) or
                                         ($att->code eq "hidden_remark" and $att->value =~ /^SLR-seq_\w+ : .+;/) or
-                                        ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_raceseq_\w+ : .+;/)
+                                        ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_raceseq_\w+ : .+;/) or
                                         ($att->code eq "hidden_remark" and $att->value =~ /^pacBio(SII):Cshl:\S+ : .+;/)
                                         ) and
                                         (scalar(@{$ts->get_all_Attributes('TAGENE_transcript')}) > 0)){

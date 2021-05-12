@@ -68,7 +68,7 @@ my $filetype;
 if ($file =~ /\.gff3(.gz)?$/){
   $filetype = "gff3";
 }
-elsif ($file =~ /\.gtf(.gz)?$/){
+elsif ($file =~ /\.g(t|f)f(.gz)?$/){
   $filetype = "gtf";
 }
 else{
