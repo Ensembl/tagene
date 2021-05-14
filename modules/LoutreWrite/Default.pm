@@ -220,13 +220,13 @@ sub make_vega_objects {
         #$gene->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'name', -value => $genes{$gid}{'gene_name'})); #Let the script generate a name if needed
         $gene->gene_author($author);
         if ($source_remark){
-            $gene->add_Attributes($source_remark);
+            #$gene->add_Attributes($source_remark);
         }
         unless ($no_NFV){
             $gene->add_Attributes($nfv_remark);
         }
         $gene->add_Attributes($tagene_gene_remark);
-        $gene->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => $genes{$gid}{'gene_name'}));
+        #$gene->add_Attributes(Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => $genes{$gid}{'gene_name'}));
         
         #Add biotype-status combination sanity check!!!
 
