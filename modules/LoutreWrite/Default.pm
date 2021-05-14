@@ -1856,6 +1856,7 @@ sub assign_host_gene {
             #Exclude undesired host genes
             if (!($db_gene->source =~ /(ensembl|havana)/) or
                 $db_gene->biotype eq "artifact" or
+                $db_gene->biotype eq "comp_pipe" or
                 scalar (grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) == 1
             ){
               next;
