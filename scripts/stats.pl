@@ -100,12 +100,13 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
       if ($is_tagene){
         foreach my $att (@{$transcript->get_all_Attributes}){
           #Increase the count of different long read models that made up the transcript
-          if ($att->code eq "hidden_remark" and $att->value =~ /^ID: (align|compmerge)/){
+          if ($att->code eq "hidden_remark" and $att->value =~ /^ID: .+(align|compmerge|NAM_TM)/){
             $tagene_models++;
           }
           #Increase the count of different long read datasets involved in making the transcript
           if ($att->code eq "remark" and 
               ($att->value =~ /^Assembled from PacBio CLS reads - .+\(GSE93848\)$/ or 
+               $att->value eq "Assembled from PacBio CLS3 reads" or
                $att->value eq "Assembled from SLRseq reads (SRP049776)" or 
                $att->value eq "Assembled from RACEseq reads")){
             $tagene_datasets++;
@@ -129,16 +130,20 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
           foreach my $att (@{$transcript->get_all_Attributes}){
             unless (($att->code eq "remark" and 
                     ($att->value =~ /^Assembled from PacBio CLS reads -.+\(GSE93848\)$/ or 
+                     $att->value eq "Assembled from PacBio CLS3 reads" or
                      $att->value eq "Assembled from SLRseq reads (SRP049776)" or 
                      $att->value eq "Assembled from RACEseq reads")) or
                     ($att->code eq "remark" and $att->value eq "not for VEGA") or
-                    ($att->code eq "hidden_remark" and $att->value =~ /^ID: (align|compmerge)/) or
+                    ($att->code eq "hidden_remark" and $att->value =~ /^ID: .+(align|compmerge|NAM_TM)/) or
                     ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq/) or
                     ($att->code eq "hidden_remark" and $att->value =~ /^SLR-seq/) or
                     ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_raceseq/) or
-                    $att->code eq "name" or 
-                    $att->code eq "TAGENE_transcript" or 
-                    $att->code eq "remark" and $att->value eq "TAGENE_transcript"
+                    ($att->code eq "hidden_remark" and $att->value =~ /^pacBio(SII)?:Cshl/) or 
+                     $att->code eq "name" or 
+                     $att->code eq "TAGENE_transcript" or                   
+                    ($att->code eq "remark" and $att->value eq "TAGENE_transcript") or
+                    ($att->code eq "remark" and $att->value eq "TAGENE_extended") or
+                    ($att->code eq "hidden_remark" and $att->value eq "Platinum set")                   
                    ){
               $extended_flag = 1;
             }
@@ -197,7 +202,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
                            ($extended_flag ? "extended" : "novel"),
                            join(", ", keys %tsources),
                            scalar(@{$transcript->get_all_Attributes('cds_end_NF')}) ? "cds_end_NF" : "NA",
-                           join(", ", map {$_->value} grep {$_->value =~ /^ID: (align|compmerge)/} @{$transcript->get_all_Attributes('hidden_remark')}),
+                           join(", ", map {$_->value} grep {$_->value =~ /^ID: .+(align|compmerge|NAM_TM)/} @{$transcript->get_all_Attributes('hidden_remark')}),
                            $is_unique_cds,
                            ($tn_length || "NA")
                       )."\n";
@@ -217,7 +222,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
     $added_tr_count += $added_c;
     $extended_tr_count += $extended_c;
     if (scalar keys %report){
-      print OUT join(", ", map {$_} grep {/ENSG/} keys %report)."\t".
+      print OUT join(", ", map {$_} grep {/ENSG|OTTHUMG/} keys %report)."\t".
                 ($gene->get_all_Attributes('name')->[0]->value || " ")."\t".
                 $gene->biotype."\t".
                 $gene_modif_date."\t".
