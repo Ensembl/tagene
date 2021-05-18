@@ -930,7 +930,10 @@ print "SUBMODE: $submode\n";
                                     }
                                     #Do not merge with Platinum transcripts unless this transcript is also Platinum
                                     elsif (scalar grep {$_->value eq "Platinum set"} @{$db_tr->get_all_Attributes('hidden_remark')}){
-                                        unless ($platinum){
+                                        if ($platinum){
+                                            push(@merge_candidates, $db_tr);
+                                        }
+                                        else{
                                             print "Skipping transcript as partially redundant with a Platinum transcript\n";
                                             $add_transcript = 0;
                                             @merge_candidates = ();
@@ -938,7 +941,7 @@ print "SUBMODE: $submode\n";
                                         }
                                     }
                                     else{
-                                      push(@merge_candidates, $db_tr);
+                                        push(@merge_candidates, $db_tr);
                                     }
                                 }
                                 else{
@@ -975,7 +978,10 @@ print "SUBMODE: $submode\n";
                                 }                                                         
                                 #Do not merge with Platinum transcripts unless this transcript is also Platinum
                                 if (scalar grep {$_->value eq "Platinum set"} @{$db_tr->get_all_Attributes('hidden_remark')}){
-                                    unless ($platinum){
+                                    if ($platinum){
+                                        push(@merge_candidates, $db_tr);
+                                    }
+                                    else{
                                         print "Skipping transcript as partially redundant with a Platinum transcript\n";
                                         $add_transcript = 0;
                                         @merge_candidates = ();
