@@ -1100,9 +1100,9 @@ print "SUBMODE: $submode\n";
                                 }
                                 
                                 #Add remark that indicates that the transcript was extended
-                                unless (scalar(grep {$_->value eq "TAGENE_extended"} @{$ts->get_all_Attributes('remark')})){
-                                    $ts->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'remark', -value => 'TAGENE_extended') );
-                                }
+                               # unless (scalar(grep {$_->value eq "TAGENE_extended"} @{$ts->get_all_Attributes('hidden_remark')})){
+                               #     $ts->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => 'TAGENE_extended') );
+                               # }
 
                                 
                                 #If flag is on, force comp_pipe biotype and "not for VEGA" remark (they should normally be associated)
