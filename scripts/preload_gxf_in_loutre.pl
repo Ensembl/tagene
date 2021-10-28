@@ -150,7 +150,7 @@ for (my $i=1; $i<=$number_of_files; $i++){
   }
   my $command = <<COM;
   bsub -M3000 -R"select[mem>3000] rusage[mem=3000]" $dependency -J "$tag.$i\[1-24\]" -oo $tmpdir/f.$tag.$i.\%I.out \\
-    ~/software/loutre_write/scripts/load_gxf_in_loutre.pl \\
+    $ENV{LOUTRE_WRITE}/scripts/load_gxf_in_loutre.pl \\
       -file $tmpdir/$tag.$i.$filetype \\
       -dataset $dataset_name \\
 COM
