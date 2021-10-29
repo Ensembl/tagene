@@ -7,10 +7,11 @@ use LoutreWrite::Default;
 use LoutreWrite::Config;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::DB::Fasta;
+use base 'Exporter';
 
+our @EXPORT = qw( $READSEQDIR );
+our $READSEQDIR;
 
-my $host = `hostname`;
-chomp $host;
 
 sub new {
   my $package = shift;
@@ -316,7 +317,7 @@ sub get_exonerate_alignment_support {
       #my $cmd = "exonerate -q query.fa -t target.fa -m est2genome --refine region --geneseed 250 -n 1 > z_ex_out";
       #my $cmd = "exonerate -q query.fa -t target.fa -m est2genome --geneseed 250 -n 1 --forcegtag yes > z_ex_out";
   
-  my $exonerate = $host eq "havana-06" ? "exonerate" : "/nfs/ensembl/deprecated/bin/exonerate-2.2.0/exonerate";
+  my $exonerate = "exonerate";
   my $pssm_dir = "/homes/jmgonzalez/work/long_read_pipeline/annotation_exercise_results/third_round/exonerate";
   my $dir = "/tmp";
   if (`wc -l $dir/$filename.query.fa | cut -d' ' -f1` < 2){
@@ -347,12 +348,14 @@ sub get_exonerate_alignment_support {
 
 sub get_read_sequences {
   my $read_names = shift;
-  my $fasta_dir = $host eq "havana-06" ? "/ebi/teams/ensembl/jmgonzalez/lrp" : "/nfs/production/panda/ensembl/havana/lrp";
-  my %db = ('SLRseq'  => Bio::DB::Fasta->new("$fasta_dir/SLRseq_merged.fasta"),
-            'CLS'     => Bio::DB::Fasta->new("$fasta_dir/Captureseq_merged.fasta"),
-            'RACEseq' => Bio::DB::Fasta->new("$fasta_dir/RACEseq_merged.fasta"),
-            'PB_test' => Bio::DB::Fasta->new("$fasta_dir/PB_test.fasta"),
-            'CLS3'    => Bio::DB::Fasta->new("$fasta_dir/CLS3.fasta"),
+  my $fasta_dir = $READSEQDIR;
+   #eq "havana-06" ? "/ebi/teams/ensembl/jmgonzalez/lrp" : "/nfs/production/panda/ensembl/havana/lrp";
+  my %db = ('SLRseq'    => Bio::DB::Fasta->new("$fasta_dir/SLRseq_merged.fasta"),
+            'CLS'       => Bio::DB::Fasta->new("$fasta_dir/Captureseq_merged.fasta"),
+            'RACEseq'   => Bio::DB::Fasta->new("$fasta_dir/RACEseq_merged.fasta"),
+            'PB_test'   => Bio::DB::Fasta->new("$fasta_dir/PB_test.fasta"),
+            'CLS3_old'  => Bio::DB::Fasta->new("$fasta_dir/CLS3.fasta"),
+            'CLS3'      => Bio::DB::Fasta->new("$fasta_dir/CLS3_human.fasta"),
            );
   my %fasta_seqs;
   my @warnings;
@@ -383,8 +386,11 @@ sub get_read_sequences {
         $seq = $db{'PB_test'}->seq($read_name);
       }
       elsif ($sample_name =~ /pacBio(SII)?:Cshl:/){
-        $seq = $db{'CLS3'}->seq($read_name);
+        $seq = $db{'CLS3_old'}->seq($read_name);
       }
+      elsif ($sample_name =~ /pacBioSII-Cshl-/){
+        $seq = $db{'CLS3'}->seq($read_name);
+      }      
       elsif ($sample_name eq "none"){
         foreach my $dataset (qw(SLRseq CLS RACEseq)){
           $seq = $db{$dataset}->seq($read_name);

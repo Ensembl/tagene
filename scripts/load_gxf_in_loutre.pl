@@ -52,6 +52,7 @@ my $only_chr;
             'max_ov_loc=s'      => \$max_overlapped_loci,
             'filter_introns!'   => \$filter_introns,
             'platinum!'         => \$platinum,
+            'readseqdir=s'      => \$READSEQDIR,
             'chr=s'             => \$only_chr,
             'write!'            => \$WRITE,
             );
@@ -74,6 +75,7 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -file           annotation file in GTF or GFF3 format - it can only contain exon lines - it will ignore anything but gene, transcript and exon lines
  -dataset        dataset name (species) already known by the Otter system, ie. present in the species.dat file on the live server
  -source         tsv file with transcript id and transcript sources, ie. RNA-seq read names supporting the model or tissues where it was found
+ -readseqdir     directory with supporting read sequences in Fasta format
  -author         author name in the corresponding loutre database
  -remark         annotation remark to be added to all transcripts, usually the ENA/GEO accession for the experiment that generated the models
  -comp_pipe      override the given biotypes and use "comp_pipe"

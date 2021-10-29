@@ -35,6 +35,7 @@ my $max_n_tr;
 my $tag;
 my $dep_job;
 my $tmpdir;
+my $read_seq_dir;
 
 &GetOptions(
             'file=s'            => \$file,
@@ -59,6 +60,7 @@ my $tmpdir;
             'tag=s'             => \$tag,
             'dep_job=s'         => \$dep_job,
             'tmpdir=s'          => \$tmpdir,
+            'readseqdir=s'      => \$read_seq_dir,
             );
 
 
@@ -150,9 +152,10 @@ for (my $i=1; $i<=$number_of_files; $i++){
   }
   my $command = <<COM;
   bsub -M3000 -R"select[mem>3000] rusage[mem=3000]" $dependency -J "$tag.$i\[1-24\]" -oo $tmpdir/f.$tag.$i.\%I.out \\
-    $ENV{LOUTRE_WRITE}/scripts/load_gxf_in_loutre.pl \\
+    perl $ENV{LOUTRE_WRITE}/scripts/load_gxf_in_loutre.pl \\
       -file $tmpdir/$tag.$i.$filetype \\
       -dataset $dataset_name \\
+      -readseqdir $read_seq_dir \\
 COM
   $command .= " -author $author_name \\\n"             if $author_name;
   $command .= " -source $source_info \\\n"             if $source_info;

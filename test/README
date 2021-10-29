@@ -37,6 +37,7 @@ bsub -M2000 -R"select[mem>2000] rusage[mem=2000]" -oo f.test.out \
   perl ../scripts/load_gxf_in_loutre.pl \
       -file SLRseq.GRCh38.sel.gtf \
       -source SLRseq_source_info.sel.txt \
+      -readseqdir $TAGENE/read_seqs \
       -dataset tagene_test \
       -author tagene \
       -comp_pipe \
