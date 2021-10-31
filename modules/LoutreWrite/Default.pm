@@ -2543,8 +2543,9 @@ sub has_polyAseq_support {
   my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
   my $sa = $DBA{'core'}->get_SliceAdaptor();
   my $slice = $sa->fetch_by_region("chromosome", $transcript->seq_region_name, $transcript_end, $transcript_end);
-  #Project slice to GRCh37 
-  my $projection = $slice->project("chromosome", "GRCh37");
+  #Project slice to polyA-seq feature assembly version
+  my $cs_version = $DBA{'polyAseq'}->get_CoordSystemAdaptor->get_default_version;
+  my $projection = $slice->project("chromosome", $cs_version);
   if ($projection){
     my $segment = $projection->[0];
     my $psa = $DBA{'polyAseq'}->get_SliceAdaptor();    

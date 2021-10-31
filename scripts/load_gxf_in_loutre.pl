@@ -7,18 +7,17 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use Bio::Otter::Lace::Defaults;
+use Bio::Otter::Server::Config;
 use LoutreWrite::Config;
 use LoutreWrite::Default;
 use LoutreWrite::IntronFilter;
-use Bio::Otter::Lace::Defaults;
-use Bio::Otter::Server::Config;
 $| = 1;
 
 our %HOST_CDS_SET;
 our %HOST_START_CODON_SET;
 my $file;
 my $source_info;
-my $write;
 my $dataset_name;
 my $author_name;
 my $remark;
@@ -34,6 +33,8 @@ my $max_overlapped_loci;
 my $filter_introns;
 my $platinum;
 my $only_chr;
+#my $read_seq_dir;
+#my $write = 0;
 
 &GetOptions(
             'file=s'            => \$file,
@@ -107,7 +108,12 @@ $otter_dba->dbc->reconnect_when_lost(1);
 my $sa = $otter_dba->get_SliceAdaptor();
 my $ga = $otter_dba->get_GeneAdaptor();
 my $ta = $otter_dba->get_TranscriptAdaptor();
+
 $DBA{'otter'} = $otter_dba;
+$SPECIES = lc($otter_dba->get_MetaContainer->get_display_name);
+if (defined($SPECIES)){
+  LoutreWrite::Config::get_db_adaptadors();
+}
 
 
 #Read data file
