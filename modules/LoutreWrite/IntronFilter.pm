@@ -215,7 +215,7 @@ sub get_ss_repeat_overlap {
   my $intron = shift;
   my $sa = $DBA{'core'}->get_SliceAdaptor();
   my $intron_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start-2, $intron->seq_region_end+2);
-  my @rfs = (@{$intron_slice->get_all_RepeatFeatures('repeatmask_repbase_human')}, 
+  my @rfs = (@{$intron_slice->get_all_RepeatFeatures("repeatmask_repbase_$SPECIES")}, 
              @{$intron_slice->get_all_RepeatFeatures('trf')});
   my $overlaps_repeat;
   my %intron_repeat_overlaps;
@@ -300,7 +300,7 @@ sub get_exonerate_alignment_support {
   my $read_seq = "";
   foreach my $att (@{$tr->get_all_Attributes('hidden_remark')}){
     if ($att->value =~ /^(pacbio_capture_seq|pacbio_raceseq|SLR-seq|postfilter)_\w+/ or
-        $att->value =~ /^pacBio(SII)?:Cshl:/
+        $att->value =~ /^pacBio(SII)?:Cshl:/ or $att->value =~ /^pacBioSII-Cshl-/
     ){
       $read_seq .= get_read_sequences($att->value);
       last;
@@ -318,7 +318,8 @@ sub get_exonerate_alignment_support {
       #my $cmd = "exonerate -q query.fa -t target.fa -m est2genome --geneseed 250 -n 1 --forcegtag yes > z_ex_out";
   
   my $exonerate = "exonerate";
-  my $pssm_dir = "/homes/jmgonzalez/work/long_read_pipeline/annotation_exercise_results/third_round/exonerate";
+  #my $pssm_dir = "/homes/jmgonzalez/work/long_read_pipeline/annotation_exercise_results/third_round/exonerate";
+  my $pssm_dir = "/nfs/production/flicek/ensembl/havana/jmgonzalez/TAGENE/pssm";
   my $dir = "/tmp";
   if (`wc -l $dir/$filename.query.fa | cut -d' ' -f1` < 2){
     return "NA";
@@ -350,13 +351,21 @@ sub get_read_sequences {
   my $read_names = shift;
   my $fasta_dir = $READSEQDIR;
    #eq "havana-06" ? "/ebi/teams/ensembl/jmgonzalez/lrp" : "/nfs/production/panda/ensembl/havana/lrp";
-  my %db = ('SLRseq'    => Bio::DB::Fasta->new("$fasta_dir/SLRseq_merged.fasta"),
-            'CLS'       => Bio::DB::Fasta->new("$fasta_dir/Captureseq_merged.fasta"),
-            'RACEseq'   => Bio::DB::Fasta->new("$fasta_dir/RACEseq_merged.fasta"),
-            'PB_test'   => Bio::DB::Fasta->new("$fasta_dir/PB_test.fasta"),
-            'CLS3_old'  => Bio::DB::Fasta->new("$fasta_dir/CLS3.fasta"),
-            'CLS3'      => Bio::DB::Fasta->new("$fasta_dir/CLS3_human.fasta"),
-           );
+  my %db;
+  if ($SPECIES eq "human"){
+    %db = ('SLRseq'   => Bio::DB::Fasta->new("$fasta_dir/SLRseq_merged.fasta"),
+           'CLS'      => Bio::DB::Fasta->new("$fasta_dir/Captureseq_merged.fasta"),
+           'RACEseq'  => Bio::DB::Fasta->new("$fasta_dir/RACEseq_merged.fasta"),
+           'PB_test'  => Bio::DB::Fasta->new("$fasta_dir/PB_test.fasta"),
+           'CLS3_old' => Bio::DB::Fasta->new("$fasta_dir/CLS3.fasta"),
+           'CLS3'     => Bio::DB::Fasta->new("$fasta_dir/CLS3_human.fasta"),
+          );
+  }
+  elsif ($SPECIES eq "mouse"){
+	%db = (
+           "CLS3"     => Bio::DB::Fasta->new("$fasta_dir/CLS3_mouse.fasta"),
+          );
+  }
   my %fasta_seqs;
   my @warnings;
   #pacbio_raceseq_testis : m160112_015449_42182_c100967152550000001823202805121624_s1_p0_34050_ccs, m160115_185856_42182_c100967052550000001823202805121653_s1_p0_130345_ccs ; pacbio_raceseq_lung : m160322_092041_42182_c100987092550000001823224907191673_s1_p0_45294_ccs ; pacbio_raceseq_liver : m160321_201548_42182_c100987182550000001823224907191657_s1_p0_25946_ccs ;

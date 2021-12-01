@@ -25,6 +25,7 @@ my $use_comp_pipe_biotype;
 my $no_artifact_check;
 my $analysis_name;
 my $tsource;
+my $assembly_version;
 my $no_NFV;
 my $do_not_add_cds;
 my $no_intron_check;
@@ -33,8 +34,6 @@ my $max_overlapped_loci;
 my $filter_introns;
 my $platinum;
 my $only_chr;
-#my $read_seq_dir;
-#my $write = 0;
 
 &GetOptions(
             'file=s'            => \$file,
@@ -45,6 +44,7 @@ my $only_chr;
             'comp_pipe!'        => \$use_comp_pipe_biotype,
             'analysis=s'        => \$analysis_name,
             'tsource=s'         => \$tsource,
+            'assembly=s'        => \$assembly_version,
             'no_check!'         => \$no_artifact_check,
             'no_NFV!'           => \$no_NFV,
             'no_CDS!'           => \$do_not_add_cds,
@@ -82,6 +82,7 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -comp_pipe      override the given biotypes and use "comp_pipe"
  -analysis       analysis logic name (default is "Otter")
  -tsource        transcript source (default is "havana")
+ -assembly       assembly version of the annotation in the file, if not the default one
  -no_check       do no check for transcripts spanning a large number of genes
  -no_NFV         do not add the 'not for VEGA' attribute
  -no_CDS         do not try to add a CDS if the transcript falls in a coding gene
@@ -105,6 +106,7 @@ my $time0 = time();
 my $dataset = Bio::Otter::Server::Config->SpeciesDat->dataset($dataset_name);
 my $otter_dba = $dataset->otter_dba or die "can't get db adaptor\n";
 $otter_dba->dbc->reconnect_when_lost(1);
+my $csa = $otter_dba->get_CoordSystemAdaptor();
 my $sa = $otter_dba->get_SliceAdaptor();
 my $ga = $otter_dba->get_GeneAdaptor();
 my $ta = $otter_dba->get_TranscriptAdaptor();
@@ -120,8 +122,55 @@ if (defined($SPECIES)){
 my $genes = LoutreWrite::Default->parse_gxf_file($file);
 
 #Make gene objects
-my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $tsource, $no_NFV, $only_chr);
+my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $tsource, $no_NFV, $only_chr, $assembly_version);
 
+#Transform coordinates to a different assembly if required
+if ($assembly_version){
+  my @transf_genes;
+  my $default_assembly_version = $csa->get_default_version();
+  if ($assembly_version ne $default_assembly_version){
+    if ($csa->fetch_by_name('chromosome', $assembly_version)){     
+      foreach my $gene (@$gene_objects){
+        my $transf_gene = $gene->transform("chromosome", $default_assembly_version);
+        if ($transf_gene){
+	      push(@transf_genes, $transf_gene);
+	      ###
+	      #foreach my $tr (@{$gene->get_all_Transcripts}){
+			#print scalar(@{$tr->get_all_Exons})."\n";
+			#foreach my $exon (@{$tr->get_all_Exons}){
+			  #print "E1: ".$exon->slice->name.":".$exon->seq_region_start."-".$exon->seq_region_end."\n";
+			#}
+			#foreach my $intron (@{$tr->get_all_Introns}){
+			  #print "I1: ".$intron->slice->name.":".$intron->seq_region_start."-".$intron->seq_region_end."\n";
+			#}
+		  #}
+		  #foreach my $tr (@{$transf_gene->get_all_Transcripts}){
+			#print "nE2:".scalar(@{$tr->get_all_Exons})."\n";
+			#print "nI2:".scalar(@{$tr->get_all_Introns})."\n";
+			#foreach my $exon (@{$tr->get_all_Exons}){
+			  #print "E2: ".$exon->slice->name.":".$exon->seq_region_start."-".$exon->seq_region_end."\n";
+			#}
+			#foreach my $intron (@{$tr->get_all_Introns}){
+			  #$intron->slice($tr->slice);
+			  #print "I2: ".$intron->slice->name.":".$intron->start."-".$intron->end."\n";
+			#}
+		  #}
+		  ###
+	    }
+	    else{
+	      foreach my $transcript (@{$gene->get_all_Transcripts}){
+			my $tname = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+            print "TR2: ".$tname.": did not transform to $default_assembly_version assembly version\n";
+          }
+        }
+      }
+    }
+    else{
+      die "Can't find assembly version $assembly_version in the coord_system table\n";
+    }
+  }
+  $gene_objects = \@transf_genes;
+}
 
 #Long artifact transcripts, spanning multiple real loci, make long artificial genes
 unless ($no_artifact_check){

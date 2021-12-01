@@ -33,7 +33,7 @@ sub get_havana_db_adaptor {
      -port   => 4581,
      -user   => 'ensro',
      -pass   => undef,
-     -dbname => 'havana_$SPECIES',
+     -dbname => "havana_$SPECIES",
      -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);
@@ -48,7 +48,7 @@ sub get_pipe_db_adaptor {
     -port   => 4581,
     -user   => 'ensro',
     -pass   => undef,
-    -dbname => 'pipe_$SPECIES',
+    -dbname => "pipe_$SPECIES",
     -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);
@@ -94,7 +94,7 @@ sub get_intron_db_adaptor {
     $dbname = "gencode_snaptron";
   }
   elsif ($SPECIES eq "mouse"){
-    $dbname = "";
+    $dbname = "gencode_mouse_recount3";
   }
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
     -host   => 'mysql-ens-havana-prod-1',

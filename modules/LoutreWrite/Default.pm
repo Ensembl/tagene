@@ -163,7 +163,7 @@ sub parse_gxf_file {
 =cut
 
 sub make_vega_objects {
-    my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype, $analysis_name, $source, $no_NFV, $only_chr) = @_;
+    my ($self, $genes, $dba, $author_name, $remark, $force_cp_biotype, $analysis_name, $source, $no_NFV, $only_chr, $assembly_version) = @_;
     
     #Some common features
     $source ||= "havana";
@@ -262,7 +262,7 @@ sub make_vega_objects {
                 $chr =~ s/^chr//;
                 next GENE if ($only_chr and $chr ne $only_chr);
                 if (!($slices{$chr})){
-                    my $slice = $sa->fetch_by_region("chromosome", $chr);
+                    my $slice = $sa->fetch_by_region("chromosome", $chr, undef, undef, undef, $assembly_version);
                     $slices{$chr} = $slice;
                 }
                 $exon->slice($slices{$chr});
@@ -1847,13 +1847,14 @@ sub find_host_gene {
 
 sub assign_host_gene {
     my ($self, $gene, $preserve_biotype) = @_;
-
+print "AAAAA:".$gene->seq_region_start."\n";
     #Fetch database genes overlapping our gene
     my $gene_slice = $gene->slice->adaptor->fetch_by_region("toplevel", $gene->seq_region_name, $gene->start, $gene->end);
     my @db_genes = grep {$_->stable_id ne $gene->stable_id and $_->seq_region_strand == $gene->strand} @{$gene_slice->get_all_Genes};
 
     my %host_by_transcript;
     foreach my $transcript (@{$gene->get_all_Transcripts}){
+print "BBBBB:".$transcript->seq_region_start."\n";
         my $host_gene;
         #Check intron match - find gene with the most matching introns
         my @candidates;
@@ -1876,8 +1877,9 @@ sub assign_host_gene {
             foreach my $db_intron (sort {$a->start <=> $b->start} @{$db_gene->get_all_Introns}){
 #print $db_gene->stable_id.".".$db_gene->version.": ".$db_intron->seq_region_start."-".$db_intron->seq_region_end."\n";            
                 foreach my $intron (@{$transcript->get_all_Introns}){
-                    if ($db_intron->seq_region_start == $intron->seq_region_start and $db_intron->seq_region_end == $intron->seq_region_end){
-                        $n_introns++; #print $db_gene->stable_id.": ".$db_intron->seq_region_start."-".$db_intron->seq_region_end."\n" if $transcript->start == 38024151;
+			#print "CCCCC: ".$intron->start." vs ".$db_intron->seq_region_start."\n";
+                    if ($db_intron->seq_region_start == $intron->start and $db_intron->seq_region_end == $intron->end){
+                        $n_introns++; #print "NNN:".$n_introns."\n"; #print $db_gene->stable_id.": ".$db_intron->seq_region_start."-".$db_intron->seq_region_end."\n" if $transcript->start == 38024151;
                     }
                 }
             }

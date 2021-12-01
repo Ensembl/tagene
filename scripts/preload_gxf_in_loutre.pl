@@ -23,6 +23,7 @@ my $use_comp_pipe_biotype;
 my $no_artifact_check;
 my $analysis_name;
 my $tsource;
+my $assembly_version;
 my $no_NFV;
 my $do_not_add_cds;
 my $no_intron_check;
@@ -46,6 +47,7 @@ my $read_seq_dir;
             'comp_pipe!'        => \$use_comp_pipe_biotype,
             'analysis=s'        => \$analysis_name,
             'tsource=s'         => \$tsource,
+            'assembly=s'        => \$assembly_version,
             'no_check!'         => \$no_artifact_check,
             'no_NFV!'           => \$no_NFV,
             'no_CDS!'           => \$do_not_add_cds,
@@ -163,6 +165,7 @@ COM
   $command .= " -comp_pipe \\\n"                       if $use_comp_pipe_biotype;
   $command .= " -analysis $analysis_name \\\n"         if $analysis_name;
   $command .= " -tsource $tsource \\\n"                if $tsource;
+  $command .= " -assembly $assembly_version \\\n"      if $assembly_version;
   $command .= " -no_check \\\n"                        if $no_artifact_check;
   $command .= " -no_NFV \\\n"                          if $no_NFV;
   $command .= " -no_CDS \\\n"                          if $do_not_add_cds;
