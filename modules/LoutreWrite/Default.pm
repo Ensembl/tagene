@@ -943,6 +943,10 @@ print "SUBMODE: $submode\n";
                                             last DBTR;
                                         }
                                     }
+                                    elsif ($db_tr->biotype =~ /pseudogene/){
+                                        print "Not merging with a pseudogene transcript\n";
+                                        next DBTR;
+                                    }
                                     else{
                                         push(@merge_candidates, $db_tr);
                                     }
