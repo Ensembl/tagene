@@ -913,7 +913,7 @@ print "SUBMODE: $submode\n";
                             if ($tr_comp{$db_tr_id}->{'exon'} == 1){
                                 if ($tr_comp{$db_tr_id}->{'merge'} == 1){
                                     my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
-                                    #Do not merge with MANE_select transcripts
+                                    #Do not merge with MANE transcripts
                                     if (scalar grep {$_->value eq "MANE_select" or $_->value eq "MANE_plus_clinical"} @{$db_tr->get_all_Attributes('remark')}){
                                         print "Skipping transcript as partially redundant with a MANE transcript\n";
                                         $add_transcript = 0;
@@ -943,6 +943,7 @@ print "SUBMODE: $submode\n";
                                             last DBTR;
                                         }
                                     }
+                                    #Do not merge with pseudogene transcripts
                                     elsif ($db_tr->biotype =~ /pseudogene/){
                                         print "Not merging with a pseudogene transcript\n";
                                         next DBTR;
@@ -976,15 +977,15 @@ print "SUBMODE: $submode\n";
                         if ($tr_comp{$db_tr_id}->{'exon'} == 1 and $tr_comp{$db_tr_id}->{'merge'} == 1){
                             my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
                             if (scalar(@{$db_tr->get_all_Exons}) == 1 and !($db_tr->translate())){ 
-                                #Do not merge with MANE_select transcripts
-                                if (scalar grep {$_->value eq "MANE_select"} @{$db_tr->get_all_Attributes('remark')}){
-                                  print "Skipping transcript as partially redundant with a MANE Select transcript\n";
+                                #Do not merge with MANE transcripts
+                                if (scalar grep {$_->value eq "MANE_select" or $_->value eq "MANE_plus_clinical"} @{$db_tr->get_all_Attributes('remark')}){
+                                  print "Skipping transcript as partially redundant with a MANE transcript\n";
                                   $add_transcript = 0;
                                   @merge_candidates = ();
                                   last DBTR;
                                 }                                                         
                                 #Do not merge with Platinum transcripts unless this transcript is also Platinum
-                                if (scalar grep {$_->value eq "Platinum set"} @{$db_tr->get_all_Attributes('hidden_remark')}){
+                                elsif (scalar grep {$_->value eq "Platinum set"} @{$db_tr->get_all_Attributes('hidden_remark')}){
                                     if ($platinum){
                                         push(@merge_candidates, $db_tr);
                                     }
@@ -995,7 +996,12 @@ print "SUBMODE: $submode\n";
                                         last DBTR;
                                     }
                                 }
-                                if ($tr->start <= $db_tr->start and $tr->end => $db_tr->end and
+                                #Do not merge with pseudogene transcripts
+                                elsif ($db_tr->biotype =~ /pseudogene/){
+                                    print "Not merging with a pseudogene transcript\n";
+                                    next DBTR;
+                                }
+                                elsif ($tr->start <= $db_tr->start and $tr->end => $db_tr->end and
                                     !($tr->start == $db_tr->start and $tr->end == $db_tr->end)){
                                     push(@merge_candidates, $db_tr);
                                 }
