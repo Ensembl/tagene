@@ -2503,9 +2503,9 @@ sub merge_transcripts {
 sub get_transcript_biotype {
     my $db_gene = shift;
     my %biotypes;
-    if ($db_gene->biotype =~ /^(processed_transcript|tec|comp_pipe)$/){
+    if ($db_gene->biotype =~ /^(processed_transcript|antisense|lincrna|lincRNA|sense_intronic|sense_overlapping|bidirectional_promoter_lncrna|tec|comp_pipe)$/){
         foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
-            if ($db_tr->biotype =~ /^(antisense|lincrna|sense_intronic|sense_overlapping|bidirectional_promoter_lncrna|3\'_overlapping_ncrna)$/){
+            if ($db_tr->biotype =~ /^(antisense|lincrna|lincRNA|sense_intronic|sense_overlapping|bidirectional_promoter_lncrna|3\'_overlapping_ncrna)$/){
                 $biotypes{$db_tr->biotype}++;
             }
             #if ($biotypes{"antisense"} > 0 and !$biotypes{"lincrna"} and !$biotypes{"sense_intronic"} and !$biotypes{"sense_overlapping"} and !$biotypes{"bidirectional_promoter_lncrna"} and !$biotypes{"3'_overlapping_ncrna"}){
