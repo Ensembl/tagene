@@ -914,8 +914,8 @@ print "SUBMODE: $submode\n";
                                 if ($tr_comp{$db_tr_id}->{'merge'} == 1){
                                     my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
                                     #Do not merge with MANE_select transcripts
-                                    if (scalar grep {$_->value eq "MANE_select"} @{$db_tr->get_all_Attributes('remark')}){
-                                        print "Skipping transcript as partially redundant with a MANE Select transcript\n";
+                                    if (scalar grep {$_->value eq "MANE_select" or $_->value eq "MANE_plus_clinical"} @{$db_tr->get_all_Attributes('remark')}){
+                                        print "Skipping transcript as partially redundant with a MANE transcript\n";
                                         $add_transcript = 0;
                                         @merge_candidates = ();
                                         last DBTR;
