@@ -871,8 +871,11 @@ print "SUBMODE: $submode\n";
                     }
                     #Exclude transcripts having a "comp_pipe_rejected" remark
                     next if scalar(grep {$_->value eq "comp_pipe_rejected"} @{$db_tr->get_all_Attributes('remark')});
-                    #Ignore single-exon transcripts (?)
-                    next if scalar @{$db_tr->get_all_Introns} == 0;  #Do not merge with single-exon transcripts? (In case they are CLS Platinum...)
+                    #Ignore single-exon transcripts unless TAGENE transcript is single-exon too (?)
+                    if (scalar @{$tr->get_all_Exons} > 1){
+                      next if scalar @{$db_tr->get_all_Exons} == 1;  #Do not merge with single-exon transcripts? (In case they are CLS Platinum...)
+                    }
+
                     my $i = intron_novelty($tr, $db_tr);
                     my $e = exon_novelty($tr, $db_tr);
                     my $m = can_be_merged($tr, $db_tr);
