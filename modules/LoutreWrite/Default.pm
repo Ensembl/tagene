@@ -1001,8 +1001,9 @@ print "SUBMODE: $submode\n";
                                     print "Not merging with a pseudogene transcript\n";
                                     next DBTR;
                                 }
-                                elsif ($tr->start <= $db_tr->start and $tr->end => $db_tr->end and
-                                    !($tr->start == $db_tr->start and $tr->end == $db_tr->end)){
+                                #elsif ($tr->start <= $db_tr->start and $tr->end => $db_tr->end and
+                                #    !($tr->start == $db_tr->start and $tr->end == $db_tr->end)){
+                                else{
                                     push(@merge_candidates, $db_tr);
                                 }
                             }
