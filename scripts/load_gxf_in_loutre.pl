@@ -133,6 +133,11 @@ if ($assembly_version){
       foreach my $gene (@$gene_objects){
         my $transf_gene = $gene->transform("chromosome", $default_assembly_version);
         if ($transf_gene){
+          foreach my $tr (@{$transf_gene->get_all_Transcripts}){
+            foreach my $exon (@{$tr->get_all_Exons}){
+              $exon->slice($tr->slice);
+            }
+          }
 	      push(@transf_genes, $transf_gene);
 	      ###
 	      #foreach my $tr (@{$gene->get_all_Transcripts}){
@@ -269,6 +274,7 @@ foreach my $gene_obj (@$gene_objects_2){
         TR:foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
             my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
             foreach my $intron (@{$transcript->get_all_Introns}){
+                $intron->slice($transcript->slice) unless $intron->slice; #provide slice to introns from genes transformed from non-default assembly version
                 my $pass;
                 if ($PASSED_INTRONS{$intron->seq_region_start."-".$intron->seq_region_end}){
                   $pass = 1;

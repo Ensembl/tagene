@@ -257,6 +257,7 @@ sub get_relative_intron_score {
   my (@scores, $pos, @novel);
   my $n = 0;
   foreach my $int (@{$tr->get_all_Introns}){
+    $int->slice($tr->slice) unless $int->slice; #provide slice to introns from genes transformed from non-default assembly version
     my $score = get_intron_score($intron);
     push(@scores, $score);
     my $is_novel = is_novel($intron);
