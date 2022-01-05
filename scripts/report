@@ -5,6 +5,9 @@
 echo -e "\nNumber of genes"
 cat $@ | grep ^LOOKING | wc -l
 
+echo -e "\nTranscripts ignored as gene didn't transform to default assembly"
+cat $@ | grep ^TR2 | grep "did not transform" | awk '{print $3}' | sort -u | wc -l
+
 echo -e "\nTranscripts ignored as overlapping multiple loci"
 cat $@ | grep ^TR2 | grep "max allowed number" | awk '{print $3}' | sort -u | wc -l
 
