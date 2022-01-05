@@ -243,7 +243,12 @@ sub get_intron_score {
   my $sa = $DBA{'intron'}->get_SliceAdaptor();
   my $intron_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
   foreach my $sf (@{$intron_slice->get_all_SimpleFeatures}){
-    next unless $sf->analysis->logic_name =~ /^recount3_pass1/;
+    if ($SPECIES eq "human"){
+      next unless $sf->analysis->logic_name =~ /^recount3_pass1/;
+    }
+    elsif ($SPECIES eq "mouse"){
+      next unless $sf->analysis->logic_name =~ /^recount3_srav1m_pass1/;
+    }
     if ($sf->seq_region_start==$intron->seq_region_start and $sf->seq_region_end==$intron->seq_region_end and $sf->seq_region_strand==$intron->seq_region_strand){
       return $sf->score;
     }
