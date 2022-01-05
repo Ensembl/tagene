@@ -222,14 +222,14 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
     $added_tr_count += $added_c;
     $extended_tr_count += $extended_c;
     if (scalar keys %report){
-      print OUT join(", ", map {$_} grep {/ENSG|OTTHUMG/} keys %report)."\t".
+      print OUT join(", ", map {$_} grep {/ENS(MUS)?G|OTT(HUM|MUS)G/} keys %report)."\t".
                 ($gene->get_all_Attributes('name')->[0]->value || " ")."\t".
                 $gene->biotype."\t".
                 $gene_modif_date."\t".
-                join(", ", map {$report{$_}} grep {/ENSG/} keys %report)."\t".
+                join(", ", map {$report{$_}} grep {/ENS(MUS)?G/} keys %report)."\t".
                 scalar(grep {/novel/} values(%report))."\t". 
                 scalar(grep {/extended/} values(%report))."\t". 
-                join(", ", map {$_.":".$report{$_}} grep {/ENST/} keys %report)."\t". 
+                join(", ", map {$_.":".$report{$_}} grep {/ENS(MUS)?T/} keys %report)."\t". 
                 join(", ", keys %{$report{'sources'}})."\n";
     }
   }
