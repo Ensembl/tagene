@@ -1785,9 +1785,9 @@ sub find_host_gene {
     my $host_gene;
     
     #Fetch database genes overlapping our gene
-    my $gene_slice = $gene->slice->adaptor->fetch_by_region("toplevel", $gene->seq_region_name, $gene->start, $gene->end);
-    my @db_genes = grep {$_->stable_id ne $gene->stable_id and $_->seq_region_strand == $gene->strand} @{$gene_slice->get_all_Genes};
-
+#    my $gene_slice = $gene->slice->adaptor->fetch_by_region("toplevel", $gene->seq_region_name, $gene->start, $gene->end);
+#    my @db_genes = grep {$_->stable_id ne $gene->stable_id and $_->seq_region_strand == $gene->strand} @{$gene_slice->get_all_Genes};
+    my @db_genes = @{get_valid_overlapping_genes($gene)};
     #Find host gene with the most matching introns with the input gene, otherwise the gene with the most exon overlap
     #Make sure that all transcripts of the input gene overlap the host gene or none (a readthrough transcript may bias 
     #the choice towards a host gene that is not overlapped by the remaining transcripts)
@@ -1885,9 +1885,9 @@ sub assign_host_gene {
     my ($self, $gene, $preserve_biotype) = @_;
 print "AAAAA:".$gene->seq_region_start."\n";
     #Fetch database genes overlapping our gene
-    my $gene_slice = $gene->slice->adaptor->fetch_by_region("toplevel", $gene->seq_region_name, $gene->start, $gene->end);
-    my @db_genes = grep {$_->stable_id ne $gene->stable_id and $_->seq_region_strand == $gene->strand} @{$gene_slice->get_all_Genes};
-
+#    my $gene_slice = $gene->slice->adaptor->fetch_by_region("toplevel", $gene->seq_region_name, $gene->start, $gene->end);
+#    my @db_genes = grep {$_->stable_id ne $gene->stable_id and $_->seq_region_strand == $gene->strand} @{$gene_slice->get_all_Genes};
+    my @db_genes = @{get_valid_overlapping_genes($gene)};
     my %host_by_transcript;
     foreach my $transcript (@{$gene->get_all_Transcripts}){
 print "BBBBB:".$transcript->seq_region_start."\n";
@@ -1896,14 +1896,14 @@ print "BBBBB:".$transcript->seq_region_start."\n";
         my @candidates;
         my $max_n_introns = 0;
         foreach my $db_gene (@db_genes){
-            #Exclude undesired host genes
-            if (!($db_gene->source =~ /(ensembl|havana)/) or
-                $db_gene->biotype eq "artifact" or
-                $db_gene->biotype eq "comp_pipe" or
-                scalar (grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) == 1
-            ){
-              next;
-            }
+#            #Exclude undesired host genes
+#            if (!($db_gene->source =~ /(ensembl|havana)/) or
+#                $db_gene->biotype eq "artifact" or
+#                $db_gene->biotype eq "comp_pipe" or
+#                scalar (grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) == 1
+#            ){
+#              next;
+#            }
             if ($preserve_biotype){
                 if ($transcript->translation and $db_gene->biotype ne "protein_coding"){
                     next;
@@ -2149,8 +2149,9 @@ sub check_artifact_transcripts {
     foreach my $gene (@$genes){
         foreach my $transcript (@{$gene->get_all_Transcripts}){
             #Fetch database genes overlapping our transcript
-            my $tr_slice = $transcript->slice->adaptor->fetch_by_region("toplevel", $transcript->seq_region_name, $transcript->start, $transcript->end);
-            my @db_genes = grep {$_->seq_region_strand == $gene->seq_region_strand} @{$tr_slice->get_all_Genes};
+#            my $tr_slice = $transcript->slice->adaptor->fetch_by_region("toplevel", $transcript->seq_region_name, $transcript->start, $transcript->end);
+#            my @db_genes = grep {$_->seq_region_strand == $gene->seq_region_strand} @{$tr_slice->get_all_Genes};
+            my @db_genes = @{get_valid_overlapping_genes($transcript)};
             if (scalar @db_genes > $min_num_genes){
                 my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
                 print "KILL: ".$t_name."  ".$transcript->start."-".$transcript->end."\n";
@@ -2181,12 +2182,13 @@ sub check_overlapped_loci {
             my $message = "";
             #Fetch database genes overlapping our transcript
             my $tr_slice = $transcript->slice->adaptor->fetch_by_region("toplevel", $transcript->seq_region_name, $transcript->start, $transcript->end);
-            my @db_genes = grep {$_->seq_region_strand == $gene->seq_region_strand} @{$tr_slice->get_all_Genes};
+#            my @db_genes = grep {$_->seq_region_strand == $gene->seq_region_strand} @{$tr_slice->get_all_Genes};
             my $overlapped_genes_count = 0;
+            my @db_genes = @{get_valid_overlapping_genes($transcript)};
             DBG:foreach my $db_gene (@db_genes){
-                next unless $db_gene->source =~ /(ensembl|havana)/;
-                next if $db_gene->biotype eq "artifact";
-                next if scalar(grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) > 0;
+#                next unless $db_gene->source =~ /(ensembl|havana)/;
+#                next if $db_gene->biotype eq "artifact";
+#                next if scalar(grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) > 0;
                 next if $db_gene->biotype =~ /^(rRNA|snRNA|misc_RNA|snoRNA|rRNA_pseudogene|miRNA|scaRNA|ribozyme|sRNA)$/;  #Ignore small RNA genes
                 foreach my $db_exon (@{$db_gene->get_all_Exons}){
                     foreach my $exon (@{$transcript->get_all_Exons}){
@@ -2548,7 +2550,7 @@ sub get_transcript_biotype {
 =head2 has_polyA_site_support
 
  Arg[1]    : Bio::Vega::Transcript object
- Arg[1]    : integer (distance threshold)
+ Arg[2]    : integer (distance threshold)
  Function  : Returns true if there is a Havana-annotated polyA site within the distance to the transcript 3' end indicated by the second argument
  Returntype: none
 
@@ -2570,7 +2572,7 @@ sub has_polyA_site_support {
 =head2 has_polyAseq_support
 
  Arg[1]    : Bio::Vega::Transcript object
- Arg[1]    : integer (distance threshold)
+ Arg[2]    : integer (distance threshold)
  Function  : Returns true if there are polyA-seq features from at least four different tissues within the distance to the transcript 3' end indicated by the second argument
  Returntype: none
 
@@ -2646,6 +2648,40 @@ sub clip_ends {
   return $transcript;
 }
 
+
+
+=head2 get_valid_overlapping_genes
+
+ Arg[1]    : Bio::Vega::Gene or Bio::Vega::Transcript object
+ Function  : Returns a list of genes that overlap the input feature on the same feature and would normally be part of the Ensembl release, i.e. the genes are not artifact or "not for VEGA" and have at least a transcript that is neither of these.
+ Returntype: list of Bio::Vega::Gene objects
+
+=cut
+
+sub get_valid_overlapping_genes {
+  my ($feat) = @_;
+  my @genes = ();
+  my $slice = $feat->slice->adaptor->fetch_by_region("toplevel", $feat->seq_region_name, $feat->start, $feat->end);
+  foreach my $gene (@{$slice->get_all_Genes}){
+    if ($gene->stable_id ne $feat->stable_id and 
+        $gene->seq_region_strand == $feat->strand and
+        $gene->source =~ /(ensembl|havana)/ and
+        $gene->biotype ne "artifact" and
+        $gene->biotype ne "comp_pipe" and        
+        scalar (grep {$_->value eq "not for VEGA"} @{$gene->get_all_Attributes('remark')}) == 0){
+      TR:foreach my $transcript (@{$gene->get_all_Transcripts}){
+        if ($transcript->source =~ /(ensembl|havana)/ and
+            $transcript->biotype ne "artifact" and
+            $transcript->biotype ne "comp_pipe" and        
+            scalar (grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')}) == 0){	  
+          push(@genes, $gene);
+          last TR;
+        }
+      }
+    }
+  }
+  return \@genes;
+}
 
 
 1;
