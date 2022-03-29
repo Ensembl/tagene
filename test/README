@@ -13,7 +13,7 @@ mysql -h$HOST -P$PORT -u$USER -p$PASS -D$DBNAME < db/havana_schema.sql
 
 zcat db/havana_human.meta.sql.gz | mysql -h$HOST -P$PORT -u$USER -p$PASS -D$DBNAME
 
-mysql -h$HOST -P$PORT -u$USER -p$PASS -D$DBNAME -e "LOAD DATA LOCAL INFILE 'db/gene.txt' INTO TABLE gene; LOAD DATA LOCAL INFILE 'db/gene_attrib.txt' INTO TABLE gene_attrib; LOAD DATA LOCAL INFILE 'db/transcript.txt' INTO TABLE transcript; LOAD DATA LOCAL INFILE 'db/transcript_attrib.txt' INTO TABLE transcript_attrib; LOAD DATA LOCAL INFILE 'db/translation.txt' INTO TABLE translation; LOAD DATA LOCAL INFILE 'db/translation_attrib.txt' INTO TABLE translation_attrib; LOAD DATA LOCAL INFILE 'db/exon_transcript.txt' INTO TABLE exon_transcript; LOAD DATA LOCAL INFILE 'db/exon.txt' INTO TABLE exon; LOAD DATA LOCAL INFILE 'db/gene_author.txt' INTO TABLE gene_author; LOAD DATA LOCAL INFILE 'db/transcript_author.txt' INTO TABLE transcript_author; LOAD DATA LOCAL INFILE 'db/author.txt' INTO TABLE author;"
+mysql --local-infile=1 -h$HOST -P$PORT -u$USER -p$PASS -D$DBNAME -e "LOAD DATA LOCAL INFILE 'db/gene.txt' INTO TABLE gene; LOAD DATA LOCAL INFILE 'db/gene_attrib.txt' INTO TABLE gene_attrib; LOAD DATA LOCAL INFILE 'db/transcript.txt' INTO TABLE transcript; LOAD DATA LOCAL INFILE 'db/transcript_attrib.txt' INTO TABLE transcript_attrib; LOAD DATA LOCAL INFILE 'db/translation.txt' INTO TABLE translation; LOAD DATA LOCAL INFILE 'db/translation_attrib.txt' INTO TABLE translation_attrib; LOAD DATA LOCAL INFILE 'db/exon_transcript.txt' INTO TABLE exon_transcript; LOAD DATA LOCAL INFILE 'db/exon.txt' INTO TABLE exon; LOAD DATA LOCAL INFILE 'db/gene_author.txt' INTO TABLE gene_author; LOAD DATA LOCAL INFILE 'db/transcript_author.txt' INTO TABLE transcript_author; LOAD DATA LOCAL INFILE 'db/author.txt' INTO TABLE author;"
 
 
 
@@ -82,7 +82,7 @@ mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_d
 #Example 1: force comp_pipe biotype, no CDS
 
 bsub -M2000 -R"select[mem>2000] rusage[mem=2000]" -oo f.test.out \
-  perl  ~/software/loutre_write/scripts/load_gxf_in_loutre.pl \
+  perl ../scripts/load_gxf_in_loutre.pl \
       -file SLRseq.GRCh38.sel.gtf \
       -source SLRseq_source_info.sel.txt \
       -dataset tagene_test \
@@ -184,7 +184,7 @@ mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_d
 #Example 2: add CDS and let the code find the best biotype
 
 bsub -M2000 -R"select[mem>2000] rusage[mem=2000]" -oo f.test.2.out \
-  perl  ~/software/loutre_write/scripts/load_gxf_in_loutre.pl \
+  perl ../scripts/load_gxf_in_loutre.pl \
       -file SLRseq.GRCh38.sel.gtf \
       -source SLRseq_source_info.sel.txt \
       -dataset tagene_test \
