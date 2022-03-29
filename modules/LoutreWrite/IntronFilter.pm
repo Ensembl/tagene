@@ -41,7 +41,8 @@ sub predict_outcome {
     my $rel_score = get_relative_intron_score($intron, $transcript);
     my $intron_length = get_intron_length($intron);
     my $exonerate_ali = get_exonerate_alignment_support($intron, $transcript);
-    print "INTRON: ".$intron->seq_region_start."-".$intron->seq_region_end."  NOV=$is_novel SS=$ss_sequence AS=$antisense_ovlp REP=$repeat_ovlp IP=$intron_score REL=$rel_score LEN=$intron_length EX=$exonerate_ali\n";
+    my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+    print "INTRON: ".$intron->seq_region_start."-".$intron->seq_region_end."  T=$t_name  NOV=$is_novel SS=$ss_sequence AS=$antisense_ovlp REP=$repeat_ovlp IP=$intron_score REL=$rel_score LEN=$intron_length EX=$exonerate_ali\n";
 
     if ($is_novel eq "yes" and
         ($ss_sequence ne "GT..AG" or
