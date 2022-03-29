@@ -831,6 +831,8 @@ print "SUBMODE: $submode\n";
                     next unless $db_tr->stable_id;
                     #Exclude artifacts
                     next if $db_tr->biotype eq "artifact";
+                    #Exclude unwanted transcript biotypes which may be associated to unexpected gene biotypes
+                    next if $db_tr->biotype =~ /^(known_ncrna|macro_lncrna|mirna|misc_RNA|ribozyme|rrna|scrna|snorna|snrna|vaultrna|tr_gene)$/;
                     #Ignore lingering OTT transcripts
                     next if $db_tr->stable_id =~ /^OTT/;
                     #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
@@ -867,6 +869,8 @@ print "SUBMODE: $submode\n";
                     next unless $db_tr->stable_id;
                     #Exclude artifacts
                     next if $db_tr->biotype eq "artifact";
+                    #Exclude unwanted transcript biotypes which may be associated to unexpected gene biotypes
+                    next if $db_tr->biotype =~ /^(known_ncrna|macro_lncrna|mirna|misc_RNA|ribozyme|rrna|scrna|snorna|snrna|vaultrna|tr_gene)$/;
                     #Ignore lingering OTT transcripts
                     next if $db_tr->stable_id =~ /^OTT/;
                     #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
