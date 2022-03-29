@@ -292,19 +292,19 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
                 }
                 print "PASS: ".($pass ? "YES" : "NO")."\n";
                 if (!$pass){
-                    print "TR2: $t_name: intron did not pass the filter\n";
-                    if (scalar(@{$new_gene_obj->get_all_Transcripts}) > 1){
-                        #$new_gene_obj->remove_Transcript($transcript);
-                        #Ensembl API remove_Transcript method requires a dbID, but transcript objects do not have one at this stage 
-                        #Reimplement method using transcript name as identifier
-                        my $array = $new_gene_obj->{_transcript_array};
-                        @$array = grep { $_->get_all_Attributes('hidden_remark')->[0]->value ne $t_name } @$array;
-                        $ga->update_coords($new_gene_obj);
-                        next TR;
-                    }
-                    else{
-                        next GENE;
-                    }
+                    print "TR3: $t_name: intron would not pass the filter\n";
+                    #if (scalar(@{$new_gene_obj->get_all_Transcripts}) > 1){
+                        ##$new_gene_obj->remove_Transcript($transcript);
+                        ##Ensembl API remove_Transcript method requires a dbID, but transcript objects do not have one at this stage 
+                        ##Reimplement method using transcript name as identifier
+                        #my $array = $new_gene_obj->{_transcript_array};
+                        #@$array = grep { $_->get_all_Attributes('hidden_remark')->[0]->value ne $t_name } @$array;
+                        #$ga->update_coords($new_gene_obj);
+                        #next TR;
+                    #}
+                    #else{
+                        #next GENE;
+                    #}
                 }
             }
         }
