@@ -831,6 +831,8 @@ print "SUBMODE: $submode\n";
                     next unless $db_tr->stable_id;
                     #Exclude artifacts
                     next if $db_tr->biotype eq "artifact";
+                    #Ignore lingering OTT transcripts
+                    next if $db_tr->stable_id =~ /^OTT/;
                     #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
                     if (scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')})){
                       next unless ($db_tr->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$db_tr->get_all_Attributes('remark')}));
@@ -865,6 +867,8 @@ print "SUBMODE: $submode\n";
                     next unless $db_tr->stable_id;
                     #Exclude artifacts
                     next if $db_tr->biotype eq "artifact";
+                    #Ignore lingering OTT transcripts
+                    next if $db_tr->stable_id =~ /^OTT/;
                     #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
                     if (scalar(grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')})){
                       next unless ($db_tr->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$db_tr->get_all_Attributes('remark')}));
