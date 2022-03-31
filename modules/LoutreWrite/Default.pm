@@ -2594,7 +2594,7 @@ sub has_polyAseq_support {
   #Project slice to polyA-seq feature assembly version
   my $cs_version = $DBA{'polyAseq'}->get_CoordSystemAdaptor->get_default_version;
   my $projection = $slice->project("chromosome", $cs_version);
-  if ($projection){
+  if (scalar @$projection){
     my $segment = $projection->[0];
     my $psa = $DBA{'polyAseq'}->get_SliceAdaptor();    
     my $ext_slice = $psa->fetch_by_region("chromosome", $segment->to_Slice->seq_region_name, $segment->to_Slice->seq_region_end - $threshold, $segment->to_Slice->seq_region_end + $threshold); 
