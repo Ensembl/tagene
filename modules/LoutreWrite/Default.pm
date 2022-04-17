@@ -2026,7 +2026,7 @@ print "BBBBB:".$transcript->seq_region_start."\n";
                 else{
                     my $min_distance = 10000000;
                     foreach my $db_gene (@host_genes){
-                        my $distance = max($transcript->seq_region_start >= $db_gene->seq_region_start) - min($transcript->seq_region_end >= $db_gene->seq_region_end) + 1;
+                        my $distance = max($transcript->seq_region_start, $db_gene->seq_region_start) - min($transcript->seq_region_end, $db_gene->seq_region_end) + 1;
                         if ($distance < $min_distance){
                             $host_gene = $db_gene;
                             $min_distance = $distance;
