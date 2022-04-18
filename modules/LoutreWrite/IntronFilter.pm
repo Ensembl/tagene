@@ -3,7 +3,7 @@ package LoutreWrite::IntronFilter;
 
 use strict;
 use warnings;
-use LoutreWrite::Default;
+use LoutreWrite::AnnotUpdate;
 use LoutreWrite::Config;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::DB::Fasta;

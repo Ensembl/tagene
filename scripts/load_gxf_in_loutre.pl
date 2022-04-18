@@ -10,7 +10,9 @@ use Getopt::Long;
 use Bio::Otter::Lace::Defaults;
 use Bio::Otter::Server::Config;
 use LoutreWrite::Config;
-use LoutreWrite::Default;
+use LoutreWrite::InputParsing;
+use LoutreWrite::GeneFilter;
+use LoutreWrite::AnnotUpdate;
 use LoutreWrite::IntronFilter;
 $| = 1;
 
@@ -119,10 +121,10 @@ if (defined($SPECIES)){
 
 
 #Read data file
-my $genes = LoutreWrite::Default->parse_gxf_file($file);
+my $genes = LoutreWrite::InputParsing->parse_gxf_file($file);
 
 #Make gene objects
-my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $tsource, $no_NFV, $only_chr, $assembly_version);
+my $gene_objects = LoutreWrite::InputParsing->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $tsource, $no_NFV, $only_chr, $assembly_version);
 
 #Transform coordinates to a different assembly if required
 if ($assembly_version){
@@ -164,7 +166,7 @@ if ($assembly_version){
 	    }
 	    else{
 	      foreach my $transcript (@{$gene->get_all_Transcripts}){
-			my $tname = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+            my $tname = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
             print "TR2: ".$tname.": did not transform to $default_assembly_version assembly version\n";
           }
         }
@@ -180,17 +182,17 @@ if ($assembly_version){
 #Long artifact transcripts, spanning multiple real loci, make long artificial genes
 unless ($no_artifact_check){
   #Generate a kill list of "artifact" transcripts (those with long introns spanning multiple genes, likely caused by misalignments)
-  my $kill_list = LoutreWrite::Default->check_artifact_transcripts($gene_objects);
+  my $kill_list = LoutreWrite::GeneFilter->check_artifact_transcripts($gene_objects);
 
   #Remove artifacts and split genes left with genomic gaps
-  $gene_objects = LoutreWrite::Default->recluster_transcripts($gene_objects, $kill_list);
+  $gene_objects = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list);
 }
 
 #Remove transcripts overlapping more than the allowed number of existing loci at the exon level
 my $gene_objects_2;
 if ($max_overlapped_loci){
-  my $kill_list_2 = LoutreWrite::Default->check_overlapped_loci($gene_objects, $max_overlapped_loci);
-  $gene_objects_2 = LoutreWrite::Default->recluster_transcripts($gene_objects, $kill_list_2);
+  my $kill_list_2 = LoutreWrite::GeneFilter->check_overlapped_loci($gene_objects, $max_overlapped_loci);
+  $gene_objects_2 = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list_2);
   foreach my $tid (keys %{$kill_list_2}){
     print "TR2: $tid: max allowed number of overlapped loci exceeded\n";
   }
@@ -199,7 +201,7 @@ if ($max_overlapped_loci){
 #Add source info
 #my $gene_objects_3;
 if ($source_info){
-    $gene_objects_2 = LoutreWrite::Default->add_sources($gene_objects_2, $source_info);
+  $gene_objects_2 = LoutreWrite::InputParsing->add_sources($gene_objects_2, $source_info);
 }
 
 my $count = 1;
@@ -219,7 +221,7 @@ foreach my $gene_obj (@$gene_objects_2){
    #IT HAS TO BE DONE BY SPLITTING GENES    
     #Readthrough genes -> should be split and assign host genes independently by transcript
     #Why not replace "find_host_gene" with "assign_host_gene" which would return an array of gene objects, each one with their new stable id if they have a host gene?
-    my $new_gene_objects = LoutreWrite::Default->assign_host_gene($gene_obj, 1);
+    my $new_gene_objects = LoutreWrite::GeneFilter->assign_host_gene($gene_obj, 1);
     my %allowed_biotypes;
     if ($host_biotype){
       %allowed_biotypes = map {$_=>1} split(/,/, $host_biotype);
@@ -331,7 +333,7 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
             }        
             my $novel_gene = $new_gene_obj->stable_id ? 0 : 1;
             print "\nMODE: $mode\n";
-            my ($msg, $log) = LoutreWrite::Default->process_gene_2($new_gene_obj, $mode, "aggr", $dataset_name, $otter_dba, $no_intron_check, $use_comp_pipe_biotype, $no_NFV, $do_not_add_cds, $platinum);
+            my ($msg, $log) = LoutreWrite::AnnotUpdate->process_gene_2($new_gene_obj, $mode, "aggr", $dataset_name, $otter_dba, $no_intron_check, $use_comp_pipe_biotype, $no_NFV, $do_not_add_cds, $platinum);
         #print "HOST_CDS_SET_B=".scalar(keys %HOST_CDS_SET)."\n";
         #print "HOST_START_CODON_SET_B=".scalar(keys %HOST_START_CODON_SET)."\n";
             if ($msg =~ /lock ok,write ok,unlock ok(,(.+))?/){
