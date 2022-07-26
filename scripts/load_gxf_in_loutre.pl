@@ -63,10 +63,15 @@ my $only_chr;
 #die unless $dataset_name && $dataset_name =~ /test/;
 
 #Find chromosome name if it has been passed as a job array index
-$only_chr ||= $ENV{LSB_JOBINDEX};
+#$only_chr ||= $ENV{LSB_JOBINDEX};
 if ($only_chr){
   $only_chr = "X" if $only_chr eq "23";
   $only_chr = "Y" if $only_chr eq "24";
+}
+
+#Fix the input file name if it is meant to include the LSF job array index
+if ($file =~ /^(.+)\%I(.+)$/){
+  $file = $1.$ENV{LSB_JOBINDEX}.$2;
 }
 
 
@@ -237,7 +242,7 @@ foreach my $gene_obj (@$gene_objects_2){
               print "Couldn't fetch host gene with stable_id ".$new_gene_obj->stable_id."\n";
               $wrong_host = 1;
             }
-            if ($host_biotype and !($allowed_biotypes{$host_gene->biotype})){
+            elsif ($host_biotype and !($allowed_biotypes{$host_gene->biotype})){
                 print "Gene ".$host_gene->stable_id." will be ignored as its biotype (".$host_gene->biotype.") is not allowed\n";
                 $wrong_host = 1;
             }
