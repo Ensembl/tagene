@@ -154,11 +154,10 @@ if ($dep_job){
     perl $ENV{LOUTRE_WRITE}/scripts/load_gxf_in_loutre.pl \\
       -file $tmpdir/$tag.\%I.$filetype \\
       -dataset $dataset_name \\
-      -readseqdir $read_seq_dir \\
 COM
 
-
   $command .= " -author $author_name \\\n"             if $author_name;
+  $command .= " -readseqdir $read_seq_dir \\\n"        if $read_seq_dir;
   $command .= " -source $source_info \\\n"             if $source_info;
   $command .= " -remark \"$remark\" \\\n"              if $remark;
   $command .= " -comp_pipe \\\n"                       if $use_comp_pipe_biotype;
