@@ -37,6 +37,7 @@ my $tag;
 my $dep_job;
 my $tmpdir;
 my $read_seq_dir;
+my $job_limit = 20; #Max number of simultaneously running jobs in a job array
 
 &GetOptions(
             'file=s'            => \$file,
@@ -63,6 +64,7 @@ my $read_seq_dir;
             'dep_job=s'         => \$dep_job,
             'tmpdir=s'          => \$tmpdir,
             'readseqdir=s'      => \$read_seq_dir,
+            'job_limit=i'       => \$job_limit,
             );
 
 
@@ -142,23 +144,65 @@ foreach my $chr (keys %transcript_data){
 
 
 
+my $dependency = "";
+if ($dep_job){
+  $dependency = "-w 'ended(\"$dep_job"."[\%I]\")'";
+}
+
+  my $command = <<COM;
+  bsub -M3000 -R"select[mem>3000] rusage[mem=3000]" $dependency -J "$tag\[1-$number_of_files\]%$job_limit" -oo $tmpdir/f.$tag.\%I.out \\
+    perl $ENV{LOUTRE_WRITE}/scripts/load_gxf_in_loutre.pl \\
+      -file $tmpdir/$tag.\%I.$filetype \\
+      -dataset $dataset_name \\
+      -readseqdir $read_seq_dir \\
+COM
+
+
+  $command .= " -author $author_name \\\n"             if $author_name;
+  $command .= " -source $source_info \\\n"             if $source_info;
+  $command .= " -remark \"$remark\" \\\n"              if $remark;
+  $command .= " -comp_pipe \\\n"                       if $use_comp_pipe_biotype;
+  $command .= " -analysis $analysis_name \\\n"         if $analysis_name;
+  $command .= " -tsource $tsource \\\n"                if $tsource;
+  $command .= " -assembly $assembly_version \\\n"      if $assembly_version;
+  $command .= " -no_check \\\n"                        if $no_artifact_check;
+  $command .= " -no_NFV \\\n"                          if $no_NFV;
+  $command .= " -no_CDS \\\n"                          if $do_not_add_cds;
+  $command .= " -no_intron_check \\\n"                 if $no_intron_check;
+  $command .= " -host_biotype $host_biotype \\\n"      if $host_biotype;
+  $command .= " -max_ov_loc $max_overlapped_loci \\\n" if $max_overlapped_loci;
+  $command .= " -filter_introns \\\n"                  if $filter_introns;
+  $command .= " -platinum \\\n"                        if $platinum;
+  $command .= " -chr $only_chr \\\n"                   if $only_chr;
+  $command .= " -write \\\n"                           if $write;
+
+  print "Sending command:\n$command\n\n";
+  `$command`; #execute command
+
+
+__END__
 for (my $i=1; $i<=$number_of_files; $i++){
   my $dependency = "";
-  if ($i == 1){
-    if ($dep_job){
-      $dependency = "-w 'ended(\"$dep_job"."[*]\")'";
-    }
+  if ($dep_job){
+    $dependency = "-w 'ended(\"$dep_job"."[$i]\")'";
   }
-  if ($i > 1){
-    $dependency = "-w 'ended(\"$tag.".($i-1)."[*]\")'";
-  }
+#  if ($i == 1){
+#    if ($dep_job){
+#      $dependency = "-w 'ended(\"$dep_job"."[*]\")'";
+#    }
+#  }
+#  if ($i > 1){
+#    $dependency = "-w 'ended(\"$tag.".($i-1)."[*]\")'";
+#  }
   my $command = <<COM;
-  bsub -M3000 -R"select[mem>3000] rusage[mem=3000]" $dependency -J "$tag.$i\[1-24\]" -oo $tmpdir/f.$tag.$i.\%I.out \\
+  bsub -M3000 -R"select[mem>3000] rusage[mem=3000]" $dependency -J "$tag\[$i\]%$job_limit" -oo $tmpdir/f.$tag.\%I.out \\
     perl $ENV{LOUTRE_WRITE}/scripts/load_gxf_in_loutre.pl \\
       -file $tmpdir/$tag.$i.$filetype \\
       -dataset $dataset_name \\
       -readseqdir $read_seq_dir \\
 COM
+
+
   $command .= " -author $author_name \\\n"             if $author_name;
   $command .= " -source $source_info \\\n"             if $source_info;
   $command .= " -remark \"$remark\" \\\n"              if $remark;
