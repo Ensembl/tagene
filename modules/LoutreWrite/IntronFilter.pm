@@ -40,7 +40,7 @@ sub predict_outcome {
     my $intron_score = get_intron_score($intron);
     my $rel_score = get_relative_intron_score($intron, $transcript);
     my $intron_length = get_intron_length($intron);
-    my $exonerate_ali = get_exonerate_alignment_support($intron, $transcript);
+    my $exonerate_ali = ($READSEQDIR ? get_exonerate_alignment_support($intron, $transcript) : "NA");
     print "INTRON: ".$intron->seq_region_start."-".$intron->seq_region_end."  NOV=$is_novel SS=$ss_sequence AS=$antisense_ovlp REP=$repeat_ovlp IP=$intron_score REL=$rel_score LEN=$intron_length EX=$exonerate_ali\n";
 
     if ($is_novel eq "yes" and
@@ -326,7 +326,7 @@ sub get_exonerate_alignment_support {
   my $exonerate = "exonerate";
   #my $pssm_dir = "/homes/jmgonzalez/work/long_read_pipeline/annotation_exercise_results/third_round/exonerate";
   my $pssm_dir = "/nfs/production/flicek/ensembl/havana/jmgonzalez/TAGENE/pssm";
-  my $dir = "/tmp";
+  my $dir = "/lscratch";
   if (`wc -l $dir/$filename.query.fa | cut -d' ' -f1` < 2){
     return "NA";
   }
@@ -365,6 +365,7 @@ sub get_read_sequences {
            'PB_test'  => Bio::DB::Fasta->new("$fasta_dir/PB_test.fasta"),
            'CLS3_old' => Bio::DB::Fasta->new("$fasta_dir/CLS3.fasta"),
            'CLS3'     => Bio::DB::Fasta->new("$fasta_dir/CLS3_human.fasta"),
+           'ENCSR309IKK' => Bio::DB::Fasta->new("$fasta_dir/ENCSR309IKK.reads.fasta"),
           );
   }
   elsif ($SPECIES eq "mouse"){
@@ -405,7 +406,10 @@ sub get_read_sequences {
       }
       elsif ($sample_name =~ /pacBioSII-Cshl-/){
         $seq = $db{'CLS3'}->seq($read_name);
-      }      
+      }
+      elsif ($sample_name eq "ENCSR309IKK"){
+        $seq = $db{'ENCSR309IKK'}->seq($read_name);
+      }        
       elsif ($sample_name eq "none"){
         foreach my $dataset (qw(SLRseq CLS RACEseq)){
           $seq = $db{$dataset}->seq($read_name);
