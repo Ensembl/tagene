@@ -232,6 +232,13 @@ sub is_retained_intron {
   my $slice_offset = $host_gene->seq_region_start - 1; #print "OFFSET=$slice_offset\n";
   $min_overhang ||= 1;
   foreach my $tr (@{$host_gene->get_all_Transcripts}){
+    #Ignore lingering OTT transcripts
+    next unless $tr->stable_id =~ /^ENS(MUS)?T000/;
+    #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
+    if (scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')})){
+      next unless ($tr->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$tr->get_all_Attributes('remark')}));
+    }
+    
     if ($tr->translate){
       #print "TR:  ".$tr->stable_id." ".$tr->biotype."\n"; 
       my $cds_start = $tr->coding_region_start + $slice_offset;
@@ -314,7 +321,15 @@ sub get_host_gene_cds_set {
   my %seen_chains;
   
   my @filtered_transcripts = grep {$_->translate and has_complete_cds($_)} @{$gene->get_all_Transcripts};
+ 
   foreach my $transcript (sort_by_categ(\@filtered_transcripts)){
+    #Ignore lingering OTT transcripts
+    next unless $transcript->stable_id =~ /^ENS(MUS)?T000/;
+    #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
+    if (scalar(grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')})){
+      next unless ($transcript->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$transcript->get_all_Attributes('remark')}));
+    }
+    
     my $chain = cds_exon_chain($transcript);
     unless ($seen_chains{$chain}){
       #push(@cds_set, {chain => $transcript->get_all_translateable_Exons, id=> $transcript->stable_id, biotype => $transcript->biotype, status => $transcript->status});
@@ -713,6 +728,13 @@ sub get_host_gene_start_codon_set {
   my %seen_sc;
   my @filtered_transcripts = grep {has_cds_start($_)} @{$gene->get_all_Transcripts};
   foreach my $transcript (sort_by_categ_2(\@filtered_transcripts)){
+    #Ignore lingering OTT transcripts
+    next unless $transcript->stable_id =~ /^ENS(MUS)?T000/;
+    #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
+    if (scalar(grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')})){
+      next unless ($transcript->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$transcript->get_all_Attributes('remark')}));
+    }
+    
     #$transcript = $transcript->transform("chromosome");
     #print "T_START=".$transcript->seq_region_start."; T_END=".$transcript->seq_region_end."\n";
     my $cds_start = $transcript->seq_region_strand == 1 ? $transcript->coding_region_start : $transcript->coding_region_end;
@@ -965,6 +987,13 @@ sub get_host_gene_stop_codon_set {
   my %seen_sc;
   my @filtered_transcripts = grep {has_cds_end($_)} @{$gene->get_all_Transcripts};
   foreach my $transcript (@filtered_transcripts){
+    #Ignore lingering OTT transcripts
+    next unless $transcript->stable_id =~ /^ENS(MUS)?T000/;
+    #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
+    if (scalar(grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')})){
+      next unless ($transcript->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$transcript->get_all_Attributes('remark')}));
+    }
+    
     #$transcript = $transcript->transform("chromosome");
     #print "T_START=".$transcript->seq_region_start."; T_END=".$transcript->seq_region_end."\n";
     my $cds_end = $transcript->seq_region_strand == 1 ? $transcript->coding_region_end : $transcript->coding_region_start;
