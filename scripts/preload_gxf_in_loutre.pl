@@ -37,6 +37,7 @@ my $tag;
 my $dep_job;
 my $tmpdir;
 my $read_seq_dir;
+my $cluster_by_gene_id;
 my $job_limit = 20; #Max number of simultaneously running jobs in a job array
 
 &GetOptions(
@@ -64,12 +65,14 @@ my $job_limit = 20; #Max number of simultaneously running jobs in a job array
             'dep_job=s'         => \$dep_job,
             'tmpdir=s'          => \$tmpdir,
             'readseqdir=s'      => \$read_seq_dir,
+            'by_gene_id!'       => \$cluster_by_gene_id,
             'job_limit=i'       => \$job_limit,
             );
 
 
 #Read input annotation file
 my %transcript_data;
+my %seen;
 my $filetype;
 if ($file =~ /\.gff3(.gz)?$/){
   $filetype = "gff3";
@@ -108,9 +111,17 @@ while (<IN>){
   }
   my $transcript_id = $attribs{'transcript_id'};
   if (!$transcript_id){
-    die $_;
+    die "No transcript id found: $_";
   }
-  push(@{$transcript_data{$chr}{$transcript_id}}, $_);
+  if ($cluster_by_gene_id){
+    if ($attribs{'gene_id'}){
+      $transcript_id = $attribs{'gene_id'};
+    }
+    else{
+      die "No gene id found: $_";
+    }
+  }
+  push(@{$transcript_data{$transcript_id}}, $_);
 }
 close (IN);
 
@@ -120,28 +131,26 @@ if ($tmpdir and !(-d $tmpdir)){
   mkdir($tmpdir);
 }
 my $number_of_files = 0;
-foreach my $chr (keys %transcript_data){
-  my $tn = 0;
-  my $fn = 0;
-  foreach my $transcript_id (keys %{$transcript_data{$chr}}){
-    $tn++;
-    if ($tn > 1 and $tn % $max_n_tr == 1){
-      close (FILE);
-    }
-    if ($tn == 1 or $tn % $max_n_tr == 1){
-      $fn++;
-      open (FILE, ">>$tmpdir/$tag.$fn.$filetype") or die "Can't open file $tmpdir/$tag.$fn.$filetype: $!";
-    }
-    foreach my $line (@{$transcript_data{$chr}{$transcript_id}}){
-      print FILE $line."\n";
-    }
+my $tn = 0;
+my $fn = 0;
+foreach my $transcript_id (keys %transcript_data){
+  $tn++;
+  if ($tn > 1 and $tn % $max_n_tr == 1){
+    close (FILE);
   }
-  close (FILE);
-  if ($fn > $number_of_files){
-    $number_of_files = $fn;
+  if ($tn == 1 or $tn % $max_n_tr == 1){
+    $fn++;
+    open (FILE, ">>$tmpdir/$tag.$fn.$filetype") or die "Can't open file $tmpdir/$tag.$fn.$filetype: $!";
+  }
+  foreach my $line (@{$transcript_data{$transcript_id}}){
+    print FILE $line."\n";
   }
 }
+close (FILE);
 
+if ($fn > $number_of_files){
+  $number_of_files = $fn;
+}
 
 
 my $dependency = "";
@@ -150,7 +159,7 @@ if ($dep_job){
 }
 
   my $command = <<COM;
-  bsub -M3000 -R"select[mem>3000] rusage[mem=3000]" $dependency -J "$tag\[1-$number_of_files\]%$job_limit" -oo $tmpdir/f.$tag.\%I.out \\
+  bsub -q short -M1000 -R"select[mem>1000] rusage[mem=1000]" $dependency -J "$tag\[1-$number_of_files\]%$job_limit" -oo $tmpdir/f.$tag.\%I.out \\
     perl $ENV{LOUTRE_WRITE}/scripts/load_gxf_in_loutre.pl \\
       -file $tmpdir/$tag.\%I.$filetype \\
       -dataset $dataset_name \\
