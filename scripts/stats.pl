@@ -32,10 +32,14 @@ print OUT join("\t", "gene_id",
                      "data_source",
               )."\n";
 
-print EXT join("\t", "gene_id",
+print EXT join("\t", "chromosome",
+                     "start",
+                     "end",
+                     "gene_id",
                      "gene_symbol",
                      "gene_biotype",
                      "transcript_id",
+                     "transcript_name",
                      "transcript_biotype",
                      "previous_transcript_biotype",
                      "novel/extended",
@@ -100,7 +104,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
       if ($is_tagene){
         foreach my $att (@{$transcript->get_all_Attributes}){
           #Increase the count of different long read models that made up the transcript
-          if ($att->code eq "hidden_remark" and $att->value =~ /^ID: .+(align|compmerge|NAM_TM)/){
+          if ($att->code eq "hidden_remark" and $att->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_)/){
             $tagene_models++;
           }
           #Increase the count of different long read datasets involved in making the transcript
@@ -108,7 +112,9 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
               ($att->value =~ /^Assembled from PacBio CLS reads - .+\(GSE93848\)$/ or 
                $att->value eq "Assembled from PacBio CLS3 reads" or
                $att->value eq "Assembled from SLRseq reads (SRP049776)" or 
-               $att->value eq "Assembled from RACEseq reads")){
+               $att->value eq "Assembled from RACEseq reads" or
+               $att->value =~ /^Assembled from LRGASP.+reads.+/
+              )){
             $tagene_datasets++;
             my ($dataset) = $att->value =~ /Assembled from (.+) reads/;
             $tsources{$dataset}++;
@@ -132,7 +138,8 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
                     ($att->value =~ /^Assembled from PacBio CLS reads -.+\(GSE93848\)$/ or 
                      $att->value eq "Assembled from PacBio CLS3 reads" or
                      $att->value eq "Assembled from SLRseq reads (SRP049776)" or 
-                     $att->value eq "Assembled from RACEseq reads")) or
+                     $att->value eq "Assembled from RACEseq reads" or
+                     $att->value =~ /^Assembled from LRGASP.+reads.+/)) or
                     ($att->code eq "remark" and $att->value eq "not for VEGA") or
                     ($att->code eq "hidden_remark" and $att->value =~ /^ID: .+(align|compmerge|NAM_TM)/) or
                     ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq/) or
@@ -193,18 +200,23 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
           }
         }
         
-        print EXT join("\t", $gene->stable_id, 
-                           ($gene->get_all_Attributes('name')->[0]->value || "NA"),
-                           $gene->biotype, 
-                           $transcript->stable_id, 
-                           $transcript->biotype,
-                           (previous_biotype($transcript) || "NA"),
-                           ($extended_flag ? "extended" : "novel"),
-                           join(", ", keys %tsources),
-                           scalar(@{$transcript->get_all_Attributes('cds_end_NF')}) ? "cds_end_NF" : "NA",
-                           join(", ", map {$_->value} grep {$_->value =~ /^ID: .+(align|compmerge|NAM_TM)/} @{$transcript->get_all_Attributes('hidden_remark')}),
-                           $is_unique_cds,
-                           ($tn_length || "NA")
+        print EXT join("\t",
+                        $transcript->seq_region_name,
+                        $transcript->seq_region_start,
+                        $transcript->seq_region_end,
+                        $gene->stable_id, 
+                        ($gene->get_all_Attributes('name')->[0]->value || "NA"),
+                        $gene->biotype, 
+                        $transcript->stable_id,
+                        ($transcript->get_all_Attributes('name')->[0]->value || "NA"),
+                        $transcript->biotype,
+                        (previous_biotype($transcript) || "NA"),
+                        ($extended_flag ? "extended" : "novel"),
+                        join(", ", keys %tsources),
+                        scalar(@{$transcript->get_all_Attributes('cds_end_NF')}) ? "cds_end_NF" : "NA",
+                        join(", ", map {$_->value} grep {$_->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_)/} @{$transcript->get_all_Attributes('hidden_remark')}),
+                        $is_unique_cds,
+                        ($tn_length || "NA")
                       )."\n";
       
       }
