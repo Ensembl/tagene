@@ -135,10 +135,10 @@ my $tn = 0;
 my $fn = 0;
 foreach my $transcript_id (keys %transcript_data){
   $tn++;
-  if ($tn > 1 and $tn % $max_n_tr == 1){
+  if (($tn > 1 and $tn % $max_n_tr == 1) or $max_n_tr == 1){
     close (FILE);
   }
-  if ($tn == 1 or $tn % $max_n_tr == 1){
+  if ($tn == 1 or $tn % $max_n_tr == 1 or $max_n_tr == 1){
     $fn++;
     open (FILE, ">>$tmpdir/$tag.$fn.$filetype") or die "Can't open file $tmpdir/$tag.$fn.$filetype: $!";
   }
