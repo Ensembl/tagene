@@ -12,11 +12,13 @@ use Getopt::Long;
 my $infile;
 my $dataset_name;
 my $outfile;
+my $use_longest_FL_supporters;
 
 &GetOptions(
             'infile=s'   => \$infile,
             'libname=s'  => \$dataset_name,
-            'outfile=s'  => \$outfile,           
+            'outfile=s'  => \$outfile,
+            'use_longest_FL_supporters!' => \$use_longest_FL_supporters,
             );            
 
 
@@ -28,7 +30,14 @@ while (<GTF>){
   if (/transcript_id \"(\S+)\"; contains \"(\S+)\";/){
     my $tid = $1;
     my $reads = $2;
+    my $fl_reads;
+    if (/longest_FL_supporters \"(\S+)\";/){
+      $fl_reads = $1;
+    }
     unless ($seen_tids{$tid}){
+      if ($use_longest_FL_supporters and $fl_reads){
+        $reads = $fl_reads;
+      }
       $reads =~ s/\//_/g;
       print OUT $tid."\t".$dataset_name." : ".join(", ", split(/,/, $reads))." ;\n";
     }
