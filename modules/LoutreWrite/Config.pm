@@ -29,11 +29,11 @@ sub get_db_adaptadors{
 #Connect to the havana database (the live/production one, not necessarily the otter database that is being edited)
 sub get_havana_db_adaptor {
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-     -host   => 'mysql-ens-havana-prod-1',
-     -port   => 4581,
+     -host   => 'mysql-ens-havana-prod-2',
+     -port   => 4682,
      -user   => 'ensro',
      -pass   => undef,
-     -dbname => "havana_$SPECIES",
+     -dbname => "havana_".$SPECIES."_backup",
      -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);
@@ -60,10 +60,10 @@ sub get_pipe_db_adaptor {
 sub get_core_db_adaptor {
   my $dbname;
   if ($SPECIES eq "human"){
-    $dbname = "homo_sapiens_core_106_38";
+    $dbname = "homo_sapiens_core_107_38";
   }
   elsif ($SPECIES eq "mouse"){
-    $dbname = "mus_musculus_core_106_39";
+    $dbname = "mus_musculus_core_107_39";
   }
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
      -host   => 'mysql-ens-havana-prod-2',
