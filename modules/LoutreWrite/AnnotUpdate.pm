@@ -57,7 +57,7 @@ print "SUBMODE: $submode\n";
     #That would prevent the new annotation from being added to the host gene.
     my ($padded_start, $padded_end);
     if ($mode eq "update"){
-        my $host_gene = $dba->get_GeneAdaptor->fetch_by_stable_id($gene->stable_id);
+        my $host_gene = $dba->get_GeneAdaptor->fetch_by_stable_id($gene->stable_id); unless ($host_gene){print "No gene for ".$gene->stable_id."\n";}
         $padded_start = min($gene->start, $host_gene->start);
         $padded_end = max($gene->end, $host_gene->end);
     }
@@ -164,6 +164,7 @@ print "SUBMODE: $submode\n";
 
                 
                 ###
+                my $outcome;
                 foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
                     #Exclude transcripts not yet stored in the database
                     next unless $db_tr->stable_id;
@@ -226,6 +227,7 @@ print "SUBMODE: $submode\n";
                                         print "Skipping transcript as partially redundant with a MANE transcript\n";
                                         $add_transcript = 0;
                                         @merge_candidates = ();
+                                        $outcome = "partially redundant with a MANE transcript";
                                         last DBTR;
                                     }
                                     #Do not merge with full-length CDS transcripts (TO DO)
@@ -237,6 +239,7 @@ print "SUBMODE: $submode\n";
                                         print "Skipping transcript as partially redundant with a coding transcript\n";
                                         $add_transcript = 0;
                                         @merge_candidates = ();
+                                        $outcome = "partially redundant with a coding transcript";
                                         last DBTR;
                                     }
                                     #Do not merge with Platinum transcripts unless this transcript is also Platinum
@@ -248,6 +251,7 @@ print "SUBMODE: $submode\n";
                                             print "Skipping transcript as partially redundant with a Platinum transcript\n";
                                             $add_transcript = 0;
                                             @merge_candidates = ();
+                                            $outcome = "partially redundant with a Platinum transcript";
                                             last DBTR;
                                         }
                                     }
@@ -290,6 +294,7 @@ print "SUBMODE: $submode\n";
                                   print "Skipping transcript as partially redundant with a MANE transcript\n";
                                   $add_transcript = 0;
                                   @merge_candidates = ();
+                                  $outcome = "partially redundant with a MANE transcript";
                                   last DBTR;
                                 }                                                         
                                 #Do not merge with Platinum transcripts unless this transcript is also Platinum
@@ -301,6 +306,7 @@ print "SUBMODE: $submode\n";
                                         print "Skipping transcript as partially redundant with a Platinum transcript\n";
                                         $add_transcript = 0;
                                         @merge_candidates = ();
+                                        $outcome = "partially redundant with a Platinum transcript";
                                         last DBTR;
                                     }
                                 }
@@ -324,6 +330,7 @@ print "SUBMODE: $submode\n";
                         elsif ($tr_comp{$db_tr_id}->{'exon'} == 0){ 
                             $add_transcript = 0;
                             @merge_candidates = ();
+                            $outcome = "no exon novelty";
                             last DBTR;
                         }
                     }
@@ -541,8 +548,14 @@ print "SUBMODE: $submode\n";
                     push (@log, "TR2: $id: Added transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id." (".$db_gene->biotype.")");
                 }
                 else{
-                    print "TR: $id: Will reject transcript in host gene ".$db_gene->stable_id." as intron chain exists\n";
-                    push (@log, "TR2: $id: Rejected transcript in host gene ".$db_gene->stable_id." as intron chain exists");
+                    if ($outcome){
+                        print "TR: $id: Will reject transcript in host gene ".$db_gene->stable_id." as $outcome\n";
+                        push (@log, "TR2: $id: Rejected transcript in host gene ".$db_gene->stable_id." as $outcome");
+                    }
+                    else{
+                        print "TR: $id: Will reject transcript in host gene ".$db_gene->stable_id." as intron chain exists\n";
+                        push (@log, "TR2: $id: Rejected transcript in host gene ".$db_gene->stable_id." as intron chain exists");
+                    }
                 }
             }
         }
@@ -708,10 +721,10 @@ sub get_new_transcript_name {
     #In Otter/Zmap, the transcript name is created by selecting 'Variant' (Ctrl+I) in the session window
     #The code can be found in ensembl-otter/modules/MenuCanvasWindow/SessionWindow.pm (sub _make_variant_subsequence)
     #Thus, the name has been created when the transcript attributes are dumped in the XML and SQLite files
-
+#    while (scalar @{$gene->get_all_Attributes('name')} == 0){ print "WAITING FOR 'name'...\n"; sleep(60); }
     my $gene_name = $gene->get_all_Attributes('name')->[0]->value; 
     #The gene name attribute may be a gene symbol rather than a clone-based name
-    #Use it only as a defaut name (eg. for new genes)
+    #Use it only as a default name (eg. for new genes)
     #To imitate what otter does, get a list of existing (clone-based) transcript names 
     #in order to infer the clone-based gene name and the next transcript number
     my $max = 0;
