@@ -104,7 +104,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
       if ($is_tagene){
         foreach my $att (@{$transcript->get_all_Attributes}){
           #Increase the count of different long read models that made up the transcript
-          if ($att->code eq "hidden_remark" and $att->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_)/){
+          if ($att->code eq "hidden_remark" and $att->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_|PB)/){
             $tagene_models++;
           }
           #Increase the count of different long read datasets involved in making the transcript
@@ -113,7 +113,8 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
                $att->value eq "Assembled from PacBio CLS3 reads" or
                $att->value eq "Assembled from SLRseq reads (SRP049776)" or 
                $att->value eq "Assembled from RACEseq reads" or
-               $att->value =~ /^Assembled from LRGASP.+reads.+/
+               $att->value =~ /^Assembled from LRGASP.+reads.+/ or
+               $att->value =~ /^Assembled from PacBio reads/
               )){
             $tagene_datasets++;
             my ($dataset) = $att->value =~ /Assembled from (.+) reads/;
@@ -139,7 +140,9 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
                      $att->value eq "Assembled from PacBio CLS3 reads" or
                      $att->value eq "Assembled from SLRseq reads (SRP049776)" or 
                      $att->value eq "Assembled from RACEseq reads" or
-                     $att->value =~ /^Assembled from LRGASP.+reads.+/)) or
+                     $att->value =~ /^Assembled from LRGASP.+reads.+/) or
+                     $att->value =~ /^Assembled from PacBio reads/ 
+                     ) or
                     ($att->code eq "remark" and $att->value eq "not for VEGA") or
                     ($att->code eq "hidden_remark" and $att->value =~ /^ID: .+(align|compmerge|NAM_TM)/) or
                     ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq/) or
@@ -214,7 +217,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
                         ($extended_flag ? "extended" : "novel"),
                         join(", ", keys %tsources),
                         scalar(@{$transcript->get_all_Attributes('cds_end_NF')}) ? "cds_end_NF" : "NA",
-                        join(", ", map {$_->value} grep {$_->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_)/} @{$transcript->get_all_Attributes('hidden_remark')}),
+                        join(", ", map {$_->value} grep {$_->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_|PB)/} @{$transcript->get_all_Attributes('hidden_remark')}),
                         $is_unique_cds,
                         ($tn_length || "NA")
                       )."\n";
