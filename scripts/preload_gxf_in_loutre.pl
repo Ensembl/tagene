@@ -70,6 +70,19 @@ my $job_limit = 20; #Max number of simultaneously running jobs in a job array
             );
 
 
+#Double check in case of writing a production database
+if ($write and ($dataset_name eq "human" or $dataset_name eq "mouse")){
+  print STDERR "You are about to modify the $dataset_name production database.\n
+                Do you want to proceed? yes | [no]\n";
+  my $answer = <STDIN>;
+  chomp $answer;
+  unless ($answer eq "yes"){
+    print STDERR "Stopping here...\n";
+    exit(0);
+  }
+}
+
+
 #Read input annotation file
 my %transcript_data;
 my %seen;
