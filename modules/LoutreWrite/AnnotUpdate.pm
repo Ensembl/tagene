@@ -128,7 +128,7 @@ print "SUBMODE: $submode\n";
                 #First round: look for micro-intron overlaps (false partial intron retention due to misalignment)
                 foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
                     #Exclude transcripts not yet stored in the database
-                    next unless $db_tr->stable_id;
+  #                  next unless $db_tr->stable_id;
                     #Exclude artifacts
                     next if $db_tr->biotype eq "artifact";
                     #Exclude unwanted transcript biotypes which may be associated to unexpected gene biotypes
@@ -167,7 +167,7 @@ print "SUBMODE: $submode\n";
                 my $outcome;
                 foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
                     #Exclude transcripts not yet stored in the database
-                    next unless $db_tr->stable_id;
+#                    next unless $db_tr->stable_id;
                     #Exclude artifacts
                     next if $db_tr->biotype eq "artifact";
                     #Exclude unwanted transcript biotypes which may be associated to unexpected gene biotypes
