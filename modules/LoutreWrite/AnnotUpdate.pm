@@ -192,7 +192,7 @@ print "SUBMODE: $submode\n";
                  #   my $c = can_be_clipped($tr, $db_tr, 15);
                     ###
                     $tr_comp{$db_tr->stable_id} = {'intron' => $i, 'exon' => $e, 'merge' => $m};
-                    print "COMP: i=$i, e=$e, m=$m ".$db_tr->stable_id." ".$db_tr->biotype."\n";
+                    print "COMP: i=$i, e=$e, m=$m ".($db_tr->stable_id || $db_tr->get_all_Attributes('name')->[0]->value)." ".$db_tr->biotype."\n";
                 }
                 #Multi-exon transcripts
                 if (scalar @{$tr->get_all_Exons} > 1){
