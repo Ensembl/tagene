@@ -498,6 +498,12 @@ print "SUBMODE: $submode\n";
                 }
                 elsif ($add_transcript == 1){
                     #Create a name for the new transcript
+                    #Before that, add a name to the gene if it doesn't have one
+                    if (scalar @{$db_gene->get_all_Attributes('name')} == 0){
+                      my $new_gene_name = $self->get_new_gene_name($region, $db_gene, $dataset_name, $dba) or return " ";
+                      my $gene_name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_gene_name);
+                      $db_gene->add_Attributes($gene_name_att);
+                    }
                     my $new_tr_name = $self->get_new_transcript_name($db_gene, $dba);
                     my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
                     $tr->add_Attributes($name_att);
