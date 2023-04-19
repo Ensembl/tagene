@@ -133,7 +133,7 @@ sub is_novel {
   my $intron = shift;
   my $chr = $intron->seq_region_name;
   my $sa = $DBA{'otter'}->get_SliceAdaptor();
-  my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $intron->seq_region_start, $intron->seq_region_end);
+  my $intron_slice = $sa->fetch_by_region("toplevel", $chr, $intron->seq_region_start, $intron->seq_region_end);
   foreach my $tr (@{$intron_slice->get_all_Transcripts}){
     if ($tr->source =~ /(ensembl|havana)/ and $tr->biotype ne "artifact" and
         scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')}) == 0){
@@ -151,7 +151,7 @@ sub is_novel {
 sub get_ss_seq {
   my $intron = shift;
   my $sa = $DBA{'otter'}->get_SliceAdaptor();
-  my $intron_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
+  my $intron_slice = $sa->fetch_by_region("toplevel", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
   my $donor = substr($intron_slice->seq, 0, 2);
   my $acceptor = substr($intron_slice->seq, -2);
   my $ssite = "$donor..$acceptor";
@@ -169,7 +169,7 @@ sub get_ss_antisense_overlap {
   my $padding = 10; #Number of nucleotides each side of the splice site that will define the slices 
   my $donor_as = 0;
   my $sa = $DBA{'otter'}->get_SliceAdaptor();
-  my $donor_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start-$padding, $intron->seq_region_start+$padding-1);
+  my $donor_slice = $sa->fetch_by_region("toplevel", $intron->seq_region_name, $intron->seq_region_start-$padding, $intron->seq_region_start+$padding-1);
   if (scalar(grep {$_->seq_region_strand != $intron->seq_region_strand} @{$donor_slice->get_all_Exons})){
     $donor_as = 1;
     #Check that the same splice site does not exist in annotation
@@ -186,7 +186,7 @@ sub get_ss_antisense_overlap {
     }
   }
   my $acceptor_as = 0;
-  my $acceptor_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_end-$padding+1, $intron->seq_region_end+$padding);
+  my $acceptor_slice = $sa->fetch_by_region("toplevel", $intron->seq_region_name, $intron->seq_region_end-$padding+1, $intron->seq_region_end+$padding);
   if (scalar(grep {$_->seq_region_strand != $intron->seq_region_strand} @{$acceptor_slice->get_all_Exons})){
     $acceptor_as = 1;
     #Check that the same splice site does not exist in annotation
@@ -214,7 +214,7 @@ sub get_ss_antisense_overlap {
 sub get_ss_repeat_overlap {
   my $intron = shift;
   my $sa = $DBA{'core'}->get_SliceAdaptor();
-  my $intron_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start-2, $intron->seq_region_end+2);
+  my $intron_slice = $sa->fetch_by_region("toplevel", $intron->seq_region_name, $intron->seq_region_start-2, $intron->seq_region_end+2);
   my @rfs = (@{$intron_slice->get_all_RepeatFeatures("repeatmask_repbase_$SPECIES")}, 
              @{$intron_slice->get_all_RepeatFeatures('trf')});
   my $overlaps_repeat;
@@ -241,7 +241,7 @@ sub get_ss_repeat_overlap {
 sub get_intron_score {
   my $intron = shift;
   my $sa = $DBA{'intron'}->get_SliceAdaptor();
-  my $intron_slice = $sa->fetch_by_region("chromosome", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
+  my $intron_slice = $sa->fetch_by_region("toplevel", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
   foreach my $sf (@{$intron_slice->get_all_SimpleFeatures}){
     if ($SPECIES eq "human"){
       next unless $sf->analysis->logic_name =~ /^recount3_pass1/;
@@ -506,7 +506,7 @@ sub add_ss_seq {
   my $coord = shift;
   my ($chr, $start, $end, $strand) = split(/:/, $coord);
   my $sa = $DBA{'otter'}->get_SliceAdaptor();
-  my $intron_slice = $sa->fetch_by_region("chromosome", $chr, $start, $end);
+  my $intron_slice = $sa->fetch_by_region("toplevel", $chr, $start, $end);
   my $donor = substr($intron_slice->seq, 0, 2);
   my $acceptor = substr($intron_slice->seq, -2);
   my $ssite = "$donor..$acceptor";

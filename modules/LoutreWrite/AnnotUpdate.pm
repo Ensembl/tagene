@@ -69,7 +69,7 @@ print "SUBMODE: $submode\n";
         chr     => $gene->seq_region_name,
         start   => $padded_start || $gene->start,   
         end     => $padded_end || $gene->end,
-        cs      => "chromosome",
+        cs      => "toplevel",
         csver   => $csver
     );
 
@@ -1131,7 +1131,7 @@ sub has_polyA_site_support {
   my ($transcript, $threshold) = @_;
   my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
   my $sa = $DBA{'havana'}->get_SliceAdaptor();
-  my $ext_slice = $sa->fetch_by_region("chromosome", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
+  my $ext_slice = $sa->fetch_by_region("toplevel", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
   if (scalar grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures('polya_site')}){
     return 1;
   }
@@ -1153,14 +1153,14 @@ sub has_polyAseq_support {
   my ($transcript, $threshold) = @_;
   my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
   my $sa = $DBA{'core'}->get_SliceAdaptor();
-  my $slice = $sa->fetch_by_region("chromosome", $transcript->seq_region_name, $transcript_end, $transcript_end);
+  my $slice = $sa->fetch_by_region("toplevel", $transcript->seq_region_name, $transcript_end, $transcript_end);
   #Project slice to polyA-seq feature assembly version
   my $cs_version = $DBA{'polyAseq'}->get_CoordSystemAdaptor->get_default_version;
-  my $projection = $slice->project("chromosome", $cs_version);
+  my $projection = $slice->project("toplevel", $cs_version);
   if (scalar @$projection){
     my $segment = $projection->[0];
     my $psa = $DBA{'polyAseq'}->get_SliceAdaptor();    
-    my $ext_slice = $psa->fetch_by_region("chromosome", $segment->to_Slice->seq_region_name, $segment->to_Slice->seq_region_end - $threshold, $segment->to_Slice->seq_region_end + $threshold); 
+    my $ext_slice = $psa->fetch_by_region("toplevel", $segment->to_Slice->seq_region_name, $segment->to_Slice->seq_region_end - $threshold, $segment->to_Slice->seq_region_end + $threshold); 
     my @polyAseq_features;
     if ($ext_slice){
       @polyAseq_features = grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures()};

@@ -244,7 +244,10 @@ sub make_vega_objects {
                 $chr =~ s/^chr//;
                 next GENE if ($only_chr and $chr ne $only_chr);
                 if (!($slices{$chr})){
-                    my $slice = $sa->fetch_by_region("chromosome", $chr, undef, undef, undef, $assembly_version);
+                    my $slice = $sa->fetch_by_region("toplevel", $chr, undef, undef, undef, $assembly_version);
+                    unless ($slice){
+                      die "Can't find slice for $chr\n";
+                    }
                     $slices{$chr} = $slice;
                 }
                 $exon->slice($slices{$chr});

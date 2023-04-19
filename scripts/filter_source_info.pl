@@ -195,7 +195,7 @@ sub make_transcript_from_bed_line {
   my ($chr, $tstart, $tend, $name, $score, $strand, $cstart, $cend, $rgb, $nexons, $elengths, $estarts) = split(/\t/, $line);
   $chr =~ s/^chr//;
   $chr = "MT" if $chr eq "M"; #Some multimappers are aligned to chrM
-  my $slice = $sa->fetch_by_region("chromosome", $chr);
+  my $slice = $sa->fetch_by_region("toplevel", $chr);
   my @exon_starts = split(/,/, $estarts);
   my @exon_lengths = split(/,/, $elengths);
   for (my $i=0; $i<$nexons; $i++){
