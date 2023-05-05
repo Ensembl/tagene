@@ -124,7 +124,7 @@ print "SUBMODE: $submode\n";
                 my @merge_candidates = ();
                 my %tr_comp;
                 print "\n\nComparing with existing transcripts:\n";
-                
+                print "GSID ".$db_gene->stable_id."\n";              
                 #First round: look for micro-intron overlaps (false partial intron retention due to misalignment)
                 foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
                     #Exclude transcripts not yet stored in the database
@@ -191,8 +191,9 @@ print "SUBMODE: $submode\n";
                     ###
                  #   my $c = can_be_clipped($tr, $db_tr, 15);
                     ###
-                    $tr_comp{$db_tr->stable_id} = {'intron' => $i, 'exon' => $e, 'merge' => $m};
-                    print "COMP: i=$i, e=$e, m=$m ".($db_tr->stable_id || $db_tr->get_all_Attributes('name')->[0]->value)." ".$db_tr->biotype."\n";
+                    my $db_tr_id = $db_tr->stable_id || $db_tr->get_all_Attributes('name')->[0]->value;
+                    $tr_comp{$db_tr_id} = {'intron' => $i, 'exon' => $e, 'merge' => $m};
+                    print "COMP: i=$i, e=$e, m=$m ".$db_tr_id." ".$db_tr->biotype."\n";
                 }
                 #Multi-exon transcripts
                 if (scalar @{$tr->get_all_Exons} > 1){
@@ -222,6 +223,9 @@ print "SUBMODE: $submode\n";
                             if ($tr_comp{$db_tr_id}->{'exon'} == 1){
                                 if ($tr_comp{$db_tr_id}->{'merge'} == 1){
                                     my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
+                                    unless ($db_tr){ #if not found, probably because it doesn't have a stable id yet, fetch it using the transcript name
+                                        $db_tr = fetch_from_gene_by_transcript_name($db_tr_id, $db_gene);
+                                    }
                                     #Do not merge with MANE transcripts
                                     if (scalar grep {$_->value eq "MANE_select" or $_->value eq "MANE_plus_clinical"} @{$db_tr->get_all_Attributes('remark')}){
                                         print "Skipping transcript as partially redundant with a MANE transcript\n";
@@ -288,6 +292,11 @@ print "SUBMODE: $submode\n";
                     DBTR:foreach my $db_tr_id (keys %tr_comp){
                         if ($tr_comp{$db_tr_id}->{'exon'} == 1 and $tr_comp{$db_tr_id}->{'merge'} == 1){
                             my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
+                            unless ($db_tr){ #if not found, probably because it doesn't have a stable id yet, fetch it using the transcript name
+                                $db_tr = fetch_from_gene_by_transcript_name($db_tr_id, $db_gene);
+                                print "AAA2=".$db_tr->seq_region_start."-".$db_tr->seq_region_end."\n";
+                                print "BBB2=".$tr->seq_region_start."-".$tr->seq_region_end."\n";
+                            }
                             if (scalar(@{$db_tr->get_all_Exons}) == 1 and !($db_tr->translate())){ 
                                 #Do not merge with MANE transcripts
                                 if (scalar grep {$_->value eq "MANE_select" or $_->value eq "MANE_plus_clinical"} @{$db_tr->get_all_Attributes('remark')}){
@@ -373,7 +382,10 @@ print "SUBMODE: $submode\n";
                     else{
                         $sel_db_tr = $merge_candidates[0];
                     }
+                    print "TR=".$tr->seq_region_start."-".$tr->seq_region_end.":".$tr->seq_region_strand."\n";
+                    print "DB_TR=".$sel_db_tr->seq_region_start."-".$sel_db_tr->seq_region_end.":".$sel_db_tr->seq_region_strand."\n";                   
                     my $merged_transcript = merge_transcripts($tr, $sel_db_tr );
+                    print "CCC=".$merged_transcript->seq_region_start."-".$merged_transcript->seq_region_end.":".$merged_transcript->seq_region_strand."\n";
 #     $db_gene->flush_Transcripts;
 #                     #$db_gene->remove_Transcript($sel_db_tr);
 #     $db_gene->add_Transcript($merged_transcript);    
@@ -385,49 +397,67 @@ print "SUBMODE: $submode\n";
                         $exon->slice($region->slice);
                     }
 #     }
+                    print "DDD=".$merged_transcript->seq_region_start."-".$merged_transcript->seq_region_end."\n";
                     foreach my $g ($region->genes) {
                         foreach my $ts (@{$g->get_all_Transcripts}){
-                            if ($ts->stable_id eq $merged_transcript->stable_id){
-                                $ts->flush_Exons; #This empties the exon list. If the same exons are added again, 
-                                                  #those that are not associated with other transcripts will get a new stable id
-                                foreach my $exon (@{$merged_transcript->get_all_Exons}){
-                                    $ts->add_Exon($exon);
-                                }
-                
-                                #Add remarks and hidden remarks from the novel transcript
-                                foreach my $att (@{$merged_transcript->get_all_Attributes}){
-                                    #Do not add the 'not for VEGA' remark if the no_NFV flag is on
-                                    if ($no_NFV){
-                                      next if ($att->code eq "remark" and $att->value eq "not for VEGA");
+                            print "ABCDE\n";
+                            if (($merged_transcript->stable_id =~ /^ENS/ and $ts->stable_id eq $merged_transcript->stable_id) or $ts == $merged_transcript){
+                                print "FGHIJ S1=".$ts->stable_id." N1=".$ts->get_all_Attributes('name')->[0]->value." S2=".$merged_transcript->stable_id." N2=".$merged_transcript->get_all_Attributes('name')->[0]->value."\n";
+                                print "TS=".$ts->seq_region_start."-".$ts->seq_region_end.":".$ts->seq_region_strand."  ".join(", ", map {$_->seq_region_start."-".$_->seq_region_end.":".$_->seq_region_strand} @{$ts->get_all_Exons})."\n";
+                                print "MT=".$merged_transcript->seq_region_start."-".$merged_transcript->seq_region_end.":".$merged_transcript->seq_region_strand."  ".join(", ", map {$_->seq_region_start."-".$_->seq_region_end.":".$_->seq_region_strand} @{$merged_transcript->get_all_Exons})."\n";
+                                # $ts and $merged_transcript point to the same object, so flushing exons in one does the same to the other
+                                unless ($ts == $merged_transcript){
+                                    $ts->flush_Exons; #This empties the exon list. If the same exons are added again, 
+                                                      #those that are not associated with other transcripts will get a new stable id
+                                    foreach my $exon (@{$merged_transcript->get_all_Exons}){
+                                        $ts->add_Exon($exon); print "ADD_EXON\n";
                                     }
-                                    #Append read names to existing remark
-                                    if ((($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq_\w+ : .+;/) or
-                                        ($att->code eq "hidden_remark" and $att->value =~ /^SLR-seq_\w+ : .+;/) or
-                                        ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_raceseq_\w+ : .+;/) or
-                                        ($att->code eq "hidden_remark" and $att->value =~ /^pacBio(SII):Cshl:\S+ : .+;/)
-                                        ) and
-                                        (scalar(@{$ts->get_all_Attributes('TAGENE_transcript')}) > 0)){
-                                        my $appended = 0;
-                                        foreach my $att2 (@{$ts->get_all_Attributes('hidden_remark')}){
-                                            if ($att2->value =~ /^pacbio_capture_seq_\w+ : .+;/ or
-                                                $att2->value =~ /^SLR-seq_\w+ : .+;/ or
-                                                $att2->value =~ /^pacbio_raceseq_\w+ : .+;/ or
-                                                $att2->value =~ /^pacBio(SII):Cshl:\S+ : .+;/){
-                                                $att2->value($att2->value." ".$att->value);
-                                                $appended = 1;
-                                                last;
+                                }
+                                $ts->recalculate_coordinates;
+                                print "TS2=".$ts->seq_region_start."-".$ts->seq_region_end.":".$ts->seq_region_strand."  ".join(", ", map {$_->seq_region_start."-".$_->seq_region_end.":".$_->seq_region_strand} @{$ts->get_all_Exons})."\n";                       
+                                print "ATTRIBS=".scalar(@{$merged_transcript->get_all_Attributes})."  ".scalar(@{$ts->get_all_Attributes})."\n";
+                                my $ac = 0;
+                                unless ($ts == $merged_transcript){
+                                    #Add remarks and hidden remarks from the novel transcript
+                                    foreach my $att (@{$merged_transcript->get_all_Attributes}){
+                                        print "AAA1 ".++$ac."  ".$att->code." ".$att->value."\n";
+                                        print "ATTRIBS=".scalar(@{$merged_transcript->get_all_Attributes})."  ".scalar(@{$ts->get_all_Attributes})."\n";
+                                        #Do not add the 'not for VEGA' remark if the no_NFV flag is on
+                                        if ($no_NFV){
+                                            next if ($att->code eq "remark" and $att->value eq "not for VEGA");
+                                        }
+                                        #Append read names to existing remark
+                                        if ((($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq_\w+ : .+;/) or
+                                            ($att->code eq "hidden_remark" and $att->value =~ /^SLR-seq_\w+ : .+;/) or
+                                            ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_raceseq_\w+ : .+;/) or
+                                            ($att->code eq "hidden_remark" and $att->value =~ /^pacBio(SII):Cshl:\S+ : .+;/)
+                                            ) and
+                                            (scalar(@{$ts->get_all_Attributes('TAGENE_transcript')}) > 0)){
+                                            my $appended = 0;
+                                            print "AAA2\n";
+                                            foreach my $att2 (@{$ts->get_all_Attributes('hidden_remark')}){
+                                                if ($att2->value =~ /^pacbio_capture_seq_\w+ : .+;/ or
+                                                    $att2->value =~ /^SLR-seq_\w+ : .+;/ or
+                                                    $att2->value =~ /^pacbio_raceseq_\w+ : .+;/ or
+                                                    $att2->value =~ /^pacBio(SII):Cshl:\S+ : .+;/){
+                                                    $att2->value($att2->value." ".$att->value);
+                                                    $appended = 1;
+                                                    last;
+                                                }
+                                            }
+                                            #If no read name remark yet, create one
+                                            unless ($appended){
+                                                $ts->add_Attributes($att);
+                                                print "AAA3\n";
                                             }
                                         }
-                                        #If no read name remark yet, create one
-                                        unless ($appended){
+                                        else{
                                             $ts->add_Attributes($att);
+                                            print "AAA4\n";
                                         }
                                     }
-                                    else{
-                                        $ts->add_Attributes($att);
-                                    }
                                 }
-                                
+                                print "KLMNO\n";                               
                                 #Add remark that indicates that the transcript was extended
                                # unless (scalar(grep {$_->value eq "TAGENE_extended"} @{$ts->get_all_Attributes('hidden_remark')})){
                                #     $ts->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => 'TAGENE_extended') );
@@ -462,14 +492,16 @@ print "SUBMODE: $submode\n";
                                 
                                 #Add 'Platinum set' hidden remark if indicated
                                 if ($platinum){
-                                    $ts->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => 'Platinum set') );
+                                    unless (scalar(grep {$_->value eq "Platinum set"} @{$ts->get_all_Attributes('hidden_remark')})){
+                                        $ts->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => 'Platinum set') );
+                                    }
                                 }
                                  
 
                                 #Firstly, check for intron retention
                                 #Else, if allowed, try to assign a CDS and change the biotype accordingly
                                 if (LoutreWrite::CDSCreation::is_retained_intron($ts, $g, 5)){
-                                    $ts->biotype("retained_intron");
+                                    $ts->biotype("retained_intron"); print "STRAND=".$ts->seq_region_strand."\n";
                                 }
                                 else{
                                     unless ($do_not_add_cds){
@@ -480,8 +512,8 @@ print "SUBMODE: $submode\n";
                                 #Change authorship
                                 $ts->transcript_author($merged_transcript->transcript_author);
                                 
-                                print "TR: $id: Will extend transcript ".$ts->stable_id." (".$ts->biotype.") in gene ".$g->stable_id."\n";
-                                push (@log, "TR2: $id: Extended transcript ".$ts->stable_id." (".$ts->biotype.") in gene ".$g->stable_id." (".$g->biotype.")");
+                                print "TR: $id: Will extend transcript ".($ts->stable_id || $ts->get_all_Attributes("name")->[0]->value)." (".$ts->biotype.") in gene ".$g->stable_id."\n";
+                                push (@log, "TR2: $id: Extended transcript ".($ts->stable_id || $ts->get_all_Attributes("name")->[0]->value)." (".$ts->biotype.") in gene ".$g->stable_id." (".$g->biotype.")");
                             }
                         }
                     }
@@ -959,6 +991,8 @@ sub pick_db_tr {
 
 sub merge_transcripts {
     my ($tr, $db_tr) = @_;
+    print "DB_TR=".$db_tr->seq_region_start."-".$db_tr->seq_region_end."   ".scalar(@{$db_tr->get_all_Attributes})."\n";
+    print "TR=".$tr->seq_region_start."-".$tr->seq_region_end."   ".scalar(@{$tr->get_all_Attributes})."\n";
     print "BEFORE: ".join('+', map {$_->vega_hashkey} @{$db_tr->get_all_Exons})."\n";
     EX:foreach my $exon (@{$tr->get_all_Exons}){
         #Check if exon is completely new or overlaps an existing exon
@@ -1002,12 +1036,14 @@ sub merge_transcripts {
 
     #Add remarks (except 'not for VEGA') and hidden remarks from the novel transcript
     foreach my $att (@{$tr->get_all_Attributes}){
-        $db_tr->add_Attributes($att);
+        unless (grep {$_->code eq $att->code and $_->value eq $att->value} @{$db_tr->get_all_Attributes}){
+            $db_tr->add_Attributes($att);
+        }
     }
     
     #Change authorship
     $db_tr->transcript_author($tr->transcript_author);
-
+    print "AAA3=".$db_tr->seq_region_start."-".$db_tr->seq_region_end."  ".$db_tr->get_all_Exons->[0]->seq_region_start."-".$db_tr->get_all_Exons->[0]->seq_region_end."   ".scalar(@{$db_tr->get_all_Attributes})."\n";
     return $db_tr;
 }
 
@@ -1452,6 +1488,27 @@ sub assign_status {
         }
     }
     return $gene;
+}
+
+
+
+=head2 fetch_from_gene_by_transcript_name
+
+ Arg[1]    : string (transcript name)
+ Arg[2]    : Bio::Vega::Gene object
+ Function  : Return a transcript having the query transcript name from the gene's transcript complement
+ Returntype: Bio::Vega::Transcript object
+
+=cut
+
+sub fetch_from_gene_by_transcript_name {
+  my ($tr_name, $gene) = @_;
+  foreach my $transcript (@{$gene->get_all_Transcripts}){
+    if ($transcript->get_all_Attributes('name')->[0]->value eq $tr_name){
+      return $transcript;
+    }
+  }
+  return;
 }
 
 
