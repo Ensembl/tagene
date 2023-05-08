@@ -21,11 +21,15 @@ my $date;
 open (OUT, ">$outfile") or die "Can't open $outfile:$!";
 open (EXT, ">$outfile.tsv") or die "Can't open $outfile.tsv:$!";
 
-print OUT join("\t", "gene_id",
+print OUT join("\t", "chromosome",
+                     "start",
+                     "end",
+                     "strand",
+                     "gene_id",
                      "gene_symbol",
                      "gene_biotype",
                      "modified_date",
-                     "",
+                     "new/modified",
                      "novel_transcripts",
                      "extended_transcripts",
                      "transcript_info",
@@ -35,6 +39,7 @@ print OUT join("\t", "gene_id",
 print EXT join("\t", "chromosome",
                      "start",
                      "end",
+                     "strand",
                      "gene_id",
                      "gene_symbol",
                      "gene_biotype",
@@ -48,6 +53,7 @@ print EXT join("\t", "chromosome",
                      "model_name",
                      "unique_CDS?",
                      "translation_length",
+                     "exon_count"
               )."\n";
 
 #Connect to loutre database
@@ -207,6 +213,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
                         $transcript->seq_region_name,
                         $transcript->seq_region_start,
                         $transcript->seq_region_end,
+                        $transcript->seq_region_strand,
                         $gene->stable_id, 
                         ($gene->get_all_Attributes('name')->[0]->value || "NA"),
                         $gene->biotype, 
@@ -219,7 +226,8 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
                         scalar(@{$transcript->get_all_Attributes('cds_end_NF')}) ? "cds_end_NF" : "NA",
                         join(", ", map {$_->value} grep {$_->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_|PB)/} @{$transcript->get_all_Attributes('hidden_remark')}),
                         $is_unique_cds,
-                        ($tn_length || "NA")
+                        ($tn_length || "NA"),
+                        scalar(@{$transcript->get_all_Exons}),
                       )."\n";
       
       }
@@ -237,15 +245,21 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
     $added_tr_count += $added_c;
     $extended_tr_count += $extended_c;
     if (scalar keys %report){
-      print OUT join(", ", map {$_} grep {/ENS(MUS)?G|OTT(HUM|MUS)G/} keys %report)."\t".
-                ($gene->get_all_Attributes('name')->[0]->value || " ")."\t".
-                $gene->biotype."\t".
-                $gene_modif_date."\t".
-                join(", ", map {$report{$_}} grep {/ENS(MUS)?G/} keys %report)."\t".
-                scalar(grep {/novel/} values(%report))."\t". 
-                scalar(grep {/extended/} values(%report))."\t". 
-                join(", ", map {$_.":".$report{$_}} grep {/ENS(MUS)?T/} keys %report)."\t". 
-                join(", ", keys %{$report{'sources'}})."\n";
+      print OUT join("\t",
+                  $gene->seq_region_name,
+                  $gene->seq_region_start,
+                  $gene->seq_region_end,
+                  $gene->seq_region_strand,
+                  join(", ", map {$_} grep {/ENS(MUS)?G|OTT(HUM|MUS)G/} keys %report),
+                  ($gene->get_all_Attributes('name')->[0]->value || " "),
+                  $gene->biotype,
+                  $gene_modif_date,
+                  join(", ", map {$report{$_}} grep {/ENS(MUS)?G/} keys %report),
+                  scalar(grep {/novel/} values(%report)),
+                  scalar(grep {/extended/} values(%report)),
+                  join(", ", map {$_.":".$report{$_}} grep {/ENS(MUS)?T/} keys %report),
+                  join(", ", keys %{$report{'sources'}})
+                )."\n";
     }
   }
 }
