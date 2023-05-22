@@ -18,7 +18,16 @@ echo -e "\nTranscripts rejected as intron didn't pass the filter"
 cat $@ | grep ^TR2 | grep "intron did not pass the filter" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts rejected as intron chain exists in annotation"
-cat $@ | grep ^TR2 | grep "Rejected" | awk '{print $3}' | sort -u | wc -l
+cat $@ | grep ^TR2 | grep -P "Rejected.+as intron chain exists" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts rejected as no exon novelty provided"
+cat $@ | grep ^TR2 | grep -P "Rejected.+as no exon novelty" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts rejected as as partially redundant with a coding transcript"
+cat $@ | grep ^TR2 | grep -P "Rejected.+as partially redundant with a coding transcript" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts rejected as as partially redundant with a MANE transcript"
+cat $@ | grep ^TR2 | grep -P "Rejected.+as partially redundant with a MANE transcript" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts skipped as clones could not be unlocked"
 cat $@ | grep "could not be unlocked" | wc -l
