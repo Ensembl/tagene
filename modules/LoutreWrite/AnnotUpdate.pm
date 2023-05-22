@@ -152,10 +152,10 @@ print "SUBMODE: $submode\n";
                     #Compare coordinates: transcript's start/end vs. db transcript's internal exon
                     #Search for a terminal exon matching an existing internal exon except for a small overhang at the end
                     #Trim transcript start/end if small overhang detected
-                    #Skip this if Platinum
-                    unless ($platinum){
-                      $tr = clip_ends($tr, $db_tr, 5, $slice_offset);
-                    }
+                    #Skip this if Platinum? 
+                   # unless ($platinum){
+                      $tr = clip_ends($tr, $db_tr, 10, $slice_offset);
+                   # }
 
                     #Loop over all transcripts in case a second db transcript supports the transcript's start/end (exclude known retained introns?)
                     
