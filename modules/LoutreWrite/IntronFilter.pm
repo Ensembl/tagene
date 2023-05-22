@@ -324,9 +324,8 @@ sub get_exonerate_alignment_support {
       #my $cmd = "exonerate -q query.fa -t target.fa -m est2genome --geneseed 250 -n 1 --forcegtag yes > z_ex_out";
   
   my $exonerate = "exonerate";
-  #my $pssm_dir = "/homes/jmgonzalez/work/long_read_pipeline/annotation_exercise_results/third_round/exonerate";
   my $pssm_dir = "/nfs/production/flicek/ensembl/havana/jmgonzalez/TAGENE/pssm";
-  my $dir = "/lscratch";
+  my $dir = $ENV{SCRATCH}."/TAGENE";
   if (`wc -l $dir/$filename.query.fa | cut -d' ' -f1` < 2){
     return "NA";
   }
