@@ -1224,6 +1224,7 @@ sub has_polyAseq_support {
 sub clip_ends {
   my ($transcript, $db_tr, $max_overhang, $slice_offset) = @_;
   $max_overhang ||= 1;
+  my $clipped = 0;
   foreach my $db_exon (@{$db_tr->get_all_Exons}){
     #  ref:  #####-----#######-------#######------######
     #   tr:           ########-------########
@@ -1234,6 +1235,7 @@ sub clip_ends {
           ($transcript->start_Exon->seq_region_start + $max_overhang) >= $db_exon->seq_region_start and
           $transcript->start_Exon->seq_region_end == $db_exon->seq_region_end){
             $transcript->start_Exon->start($db_exon->seq_region_start - $slice_offset);
+            $clipped = 1;
             print "Clipping transcript start to exon in ".$db_tr->stable_id."\n";
       }
       if ($transcript->seq_region_strand == -1 and 
@@ -1241,6 +1243,7 @@ sub clip_ends {
           ($transcript->end_Exon->seq_region_start + $max_overhang) >= $db_exon->seq_region_start and
           $transcript->end_Exon->seq_region_end == $db_exon->seq_region_end){
             $transcript->end_Exon->start($db_exon->seq_region_start - $slice_offset);
+            $clipped = 1;
             print "Clipping transcript end to exon in ".$db_tr->stable_id."\n";
       }
       if ($transcript->seq_region_strand == 1 and 
@@ -1248,6 +1251,7 @@ sub clip_ends {
           ($transcript->end_Exon->seq_region_end - $max_overhang) <= $db_exon->seq_region_end and
           $transcript->end_Exon->seq_region_start == $db_exon->seq_region_start){
             $transcript->end_Exon->end($db_exon->seq_region_end - $slice_offset);
+            $clipped = 1;
             print "Clipping transcript end to exon in ".$db_tr->stable_id."\n";
       }
       if ($transcript->seq_region_strand == -1 and 
@@ -1255,10 +1259,19 @@ sub clip_ends {
           ($transcript->start_Exon->seq_region_end - $max_overhang) <= $db_exon->seq_region_end and
           $transcript->start_Exon->seq_region_start == $db_exon->seq_region_start){
             $transcript->start_Exon->end($db_exon->seq_region_end - $slice_offset);
+            $clipped = 1;
             print "Clipping transcript start to exon in ".$db_tr->stable_id."\n";
       }
     }
   }
+  #print "PRECLIPPED=".$transcript->start."-".$transcript->end."  ".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
+  #Recalculate transcript coordinates but, unlike with exons, keep start/end identical to seq_region_start/seq_region_end
+  if ($clipped){
+    $transcript->start(min(map{$_->seq_region_start} @{$transcript->get_all_Exons}));
+    $transcript->end(max(map{$_->seq_region_end} @{$transcript->get_all_Exons}));
+  }
+  #print "CLIPPED=".$transcript->start."-".$transcript->end."  ".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
+  #print join(":", map {$_->seq_region_start."-".$_->seq_region_end} @{$transcript->get_all_Exons})."\n";
   return $transcript;
 }
 
