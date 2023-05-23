@@ -60,29 +60,61 @@ sub check_overlapped_loci {
         foreach my $transcript (@{$gene->get_all_Transcripts}){
             my $message = "";
             #Fetch database genes overlapping our transcript
-            my $tr_slice = $transcript->slice->adaptor->fetch_by_region("toplevel", $transcript->seq_region_name, $transcript->start, $transcript->end);
+#            my $tr_slice = $transcript->slice->adaptor->fetch_by_region("toplevel", $transcript->seq_region_name, $transcript->start, $transcript->end);
 #            my @db_genes = grep {$_->seq_region_strand == $gene->seq_region_strand} @{$tr_slice->get_all_Genes};
-            my $overlapped_genes_count = 0;
+            #my $overlapped_genes_count = 0;
             my @db_genes = @{get_valid_overlapping_genes($transcript)};
+            my @overlapped_db_genes;
             DBG:foreach my $db_gene (@db_genes){
 #                next unless $db_gene->source =~ /(ensembl|havana)/;
 #                next if $db_gene->biotype eq "artifact";
 #                next if scalar(grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) > 0;
-                next if $db_gene->biotype =~ /^(rRNA|snRNA|misc_RNA|snoRNA|rRNA_pseudogene|miRNA|scaRNA|ribozyme|sRNA)$/i;  #Ignore small RNA genes
-                next if $db_gene->biotype =~ /pseudo/; #Ignore pseudogenes
-                foreach my $db_exon (@{$db_gene->get_all_Exons}){
-                    foreach my $exon (@{$transcript->get_all_Exons}){
-                        if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
-                            $overlapped_genes_count++; 
-                            $message .= "OV: ".$db_gene->stable_id." ".$db_gene->biotype."  ";
-                            next DBG;
+               # next if $db_gene->biotype =~ /^(miRNA|misc_RNA|ribozyme|rRNA|rRNA_pseudogene|scaRNA|snoRNA|snRNA|sRNA|vault_rna)$/i;  #Ignore small RNA genes
+               # next if $db_gene->biotype =~ /ig_pseudogene|processed_pseudogene|pseudoexon|pseudogene|transcribed_.+_pseudogene|tr_pseudogene|unitary_pseudogene/; #Ignore pseudogenes
+                if ($db_gene->biotype =~ /antisense|bidirectional_promoter_lncrna|ig_gene|IG_V_gene|lincRNA|polymorphic_pseudogene|processed_transcript|protein_coding|sense_intronic|sense_overlapping|tec/i){
+                    foreach my $db_exon (@{$db_gene->get_all_Exons}){
+                        foreach my $exon (@{$transcript->get_all_Exons}){
+                            if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
+                                push(@overlapped_db_genes, $db_gene);
+                                #$overlapped_genes_count++; 
+                                $message .= "OV: ".$db_gene->stable_id." ".$db_gene->biotype."  ";
+                                next DBG;
+                            }
                         }
                     }
                 }
             }
-            if ($overlapped_genes_count > $max_ov_loci){
+            #Instead of counting overlapped genes, count clusters of overlapped genes
+            my @clusters;
+            foreach my $db_gene (sort {$a->seq_region_start <=> $b->seq_region_start} @overlapped_db_genes){
+                my $clustered = 0;
+                if (scalar @clusters){
+                    foreach my $cluster (@clusters){
+                        if ($cluster->{'start'} <= $db_gene->seq_region_end and $cluster->{'end'} >= $db_gene->seq_region_start){
+                            if ($cluster->{'start'} > $db_gene->seq_region_start){
+                                $cluster->{'start'} = $db_gene->seq_region_start;
+                            }
+                            if ($cluster->{'end'} < $db_gene->seq_region_end){
+                                $cluster->{'end'} = $db_gene->seq_region_end;
+                            }
+                            push(@{$cluster->{'genes'}}, $db_gene->stable_id);
+                            $clustered = 1;
+                            last;
+                        }
+                    }
+                }
+                if (scalar @clusters == 0 or !$clustered){
+                    my %cluster;
+                    $cluster{'start'} = $db_gene->seq_region_start;
+                    $cluster{'end'} = $db_gene->seq_region_end;
+                    push(@{$cluster{'genes'}}, $db_gene->stable_id);
+                    push(@clusters, \%cluster);
+                }
+            }
+            
+            if (scalar @clusters > $max_ov_loci){
                 my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
-                print "KILL_2: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps $overlapped_genes_count loci: $message\n";
+                print "KILL_2: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@clusters)." loci: $message\n";
                 $list{$t_name} = 1;
             }
         }
