@@ -383,10 +383,26 @@ print "SUBMODE: $submode\n";
                     else{
                         $sel_db_tr = $merge_candidates[0];
                     }
-                    print "TR=".$tr->seq_region_start."-".$tr->seq_region_end.":".$tr->seq_region_strand."\n";
-                    print "DB_TR=".$sel_db_tr->seq_region_start."-".$sel_db_tr->seq_region_end.":".$sel_db_tr->seq_region_strand."\n";                   
+                    print "TR=".$tr->seq_region_start."-".$tr->seq_region_end.":".$tr->seq_region_strand."  ".
+                          join(", ", map {$_->seq_region_start."-".$_->seq_region_end.":".$_->seq_region_strand} @{$tr->get_all_Exons})."  ".
+                          join(", ", map {$_->start."-".$_->end.":".$_->strand} @{$tr->get_all_Exons}).
+                          "\n";
+                    print "DB_TR=".$sel_db_tr->seq_region_start."-".$sel_db_tr->seq_region_end.":".$sel_db_tr->seq_region_strand."  ".
+                          join(", ", map {$_->seq_region_start."-".$_->seq_region_end.":".$_->seq_region_strand} @{$sel_db_tr->get_all_Exons})."  ".
+                          join(", ", map {$_->start."-".$_->end.":".$_->strand} @{$sel_db_tr->get_all_Exons}).
+                          "\n";
+                    #If the db_tr was not stored yet (ie. no ENS stable id), its exons will still be on local region slices and the coordinates of the merged transcript will get messed up
+                    #Transform the db_tr to toplevel before merging it with the new transcript
+                    unless ($sel_db_tr->stable_id =~ /^ENST/){
+                        $sel_db_tr = $sel_db_tr->transform("toplevel");
+                        print "SLICES=".$sel_db_tr->slice->name."  ".join(", ", map {$_->slice->name} @{$sel_db_tr->get_all_Exons})."\n";
+                    }
+                    #Merge transcripts
                     my $merged_transcript = merge_transcripts($tr, $sel_db_tr );
-                    print "CCC=".$merged_transcript->seq_region_start."-".$merged_transcript->seq_region_end.":".$merged_transcript->seq_region_strand."\n";
+                    print "CCC=".$merged_transcript->seq_region_start."-".$merged_transcript->seq_region_end.":".$merged_transcript->seq_region_strand."  ".
+                          join(", ", map {$_->seq_region_start."-".$_->seq_region_end.":".$_->seq_region_strand} @{$merged_transcript->get_all_Exons})."  ".
+                          join(", ", map {$_->start."-".$_->end.":".$_->strand} @{$merged_transcript->get_all_Exons}).
+                          "\n";
 #     $db_gene->flush_Transcripts;
 #                     #$db_gene->remove_Transcript($sel_db_tr);
 #     $db_gene->add_Transcript($merged_transcript);    
@@ -398,7 +414,10 @@ print "SUBMODE: $submode\n";
                         $exon->slice($region->slice);
                     }
 #     }
-                    print "DDD=".$merged_transcript->seq_region_start."-".$merged_transcript->seq_region_end."\n";
+                    print "DDD=".$merged_transcript->seq_region_start."-".$merged_transcript->seq_region_end."  ".
+                          join(", ", map {$_->seq_region_start."-".$_->seq_region_end.":".$_->seq_region_strand} @{$merged_transcript->get_all_Exons})."  ".
+                          join(", ", map {$_->start."-".$_->end.":".$_->strand} @{$merged_transcript->get_all_Exons}).
+                          "\n";
                     foreach my $g ($region->genes) {
                         foreach my $ts (@{$g->get_all_Transcripts}){
                             print "ABCDE\n";
@@ -540,7 +559,7 @@ print "SUBMODE: $submode\n";
                     my $new_tr_name = $self->get_new_transcript_name($db_gene, $dba);
                     my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
                     $tr->add_Attributes($name_att);
-                    print "TR0_START=".$tr->seq_region_start."; TR0_END=".$tr->seq_region_end."\n";
+                    print "TR0_START=".$tr->seq_region_start."; TR0_END=".$tr->seq_region_end."; EXONS=".join(":", map {$_->seq_region_start."-".$_->seq_region_end} @{$tr->get_all_Exons})."\n";
                     $tr->slice($region->slice);
                     $tr->start($tr->start - $slice_offset);
                     $tr->end($tr->end - $slice_offset);
@@ -571,7 +590,7 @@ print "SUBMODE: $submode\n";
                         }
                     }
 
-                    print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."\n";
+                    print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."; EXONS=".join(":", map {$_->seq_region_start."-".$_->seq_region_end} @{$tr->get_all_Exons})."\n";
                     #Firstly, check for intron retention
                     #Else, if allowed, try to assign a CDS and change the biotype accordingly
                     if (LoutreWrite::CDSCreation::is_retained_intron($tr, $db_gene, 5)){
@@ -612,9 +631,9 @@ print "SUBMODE: $submode\n";
     if ($WRITE){
         $local_server->authorized_user($gene->gene_author->name); # preserve authorship
         my $n = 0;
-        while (($g_msg eq " " or $g_msg =~ /write failed/) and $n<10){
+        while (($g_msg eq " " or $g_msg =~ /write failed/ or $g_msg =~ /lock failed/) and $n<5){
             $g_msg = write_gene_region($region_action, $region);
-            sleep(int(rand(3)));
+            sleep(30);
             $n++;
         }
         print $g_msg."\n";
