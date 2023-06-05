@@ -357,9 +357,25 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
                     print join("\n", @$log)."\n";
                 }
             }
-            else{
+            elsif ($msg =~ /lock ok,write failed/){
+                if ($WRITE){
+                    print "\nRESULT: gene ".$new_gene_obj->stable_id." could not be modified because of an error\n";
+                }
+                else{
+                    print "\nRESULT: gene ".$new_gene_obj->stable_id." not modified (WRITE = 0)\n";
+                }
+            }
+            elsif ($msg =~ /lock failed/){
                 if ($WRITE){
                     print "\nRESULT: gene ".$new_gene_obj->stable_id." could not be unlocked\n";
+                }
+                else{
+                    print "\nRESULT: gene ".$new_gene_obj->stable_id." not modified (WRITE = 0)\n";
+                }
+            }
+            else{
+                if ($WRITE){
+                    print "\nRESULT: gene ".$new_gene_obj->stable_id." - undetermined outcome\n";
                 }
                 else{
                     print "\nRESULT: gene ".$new_gene_obj->stable_id." not modified (WRITE = 0)\n";
