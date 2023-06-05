@@ -664,7 +664,8 @@ sub get_new_gene_name {
     #Thus, the name has been created when the gene attributes are dumped in the XML and SQLite files
 
     #Find the clone that overlaps the gene's 3' end - according to ensembl-otter/modules/MenuCanvasWindow/SessionWindow.pm (sub _region_name_and_next_locus_number)
-    my $most_3prime = $gene->strand == 1 ? $gene->end : $gene->start;
+    #my $most_3prime = $gene->strand == 1 ? $gene->end : $gene->start;
+    my $most_3prime = $gene->seq_region_strand == 1 ? $gene->seq_region_end : $gene->seq_region_start; #try genome coordinates as local coordinates may fail in some cases
     
 #    my $clone_name;
 #    my $tmp_slice = $dba->get_SliceAdaptor->fetch_by_region("toplevel", $gene->seq_region_name, $most_3prime, $most_3prime);
@@ -675,6 +676,7 @@ sub get_new_gene_name {
     my $clone_name;
     my $actual_cs;
     foreach my $cs ($region->fetch_CloneSequences){ #Bio::Vega::Region method - gets clones trimmed down to the region boundaries
+      #print "AAAAAAAAAAAAA  ".$cs->chr_start." ".$cs->chr_end."  ".$most_3prime."  ".$gene->start."-".$gene->end."  ".$gene->seq_region_start."-".$gene->seq_region_end."\n";
         if ($cs->chr_start <= $most_3prime and $cs->chr_end >= $most_3prime){
             $clone_name = $cs->clone_name;
             $actual_cs = $cs;
