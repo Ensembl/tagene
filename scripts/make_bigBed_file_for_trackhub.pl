@@ -41,6 +41,8 @@ my $ftp_user;
            );
 $outfile ||= $dbname;
 
+$run_date =~ s/-//g;
+
 #Connect to database and get adaptors
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -host => $host,
