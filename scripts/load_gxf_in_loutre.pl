@@ -360,6 +360,13 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
             elsif ($msg =~ /lock ok,write failed/){
                 if ($WRITE){
                     print "\nRESULT: gene ".$new_gene_obj->stable_id." could not be modified because of an error\n";
+                    foreach my $log_message (@$log){
+                      if ($log_message =~ /^TR2: .+ (Added|Extended) transcript/){
+                        $log_message =~ s/^(TR2: ID: .+:) (.+)$/$1 Transcript could not be processed because of an error/;
+                      }
+                      print $log_message."\n";
+                    }
+                    #print join("\n", map {s/^(TR2: ID: .+:) (.+)$/$1 Transcript could not be processed because of an error/; $_} @$log)."\n";
                 }
                 else{
                     print "\nRESULT: gene ".$new_gene_obj->stable_id." not modified (WRITE = 0)\n";
@@ -368,6 +375,13 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
             elsif ($msg =~ /lock failed/){
                 if ($WRITE){
                     print "\nRESULT: gene ".$new_gene_obj->stable_id." could not be unlocked\n";
+                    foreach my $log_message (@$log){
+                      if ($log_message =~ /^TR2: .+ (Added|Extended) transcript/){
+                        $log_message =~ s/^(TR2: ID: .+:) (.+)$/$1 Transcript slice could not be unlocked/;
+                      }
+                      print $log_message."\n";
+                    }
+                    #print join("\n", map {s/^(TR2: ID: .+:) (.+)$/$1 Transcript slice could not be unlocked/; $_} @$log)."\n";
                 }
                 else{
                     print "\nRESULT: gene ".$new_gene_obj->stable_id." not modified (WRITE = 0)\n";
