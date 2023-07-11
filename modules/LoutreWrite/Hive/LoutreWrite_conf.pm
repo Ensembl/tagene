@@ -104,8 +104,9 @@ sub default_options {
     load_gxf_script => catfile($self->o('scripts_dir'), 'load_gxf_in_loutre.pl'),
     log_stats_script => catfile($self->o('scripts_dir'), 'report'),
     db_stats_script => catfile($self->o('scripts_dir'), 'stats.pl'),
-    trackhub_script => catfile($self->o('scripts_dir'), 'make_bigBed_file_for_trackhub.pl'),
-    gtf2bgp_script => catfile($self->o('scripts_dir'), 'convert_gtf_to_bigGenePred.pl'),
+    trackhub_script => catfile($self->o('scripts_dir'), 'make_trackhub_files.pl'),
+    annot_to_bgp_script => catfile($self->o('scripts_dir'), 'make_bigBed_file_for_trackhub.pl'),
+    gtf_to_bgp_script => catfile($self->o('scripts_dir'), 'convert_gtf_to_bigGenePred.pl'),
     date => $date2,
   };
 }
@@ -331,7 +332,31 @@ sub pipeline_analyses {
       -logic_name => 'make_trackhub_files',
       -module => 'Bio::EnsEMBL::Hive::RunnableDB::SystemCmd',
       -parameters => {
-        cmd => 'cd #outdir# && perl #trackhub_script#'     
+        cmd => 'cd #outdir# && perl #trackhub_script#'
+          .' -name '.$self->o('dataset').'_'.$self->o('date')
+          .' -host '.$self->o('target_db_host')
+          .' -port '.$self->o('target_db_port')
+          .' -user '.$self->o('user_r')
+          .' -dbname '.$self->o('target_db_name')
+          .' -input #input_file#'
+          .' -annot #annot_file#',
+        trackhub_script => $self->o('annot_to_bgp_script'),
+        outdir => catdir($self->o('output_dir'), "trackhub"),
+        input_file => catfile('#outdir#', "input_annot.bb"),
+        annot_file => catfile('#outdir#', $self->o('dataset')),
+      },
+      -max_retry_count => 0,
+      -flow_into => {
+        1 => ['make_trackhub_annotation_file'],
+      },
+      -rc_name => 'default',
+    },    
+
+    {
+      -logic_name => 'make_trackhub_annotation_file',
+      -module => 'Bio::EnsEMBL::Hive::RunnableDB::SystemCmd',
+      -parameters => {
+        cmd => 'cd #outdir# && perl #annot_to_bgp_script#'     
           .' -host '.$self->o('target_db_host')
           .' -port '.$self->o('target_db_port')
           .' -user '.$self->o('user_r')
@@ -340,28 +365,29 @@ sub pipeline_analyses {
           .' -colour1 22,74,216'
           .' -colour2 220,21,21'
           .' -out #output_file#',
-        trackhub_script => $self->o('trackhub_script'),
+        annot_to_bgp_script => $self->o('annot_to_bgp_script'),
         outdir => catdir($self->o('output_dir'), "trackhub"),
         output_file => catfile('#outdir#', $self->o('dataset')),
       },
       -max_retry_count => 0,
       -flow_into => {
-        1 => ['make_trackhub_file_from_input_gtf'],
+        1 => ['make_trackhub_input_file'],
+      },
       -rc_name => 'default',
     },
 
     {
-      -logic_name => 'make_trackhub_file_from_input_gtf',
+      -logic_name => 'make_trackhub_input_file',
       -module => 'Bio::EnsEMBL::Hive::RunnableDB::SystemCmd',
       -parameters => {
-        cmd => 'cd #outdir# && perl #gtf2bgp_script#'
+        cmd => 'cd #outdir# && perl #gtf_to_bgp_script#'
           .' -gtf '.$self->o('input_file')
           .' -host '.$self->o('target_db_host')
           .' -port '.$self->o('target_db_port')
           .' -user '.$self->o('user_r')
           .' -species '.$self->o('species')
           .' -out #output_file#',
-        gtf2bgp_script => $self->o('gtf2bgp_script'),
+        gtf_to_bgp_script => $self->o('gtf_to_bgp_script'),
         outdir => catdir($self->o('output_dir'), "trackhub"),
         output_file => catfile('#outdir#', "input_annot.bb"),
       },
