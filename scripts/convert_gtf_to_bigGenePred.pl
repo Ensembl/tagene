@@ -30,8 +30,8 @@ $registry->load_registry_from_db(
     -user => $user
 );
 my $meta_container = $registry->get_adaptor($species, 'Core', 'MetaContainer');
-my $ucsc_alias = $meta_container->single_value_by_key('assembly.ucsc_alias');
-my $assembly_version = $registry->get_adaptor($species, 'Core', 'Slice');
+my $assembly_version = $meta_container->single_value_by_key('assembly.ucsc_alias');
+my $sa = $registry->get_adaptor($species, 'Core', 'Slice');
 
 system("gtfToGenePred -genePredExt $gtf_file file.gp");
 system("genePredToBigGenePred file.gp file.bgpInput");
