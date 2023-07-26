@@ -32,6 +32,7 @@ my $no_NFV;
 my $do_not_add_cds;
 my $no_intron_check;
 my $host_biotype;
+my $no_overlap_biotype;
 my $max_overlapped_loci;
 my $filter_introns;
 my $platinum;
@@ -52,7 +53,8 @@ my $only_chr;
             'no_CDS!'           => \$do_not_add_cds,
             'no_intron_check!'  => \$no_intron_check,
             'host_biotype=s'    => \$host_biotype,
-            'max_ov_loc=s'      => \$max_overlapped_loci,
+            'no_overlap_biotype=s' => \$no_overlap_biotype,
+            'max_ov_loc=i'      => \$max_overlapped_loci,
             'filter_introns!'   => \$filter_introns,
             'platinum!'         => \$platinum,
             'readseqdir=s'      => \$READSEQDIR,
@@ -95,6 +97,7 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -no_CDS         do not try to add a CDS if the transcript falls in a coding gene
  -no_intron_check  allow transcripts with intron chains fully or partially identical to others in the database
  -host_biotype   restrict host genes by biotype (comma-separated list)
+ -no_overlap_biotype skip overlapped genes by biotype (comma-separated list) 
  -max_ov_loc     maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
  -filter_introns assess introns and ignore transcript if at least an intron does not pass the filters
  -platinum       add a 'platinum' hidden remark to all transcripts
@@ -194,25 +197,35 @@ unless ($no_artifact_check){
 }
 
 #Remove transcripts overlapping more than the allowed number of existing loci at the exon level
-my $gene_objects_2;
 if ($max_overlapped_loci){
-  my $kill_list_2 = LoutreWrite::GeneFilter->check_overlapped_loci($gene_objects, $max_overlapped_loci);
-  $gene_objects_2 = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list_2);
+  my $kill_list_2 = LoutreWrite::GeneFilter->check_max_overlapped_loci($gene_objects, $max_overlapped_loci);
+  $gene_objects = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list_2);
   foreach my $tid (keys %{$kill_list_2}){
     print "TR2: $tid: max allowed number of overlapped loci exceeded\n";
   }
 }
 
+#Remove trancripts that overlap a gene having an unallowed biotype
+if ($no_overlap_biotype){
+  my %excluded_biotypes = map {$_=>1} split(/,/, $no_overlap_biotype);
+  my $kill_list_3 = LoutreWrite::GeneFilter->check_overlapped_gene_biotypes($gene_objects, \%excluded_biotypes);
+  $gene_objects = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list_3);
+  foreach my $tid (keys %{$kill_list_3}){
+    print "TR2: $tid: overlapped locus with unallowed biotype\n";
+  }
+}
+
+
 #Add source info
 #my $gene_objects_3;
 if ($source_info){
-  $gene_objects_2 = LoutreWrite::InputParsing->add_sources($gene_objects_2, $source_info);
+  $gene_objects = LoutreWrite::InputParsing->add_sources($gene_objects, $source_info);
 }
 
 my $count = 1;
-my $total = scalar(@$gene_objects_2);
+my $total = scalar(@$gene_objects);
 #Process gene objects
-foreach my $gene_obj (@$gene_objects_2){
+foreach my $gene_obj (@$gene_objects){
     print "##########\n\nLOOKING AT GENE IN ".$gene_obj->seq_region_name.":".$gene_obj->start."-".$gene_obj->end."  ($count/$total)\n\n";
     $count++;
 
@@ -273,6 +286,7 @@ foreach my $gene_obj (@$gene_objects_2){
             
             #$new_gene_obj = LoutreWrite::Default->assign_cds_to_transcripts($new_gene_obj, $host_gene);
         }
+ 
         
         #Predict intron outcome
         #Only if novel intron?

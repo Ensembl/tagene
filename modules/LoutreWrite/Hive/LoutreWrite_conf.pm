@@ -85,7 +85,8 @@ sub default_options {
     no_artifact_check => 0,
     no_intron_check => 0,
     host_biotype => '',
-    max_ov_loci => 1,
+    no_overlap_biotype => '',
+    max_ov_loci => 0,
     filter_introns => 0,
     platinum => 0,
     chr => '',
@@ -260,6 +261,7 @@ sub pipeline_analyses {
           .' #no_cds#'
        #   .' -no_intron_check '.$self->o('no_intron_check')
           .' -host_biotype '.$self->o('host_biotype')
+          .' -no_overlap_biotype '.$self->o('no_overlap_biotype')
           .' -max_ov_loc '.$self->o('max_ov_loci')
       #    .' -filter_introns '.$self->o('filter_introns')
           .' #filter_introns#'

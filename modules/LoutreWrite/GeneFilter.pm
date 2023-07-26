@@ -44,7 +44,7 @@ sub check_artifact_transcripts {
 
 
 
-=head2 check_overlapped_loci
+=head2 check_max_overlapped_loci
 
  Arg[1]    : list of Bio::Vega::Gene objects
  Arg[2]    : Integer
@@ -53,7 +53,7 @@ sub check_artifact_transcripts {
 
 =cut
 
-sub check_overlapped_loci {
+sub check_max_overlapped_loci {
     my ($self, $genes, $max_ov_loci) = @_;
     my %list;
     foreach my $gene (@$genes){
@@ -71,7 +71,7 @@ sub check_overlapped_loci {
 #                next if scalar(grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) > 0;
                # next if $db_gene->biotype =~ /^(miRNA|misc_RNA|ribozyme|rRNA|rRNA_pseudogene|scaRNA|snoRNA|snRNA|sRNA|vault_rna)$/i;  #Ignore small RNA genes
                # next if $db_gene->biotype =~ /ig_pseudogene|processed_pseudogene|pseudoexon|pseudogene|transcribed_.+_pseudogene|tr_pseudogene|unitary_pseudogene/; #Ignore pseudogenes
-                if ($db_gene->biotype =~ /antisense|bidirectional_promoter_lncrna|ig_gene|IG_V_gene|lincRNA|polymorphic_pseudogene|processed_transcript|protein_coding|sense_intronic|sense_overlapping|tec/i){
+                if ($db_gene->biotype =~ /antisense|bidirectional_promoter_lncrna|ig_gene|IG_V_gene|lincRNA|macro_lncrna|overlapping_ncrna|polymorphic_pseudogene|processed_transcript|protein_coding|sense_intronic|sense_overlapping|tec|tr_gene/i){
                     foreach my $db_exon (@{$db_gene->get_all_Exons}){
                         foreach my $exon (@{$transcript->get_all_Exons}){
                             if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
@@ -116,6 +116,46 @@ sub check_overlapped_loci {
                 my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
                 print "KILL_2: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@clusters)." loci: $message\n";
                 $list{$t_name} = 1;
+            }
+        }
+    }
+
+    return \%list;
+}
+
+
+
+=head2 check_overlapped_gene_biotypes
+
+ Arg[1]    : list of Bio::Vega::Gene objects
+ Arg[2]    : Hashref - list of unallowed biotypes
+ Function  : Check for transcripts overlapping at the exon level a gene with an unallowed biotype that belongs to the list given in the second argument.
+ Returntype: Hashref - list of transcript names
+
+=cut
+
+sub check_overlapped_gene_biotypes {
+    my ($self, $genes, $biotypes) = @_;
+    my %list;
+    foreach my $gene (@$genes){
+        foreach my $transcript (@{$gene->get_all_Transcripts}){
+            my $message = "";
+            #Fetch database genes overlapping our transcript
+            my @db_genes = @{get_valid_overlapping_genes($transcript)};
+            my @overlapped_db_genes;
+            DBG:foreach my $db_gene (@db_genes){
+                foreach my $db_exon (@{$db_gene->get_all_Exons}){
+                    foreach my $exon (@{$transcript->get_all_Exons}){
+                        if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
+                            if ($biotypes->{$db_gene->biotype}){
+                                my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+                                print "KILL_2: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps gene ".$db_gene->stable_id." - ".$db_gene->biotype."\n";
+                                $list{$t_name} = 1;
+                                next DBG;
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -336,6 +376,11 @@ print "BBBBB:".$transcript->seq_region_start."\n";
 #            ){
 #              next;
 #            }
+            #EXPERIMENTAL: exclude pseudogenes so that spliced transcripts are assigned to new (lncRNA) genes
+            if (scalar @{$transcript->get_all_Introns} > 1 and $db_gene->biotype =~ /pseudogene/){
+                next;
+            }
+            
             if ($preserve_biotype){
                 if ($transcript->translation and $db_gene->biotype ne "protein_coding"){
                     next;

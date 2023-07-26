@@ -37,6 +37,7 @@ my $no_NFV;
 my $do_not_add_cds;
 my $no_intron_check;
 my $host_biotype;
+my $no_overlap_biotype;
 my $max_overlapped_loci;
 my $filter_introns;
 my $platinum;
@@ -68,6 +69,7 @@ my $job_limit = 20; #Max number of simultaneously running jobs in a job array
             'no_CDS!'           => \$do_not_add_cds,
             'no_intron_check!'  => \$no_intron_check,
             'host_biotype=s'    => \$host_biotype,
+            'no_overlap_biotype=s' => \$no_overlap_biotype,
             'max_ov_loc=i'      => \$max_overlapped_loci,
             'filter_introns!'   => \$filter_introns,
             'platinum!'         => \$platinum,
@@ -117,6 +119,7 @@ perl preload_gxf_in_loutre.pl -file ANNOTATION_FILE [OPTIONS]
  -no_CDS         do not try to add a CDS if the transcript falls in a coding gene
  -no_intron_check  allow transcripts with intron chains fully or partially identical to others in the database
  -host_biotype   restrict host genes by biotype (comma-separated list)
+ -no_overlap_biotype skip overlapped genes by biotype (comma-separated list) 
  -max_ov_loc     maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
  -filter_introns assess introns and ignore transcript if at least an intron does not pass the filters
  -platinum       add a 'platinum' hidden remark to all transcripts
@@ -348,6 +351,7 @@ COM
   $command .= " -no_CDS \\\n"                          if $do_not_add_cds;
   $command .= " -no_intron_check \\\n"                 if $no_intron_check;
   $command .= " -host_biotype $host_biotype \\\n"      if $host_biotype;
+  $command .= " -no_overlap_biotype $no_overlap_biotype \\\n" if $no_overlap_biotype; 
   $command .= " -max_ov_loc $max_overlapped_loci \\\n" if $max_overlapped_loci;
   $command .= " -filter_introns \\\n"                  if $filter_introns;
   $command .= " -platinum \\\n"                        if $platinum;
