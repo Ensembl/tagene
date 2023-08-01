@@ -89,6 +89,7 @@ sub default_options {
     max_ov_loci => 0,
     filter_introns => 0,
     platinum => 0,
+    die_locked => 0,
     chr => '',
     write => 0,
     max_trs => 0,
@@ -267,6 +268,7 @@ sub pipeline_analyses {
           .' #filter_introns#'
           #.' -platinum '.$self->o('platinum')
           .' #platinum#'
+          .' #die_locked#'
       #    .' -chr '.$self->o('chr')
           .' #chr#'
           #.' -write '.$self->o('write')
@@ -287,6 +289,7 @@ sub pipeline_analyses {
         no_cds => ($self->o('no_CDS') ? '-no_CDS' : ''),
         filter_introns => ($self->o('filter_introns') ? '-filter_introns' : ''),
         platinum => ($self->o('platinum') ? '-platinum' : ''),
+        die_locked => ($self->o('die_locked') ? '-die_locked' : ''),
         write => ($self->o('write') ? '-write' : ''),
       },
       -max_retry_count => 0,
@@ -329,6 +332,7 @@ sub pipeline_analyses {
           .' #filter_introns#'
           #.' -platinum '.$self->o('platinum')
           .' #platinum#'
+          .' #die_locked#'
       #    .' -chr '.$self->o('chr')
           .' #chr#'
           #.' -write '.$self->o('write')
@@ -349,6 +353,7 @@ sub pipeline_analyses {
         no_cds => ($self->o('no_CDS') ? '-no_CDS' : ''),
         filter_introns => ($self->o('filter_introns') ? '-filter_introns' : ''),
         platinum => ($self->o('platinum') ? '-platinum' : ''),
+        die_locked => ($self->o('die_locked') ? '-die_locked' : ''),
         write => ($self->o('write') ? '-write' : ''),
       },
       -max_retry_count => 0,

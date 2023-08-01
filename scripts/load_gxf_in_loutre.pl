@@ -37,6 +37,7 @@ my $max_overlapped_loci;
 my $filter_introns;
 my $platinum;
 my $only_chr;
+my $die_if_locked_clone;
 
 &GetOptions(
             'file=s'            => \$file,
@@ -59,6 +60,7 @@ my $only_chr;
             'platinum!'         => \$platinum,
             'readseqdir=s'      => \$READSEQDIR,
             'chr=s'             => \$only_chr,
+            'die_locked!'       => \$die_if_locked_clone,
             'write!'            => \$WRITE,
             );
 
@@ -400,6 +402,7 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
                 else{
                     print "\nRESULT: gene ".$new_gene_obj->stable_id." not modified (WRITE = 0)\n";
                 }
+                die "Dying as slice is locked" if $die_if_locked_clone;
             }
             else{
                 if ($WRITE){
