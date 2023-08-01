@@ -274,7 +274,7 @@ sub pipeline_analyses {
           .' > #output_file#'
           .' 2> #output_file#.err',
         load_gxf_script => $self->o('load_gxf_script'),
-        gxf_dir => catdir($self->o('output_dir'), 'gxf'),        
+        gxf_dir => catdir($self->o('output_dir'), 'gxf'),
         infile => catfile('#gxf_dir#', '#filename#'),
         log_dir => catdir($self->o('output_dir'), 'log'),
         output_file => catfile('#log_dir#', '#filename#.log'),
@@ -291,6 +291,68 @@ sub pipeline_analyses {
       },
       -max_retry_count => 0,
       -rc_name => 'default',
+      -analysis_capacity => $self->o('job_limit'),
+      -flow_into => {
+        'MEMLIMIT' => ['load_gxf_in_loutre_high_mem'],
+        'RUNLIMIT' => ['load_gxf_in_loutre_high_mem'],
+      },
+    },
+
+    {
+      -logic_name => 'load_gxf_in_loutre_high_mem',
+      -module => 'Bio::EnsEMBL::Hive::RunnableDB::SystemCmd',
+      -parameters => {
+        cmd => 'perl #load_gxf_script#'
+          .' -file #infile#'
+          .' -dataset '.$self->o('dataset')
+          .' -author '.$self->o('author')
+       #   .' -source '.$self->o('source')
+          .' -remark "'.$self->o('remark').'"'
+       #   .' -readseqdir '.$self->o('read_seq_dir')
+          .' #readseqdir#'
+       #   .' -comp_pipe '.$self->o('comp_pipe')
+       #   .' -analysis '.$self->o('analysis')
+       #   .' -tsource '.$self->o('tsource')
+       #   .' -assembly '.$self->o('assembly_version')
+          .' #assembly#'
+       #   .' -no_check '.$self->o('no_check')
+          .' #no_artifact_check#'
+       #   .' -no_NFV '.$self->o('no_NFV')
+          .' #no_nfv#'
+       #   .' -no_CDS '.$self->o('no_CDS')
+          .' #no_cds#'
+       #   .' -no_intron_check '.$self->o('no_intron_check')
+          .' -host_biotype '.$self->o('host_biotype')
+          .' -no_overlap_biotype '.$self->o('no_overlap_biotype')
+          .' -max_ov_loc '.$self->o('max_ov_loci')
+      #    .' -filter_introns '.$self->o('filter_introns')
+          .' #filter_introns#'
+          #.' -platinum '.$self->o('platinum')
+          .' #platinum#'
+      #    .' -chr '.$self->o('chr')
+          .' #chr#'
+          #.' -write '.$self->o('write')
+          .' #write#'
+          .' > #output_file#'
+          .' 2> #output_file#.err',
+        load_gxf_script => $self->o('load_gxf_script'),
+        gxf_dir => catdir($self->o('output_dir'), 'gxf'),
+        infile => catfile('#gxf_dir#', '#filename#'),
+        log_dir => catdir($self->o('output_dir'), 'log'),
+        output_file => catfile('#log_dir#', '#filename#.log'),
+        #log_dir_2 => join("", grep {$_ =~ /\//} splitpath('#output_file#')),
+        readseqdir => ($self->o('read_seq_dir') ? '-readseqdir '.$self->o('read_seq_dir') : ''),
+        assembly => ($self->o('assembly_version') ? '-assembly_version '.$self->o('assembly_version') : ''),
+        chr => ($self->o('chr') ? ' -chr '.$self->o('chr') : ''),
+        no_artifact_check => ($self->o('no_artifact_check') ? ' -no_check ' : ''),
+        no_nfv => ($self->o('no_NFV') ? '-no_NFV' : ''),
+        no_cds => ($self->o('no_CDS') ? '-no_CDS' : ''),
+        filter_introns => ($self->o('filter_introns') ? '-filter_introns' : ''),
+        platinum => ($self->o('platinum') ? '-platinum' : ''),
+        write => ($self->o('write') ? '-write' : ''),
+      },
+      -max_retry_count => 0,
+      -rc_name => '6GB',
       -analysis_capacity => $self->o('job_limit'),
     },
 
@@ -415,6 +477,7 @@ sub resource_classes {
     'default' => { LSF => '-q short -M 1000 -R"select[mem>1000] rusage[mem=1000]"'},
     '2GB' => { LSF => '-q short -M 2000 -R"select[mem>2000] rusage[mem=2000]"'},    
     '4GB' => { LSF => '-q short -M 4000 -R"select[mem>4000] rusage[mem=4000]"'},
+    '6GB' => { LSF => '-q standard -M 6000 -R"select[mem>6000] rusage[mem=6000]"'},
   };
 }
 
