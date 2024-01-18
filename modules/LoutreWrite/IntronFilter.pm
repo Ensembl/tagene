@@ -21,6 +21,7 @@ sub new {
 
 sub predict_outcome {
     my ($self, $intron, $transcript, $only_novel) = @_;
+    my $intron_score_cutoff = 25;
     my $rel_score_cutoff = -7;
     my $length_cutoff = 50;
     #my $source;
@@ -36,19 +37,21 @@ sub predict_outcome {
     }
     my $ss_sequence = get_ss_seq($intron);
     my $antisense_ovlp = get_ss_antisense_overlap($intron);
+    my $proc_pseudo_ovlp = get_processed_pseudogene_overlap($intron);
     my $repeat_ovlp = get_ss_repeat_overlap($intron);
     my $intron_score = get_intron_score($intron);
     my $rel_score = get_relative_intron_score($intron, $transcript);
     my $intron_length = get_intron_length($intron);
     my $exonerate_ali = ($READSEQDIR ? get_exonerate_alignment_support($intron, $transcript) : "NA");
-    print "INTRON: ".$intron->seq_region_start."-".$intron->seq_region_end."  NOV=$is_novel SS=$ss_sequence AS=$antisense_ovlp REP=$repeat_ovlp IP=$intron_score REL=$rel_score LEN=$intron_length EX=$exonerate_ali\n";
+    print "INTRON: ".$intron->seq_region_start."-".$intron->seq_region_end."  NOV=$is_novel SS=$ss_sequence AS=$antisense_ovlp PO=$proc_pseudo_ovlp REP=$repeat_ovlp IP=$intron_score REL=$rel_score LEN=$intron_length EX=$exonerate_ali\n";
 
     if ($is_novel eq "yes" and
         ($ss_sequence ne "GT..AG" or
-        $antisense_ovlp eq "yes" or
+        #$antisense_ovlp eq "yes" or
+        $proc_pseudo_ovlp eq "yes" or
         $repeat_ovlp =~ /SINE|Tandem_repeats/ or
-        $intron_score == 0 or
-        ($rel_score ne "NA" and $rel_score < $rel_score_cutoff) or
+        $intron_score < $intron_score_cutoff or
+        #($rel_score ne "NA" and $rel_score < $rel_score_cutoff) or
         $intron_length < $length_cutoff)){
         return 0;
     }
@@ -211,6 +214,25 @@ sub get_ss_antisense_overlap {
 }
 
 
+sub get_processed_pseudogene_overlap {
+  my $intron = shift;
+  my @as_exon_overlaps;
+  my $padding = 10; #Number of nucleotides each side of the splice site that will define the slices 
+  my $donor_as = 0;
+  my $sa = $DBA{'otter'}->get_SliceAdaptor();
+  my $slice = $sa->fetch_by_region("toplevel", $intron->seq_region_name, $intron->seq_region_start-$padding, $intron->seq_region_end+$padding);
+  TR:foreach my $tr (@{$slice->get_all_Transcripts}){
+    if ($tr->biotype eq "processed_pseudogene"){
+      #Look for a processed pseudogene that overlaps the whole intron on either strand
+      if ($tr->seq_region_start < $intron->seq_region_start and $tr->seq_region_end > $intron->seq_region_end){
+        return "yes";
+      }
+    }
+  }
+  return "no";
+}
+
+
 sub get_ss_repeat_overlap {
   my $intron = shift;
   my $sa = $DBA{'core'}->get_SliceAdaptor();
@@ -221,7 +243,8 @@ sub get_ss_repeat_overlap {
   my %intron_repeat_overlaps;
   foreach my $rf (@rfs){
     #overlap with splice site: -2/+2 nt
-    if (($rf->seq_region_start <= $intron->seq_region_start + 1 and $rf->seq_region_end >= $intron->seq_region_start - 2) or
+    #both splice sites must overlap the same repeat feature
+    if (($rf->seq_region_start <= $intron->seq_region_start + 1 and $rf->seq_region_end >= $intron->seq_region_start - 2) and 
         ($rf->seq_region_start <= $intron->seq_region_end + 2 and $rf->seq_region_end >= $intron->seq_region_end - 1)){
       $overlaps_repeat = 1;
       my $repeat_type = $rf->repeat_consensus->repeat_type;
