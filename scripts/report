@@ -11,6 +11,9 @@ grep -R ^TR2 $@ | grep "did not transform" | awk '{print $3}' | sort -u | wc -l
 echo -e "\nTranscripts ignored as overlapping multiple loci"
 grep -R ^TR2 $@ | grep "max allowed number" | awk '{print $3}' | sort -u | wc -l
 
+echo -e "\nTranscripts ignored as overlapping locus with unallowed biotype"
+grep -R ^TR2 $@ | grep "overlapped locus with unallowed biotype" | awk '{print $3}' | sort -u | wc -l
+
 echo -e "\nTranscripts ignored as host gene biotype not allowed"
 grep -R ^TR2 $@ | grep "host gene biotype not allowed" | awk '{print $3}' | sort -u | wc -l
 
