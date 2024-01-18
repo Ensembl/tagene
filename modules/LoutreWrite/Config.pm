@@ -33,7 +33,8 @@ sub get_havana_db_adaptor {
      -port   => 4682,
      -user   => 'ensro',
      -pass   => undef,
-     -dbname => "havana_".$SPECIES."_backup",
+     #-dbname => "havana_".$SPECIES."_backup",
+     -dbname => "havana_".$SPECIES."_tagene_test_1", #temporarily to avoid failures when the backup database is being updated
      -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);
@@ -97,8 +98,8 @@ sub get_intron_db_adaptor {
     $dbname = "gencode_mouse_recount3";
   }
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-    -host   => 'mysql-ens-havana-prod-1',
-    -port   => 4581,
+    -host   => 'mysql-ens-havana-prod-2',
+    -port   => 4682,
     -user   => 'ensro',
     -pass   => undef,
     -dbname => $dbname,
@@ -119,8 +120,8 @@ sub get_polyAseq_db_adaptor {
     $dbname = "gencode_mouse_polyAseq_mm9_assembly_schema_73";
   }
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-    -host   => 'mysql-ens-havana-prod-1',
-    -port   => 4581,
+    -host   => 'mysql-ens-havana-prod-2',
+    -port   => 4682,
     -user   => 'ensro',
     -pass   => undef,
     -dbname => $dbname,
