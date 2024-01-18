@@ -30,6 +30,7 @@ print OUT join("\t", "chromosome",
                      "gene_biotype",
                      "modified_date",
                      "new/modified",
+                     "single_exon",
                      "novel_transcripts",
                      "extended_transcripts",
                      "transcript_info",
@@ -65,6 +66,7 @@ my $sa = $otter_dba->get_SliceAdaptor();
 
 
 my $new_gene_count = 0;
+my $new_se_gene_count = 0;
 my $modified_gene_count = 0;
 my $added_tr_count = 0;
 my $extended_tr_count = 0;
@@ -89,6 +91,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
     my $extended_c = 0; #Extended by TAGENE pipeline
     my $pre_c = 0; #Pre-existing transcript, not extended by TAGENE pipeline
     my $is_tagene_gene = 0; #Has a TAGENE transcript
+    my $is_single_exon_gene = 0;
     my %report;
     foreach my $transcript (@{$gene->get_all_Transcripts}){
       my $is_tagene = 0;
@@ -96,6 +99,9 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
       my $tagene_models = 0;
       my $extended_flag = 0;
       my %tsources;
+      if (scalar(@{$gene->get_all_Transcripts}) == 1 and scalar(@{$transcript->get_all_Exons}) == 1){
+        $is_single_exon_gene = 1;
+      }
       foreach my $att (@{$transcript->get_all_Attributes}){
         #Was the transcript created or extended by the TAGENE pipeline?
         if ($att->code eq "remark" and $att->value eq "TAGENE_transcript"
@@ -236,6 +242,9 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
       if ($added_c > 0 and $extended_c == 0 and $pre_c == 0){
         $new_gene_count++;
         $report{$gene->stable_id} = "new";
+        if ($is_single_exon_gene){
+          $new_se_gene_count++;
+        }
       }
       else{
         $modified_gene_count++;
@@ -255,6 +264,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
                   $gene->biotype,
                   $gene_modif_date,
                   join(", ", map {$report{$_}} grep {/ENS(MUS)?G/} keys %report),
+                  ($is_single_exon_gene ? "yes" : "no"),
                   scalar(grep {/novel/} values(%report)),
                   scalar(grep {/extended/} values(%report)),
                   join(", ", map {$_.":".$report{$_}} grep {/ENS(MUS)?T/} keys %report),
@@ -265,6 +275,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
 }
 
 print OUT "\nNew genes: $new_gene_count\n".
+          "New single exon genes: $new_se_gene_count\n".
           "Modified genes: $modified_gene_count\n".
           "Novel transcripts: $added_tr_count\n".
           "Extended transcripts: $extended_tr_count\n".
