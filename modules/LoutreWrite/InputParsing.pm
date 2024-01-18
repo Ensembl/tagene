@@ -409,14 +409,14 @@ foreach my $exonid (sort keys %{$genes{$gid}{transcripts}{$tid}{stop_codon}}){
             $gene->add_Transcript($transcript);
         }
         
-print "ZZZ".$gene->biotype."\n";        
-print "ZZZ".join(", ", map {$_->biotype} @{$gene->get_all_Transcripts})."\n"; 
+#print "ZZZ".$gene->biotype."\n";        
+#print "ZZZ".join(", ", map {$_->biotype} @{$gene->get_all_Transcripts})."\n"; 
         #Update gene and transcript biotypes
         if (!($gene->biotype) or $gene->biotype eq "missing_biotype"){
             $gene = LoutreWrite::AnnotUpdate->assign_biotypes($gene); #This also updates description if appropriate 
         }
-print "ZZZ".$gene->biotype."\n"; 
-print "ZZZ".join(", ", map {$_->biotype} @{$gene->get_all_Transcripts})."\n";          
+#print "ZZZ".$gene->biotype."\n"; 
+#print "ZZZ".join(", ", map {$_->biotype} @{$gene->get_all_Transcripts})."\n";          
         #Update gene and transcript status - only lncRNA genes for now
         $gene = LoutreWrite::AnnotUpdate->assign_status($gene);
         
