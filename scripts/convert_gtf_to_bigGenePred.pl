@@ -4,34 +4,38 @@
 
 use strict;
 use Getopt::Long;
-use Bio::EnsEMBL::Registry;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
 
 my $gtf_file;
-my $species;
 my $big_genepred_file;
-my $host = "ensembldb.ensembl.org";
-my $port = "3306";
-my $user = "anonymous";
+my $host;
+my $port;
+my $user;
+my $dbname;
 
 &GetOptions(
              'gtf=s'     => \$gtf_file,
              'host=s'    => \$host,
              'port=i'    => \$port,
              'user=s'    => \$user,
-             'species=s' => \$species,
+             'dbname=s'  => \$dbname,
              'out=s'     => \$big_genepred_file,
           );
 
-my $registry = 'Bio::EnsEMBL::Registry';
-$registry->load_registry_from_db(
-    -host => $host,
-    -port => $port,
-    -user => $user
+my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+     -host   => $host,
+     -port   => $port,
+     -user   => $user,
+     -pass   => undef,
+     -dbname => $dbname,
+     -driver => 'mysql',
 );
-my $meta_container = $registry->get_adaptor($species, 'Core', 'MetaContainer');
+
+my $sa = $db->get_SliceAdaptor();
+
+my $meta_container = $db->get_MetaContainerAdaptor();
 my $assembly_version = $meta_container->single_value_by_key('assembly.ucsc_alias');
-my $sa = $registry->get_adaptor($species, 'Core', 'Slice');
 
 system("gtfToGenePred -genePredExt $gtf_file file.gp");
 system("genePredToBigGenePred file.gp file.bgpInput");
