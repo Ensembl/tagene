@@ -246,6 +246,7 @@ sub pipeline_analyses {
           .' -dataset '.$self->o('dataset')
           .' -author '.$self->o('author')
        #   .' -source '.$self->o('source')
+          .' #source#'
           .' -remark "'.$self->o('remark').'"'
        #   .' -readseqdir '.$self->o('read_seq_dir')
           .' #readseqdir#'
@@ -281,6 +282,7 @@ sub pipeline_analyses {
         log_dir => catdir($self->o('output_dir'), 'log'),
         output_file => catfile('#log_dir#', '#filename#.log'),
         #log_dir_2 => join("", grep {$_ =~ /\//} splitpath('#output_file#')),
+        source => ($self->o('source') ? '-source '.$self->o('source') : ''),
         readseqdir => ($self->o('read_seq_dir') ? '-readseqdir '.$self->o('read_seq_dir') : ''),
         assembly => ($self->o('assembly_version') ? '-assembly_version '.$self->o('assembly_version') : ''),
         chr => ($self->o('chr') ? ' -chr '.$self->o('chr') : ''),
@@ -310,6 +312,7 @@ sub pipeline_analyses {
           .' -dataset '.$self->o('dataset')
           .' -author '.$self->o('author')
        #   .' -source '.$self->o('source')
+           .' #source#'
           .' -remark "'.$self->o('remark').'"'
        #   .' -readseqdir '.$self->o('read_seq_dir')
           .' #readseqdir#'
@@ -345,6 +348,7 @@ sub pipeline_analyses {
         log_dir => catdir($self->o('output_dir'), 'log'),
         output_file => catfile('#log_dir#', '#filename#.log'),
         #log_dir_2 => join("", grep {$_ =~ /\//} splitpath('#output_file#')),
+        source => ($self->o('source') ? '-source '.$self->o('source') : ''),
         readseqdir => ($self->o('read_seq_dir') ? '-readseqdir '.$self->o('read_seq_dir') : ''),
         assembly => ($self->o('assembly_version') ? '-assembly_version '.$self->o('assembly_version') : ''),
         chr => ($self->o('chr') ? ' -chr '.$self->o('chr') : ''),
