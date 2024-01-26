@@ -458,6 +458,7 @@ sub pipeline_analyses {
           .' -host '.$self->o('target_db_host')
           .' -port '.$self->o('target_db_port')
           .' -user '.$self->o('user_r')
+          .' -dbname '.$self->o('target_db_name')
           .' -species '.$self->o('species')
           .' -out #output_file#',
         gtf_to_bgp_script => $self->o('gtf_to_bgp_script'),
