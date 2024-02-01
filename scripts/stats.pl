@@ -72,7 +72,7 @@ my $added_tr_count = 0;
 my $extended_tr_count = 0;
 my $multiple_tagene_ds_count = 0;
 my $multiple_tagene_ms_count = 0;
-foreach my $slice (@{$sa->fetch_all("chromosome")}){
+foreach my $slice (@{$sa->fetch_all("toplevel")}){
   print $slice->seq_region_name."...";
   foreach my $gene (@{$slice->get_all_Genes}){
     next unless $gene->source =~ /havana/;
@@ -259,15 +259,15 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
                   $gene->seq_region_start,
                   $gene->seq_region_end,
                   $gene->seq_region_strand,
-                  join(", ", map {$_} grep {/ENS(MUS)?G|OTT(HUM|MUS)G/} keys %report),
+                  join(", ", map {$_} grep {/ENS([A-Z]{3})?G|OTT([A-Z]{3})G/} keys %report),
                   ($gene->get_all_Attributes('name')->[0]->value || " "),
                   $gene->biotype,
                   $gene_modif_date,
-                  join(", ", map {$report{$_}} grep {/ENS(MUS)?G/} keys %report),
+                  join(", ", map {$report{$_}} grep {/ENS([A-Z]{3})?G/} keys %report),
                   ($is_single_exon_gene ? "yes" : "no"),
                   scalar(grep {/novel/} values(%report)),
                   scalar(grep {/extended/} values(%report)),
-                  join(", ", map {$_.":".$report{$_}} grep {/ENS(MUS)?T/} keys %report),
+                  join(", ", map {$_.":".$report{$_}} grep {/ENS([A-Z]{3})?T/} keys %report),
                   join(", ", keys %{$report{'sources'}})
                 )."\n";
     }
