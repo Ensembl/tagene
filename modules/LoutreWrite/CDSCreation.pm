@@ -233,7 +233,7 @@ sub is_retained_intron {
   $min_overhang ||= 1;
   foreach my $tr (@{$host_gene->get_all_Transcripts}){
     #Ignore lingering OTT transcripts
-    next unless $tr->stable_id =~ /^ENS(MUS)?T000/;
+    next unless $tr->stable_id =~ /^ENS([A-Z]{3})?T000/;
     #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
     if (scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')})){
       next unless ($tr->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$tr->get_all_Attributes('remark')}));
@@ -324,7 +324,7 @@ sub get_host_gene_cds_set {
  
   foreach my $transcript (sort_by_categ(\@filtered_transcripts)){
     #Ignore lingering OTT transcripts
-    next unless $transcript->stable_id =~ /^ENS(MUS)?T000/;
+    next unless $transcript->stable_id =~ /^ENS([A-Z]{3})?T000/;
     #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
     if (scalar(grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')})){
       next unless ($transcript->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$transcript->get_all_Attributes('remark')}));
@@ -729,7 +729,7 @@ sub get_host_gene_start_codon_set {
   my @filtered_transcripts = grep {has_cds_start($_)} @{$gene->get_all_Transcripts};
   foreach my $transcript (sort_by_categ_2(\@filtered_transcripts)){
     #Ignore lingering OTT transcripts
-    next unless $transcript->stable_id =~ /^ENS(MUS)?T000/;
+    next unless $transcript->stable_id =~ /^ENS([A-Z]{3})?T000/;
     #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
     if (scalar(grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')})){
       next unless ($transcript->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$transcript->get_all_Attributes('remark')}));
@@ -988,7 +988,7 @@ sub get_host_gene_stop_codon_set {
   my @filtered_transcripts = grep {has_cds_end($_)} @{$gene->get_all_Transcripts};
   foreach my $transcript (@filtered_transcripts){
     #Ignore lingering OTT transcripts
-    next unless $transcript->stable_id =~ /^ENS(MUS)?T000/;
+    next unless $transcript->stable_id =~ /^ENS([A-Z]{3})?T000/;
     #Ignore "not for VEGA" transcripts unless they have a "comp_pipe" biotype or a "TAGENE_transcript" remark
     if (scalar(grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')})){
       next unless ($transcript->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$transcript->get_all_Attributes('remark')}));
