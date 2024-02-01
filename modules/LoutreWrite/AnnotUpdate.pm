@@ -660,6 +660,13 @@ print "SUBMODE: $submode\n";
 
 sub get_new_gene_name {
     my ($self, $region, $gene, $dataset_name, $dba) = @_;
+
+    #For new databases that only have a 'primary_assembly' coordinate system name, return a genomic coordinate-based gene name
+    if ($region->slice->coord_system_name eq "primary_assembly"){
+      return join("_", $gene->seq_region_name, $gene->seq_region_start, $gene->seq_region_end);
+    }
+
+    #Older databases should have a clone coordinate system name. The clone-based gene name is obtained as described below.
     
     #In Otter/Zmap, the gene name is created by selecting 'New' (Ctrl+N) in the session window
     #The code can be found in ensembl-otter/modules/MenuCanvasWindow/SessionWindow.pm (subs_edit_new_subsequence and _region_name_and_next_locus_number)
