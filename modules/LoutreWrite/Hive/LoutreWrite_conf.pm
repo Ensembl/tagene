@@ -106,7 +106,7 @@ sub default_options {
     load_gxf_script => catfile($self->o('scripts_dir'), 'load_gxf_in_loutre.pl'),
     log_stats_script => catfile($self->o('scripts_dir'), 'report'),
     db_stats_script => catfile($self->o('scripts_dir'), 'stats.pl'),
-    trackhub_script => catfile($self->o('scripts_dir'), 'make_trackhub_files.pl'),
+    trackhub_script => catfile($self->o('scripts_dir'), 'make_trackhub_directory.pl'),
     annot_to_bgp_script => catfile($self->o('scripts_dir'), 'make_bigBed_file_for_trackhub.pl'),
     gtf_to_bgp_script => catfile($self->o('scripts_dir'), 'convert_gtf_to_bigGenePred.pl'),
     date => $date2,
@@ -442,13 +442,13 @@ sub pipeline_analyses {
       },
       -max_retry_count => 0,
       -flow_into => {
-        1 => ['make_trackhub_files'],
+        1 => ['make_trackhub_directory'],
       },
       -rc_name => 'default',
     },
 
     {
-      -logic_name => 'make_trackhub_files',
+      -logic_name => 'make_trackhub_directory',
       -module => 'Bio::EnsEMBL::Hive::RunnableDB::SystemCmd',
       -parameters => {
         cmd => 'cd #outdir# && perl #trackhub_script#'
