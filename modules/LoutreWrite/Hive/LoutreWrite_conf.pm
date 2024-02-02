@@ -396,34 +396,10 @@ sub pipeline_analyses {
       },
       -max_retry_count => 0,
       -flow_into => {
-        1 => ['make_trackhub_files'],
-      },
-      -rc_name => 'default',
-    },
-
-    {
-      -logic_name => 'make_trackhub_files',
-      -module => 'Bio::EnsEMBL::Hive::RunnableDB::SystemCmd',
-      -parameters => {
-        cmd => 'cd #outdir# && perl #trackhub_script#'
-          .' -name '.$self->o('dataset').'_'.$self->o('date')
-          .' -host '.$self->o('target_db_host')
-          .' -port '.$self->o('target_db_port')
-          .' -user '.$self->o('user_r')
-          .' -dbname '.$self->o('target_db_name')
-          .' -input #input_file#'
-          .' -annot #annot_file#',
-        trackhub_script => $self->o('annot_to_bgp_script'),
-        outdir => catdir($self->o('output_dir'), "trackhub"),
-        input_file => catfile('#outdir#', "input_annot.bb"),
-        annot_file => catfile('#outdir#', $self->o('dataset')),
-      },
-      -max_retry_count => 0,
-      -flow_into => {
         1 => ['make_trackhub_annotation_file'],
       },
       -rc_name => 'default',
-    },    
+    },  
 
     {
       -logic_name => 'make_trackhub_annotation_file',
@@ -459,11 +435,34 @@ sub pipeline_analyses {
           .' -port '.$self->o('target_db_port')
           .' -user '.$self->o('user_r')
           .' -dbname '.$self->o('target_db_name')
-          .' -species '.$self->o('species')
           .' -out #output_file#',
         gtf_to_bgp_script => $self->o('gtf_to_bgp_script'),
         outdir => catdir($self->o('output_dir'), "trackhub"),
         output_file => catfile('#outdir#', "input_annot.bb"),
+      },
+      -max_retry_count => 0,
+      -flow_into => {
+        1 => ['make_trackhub_files'],
+      },
+      -rc_name => 'default',
+    },
+
+    {
+      -logic_name => 'make_trackhub_files',
+      -module => 'Bio::EnsEMBL::Hive::RunnableDB::SystemCmd',
+      -parameters => {
+        cmd => 'cd #outdir# && perl #trackhub_script#'
+          .' -name '.$self->o('dataset').'_'.$self->o('date')
+          .' -host '.$self->o('target_db_host')
+          .' -port '.$self->o('target_db_port')
+          .' -user '.$self->o('user_r')
+          .' -dbname '.$self->o('target_db_name')
+          .' -input #input_file#'
+          .' -annot #annot_file#',
+        trackhub_script => $self->o('trackhub_script'),
+        outdir => catdir($self->o('output_dir'), "trackhub"),
+        input_file => catfile('#outdir#', "input_annot.bb"),
+        annot_file => catfile('#outdir#', $self->o('dataset')),
       },
       -max_retry_count => 0,
       -rc_name => 'default',
