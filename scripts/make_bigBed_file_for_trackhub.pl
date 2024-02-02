@@ -81,7 +81,7 @@ foreach my $slice (sort {
                             $a->seq_region_name cmp $b->seq_region_name;
                           }
                         }
-              @{$sa->fetch_all('chromosome', undef, 0, 1)}){
+              @{$sa->fetch_all('toplevel', undef, 0, 1)}){
 
   print $slice->seq_region_name."...";
   foreach my $gene (@{$slice->get_all_Genes}){
@@ -127,7 +127,7 @@ close (BED);
 print "\n";
 
 #Sort BED file
-system("sort -k1,1 -k2,2n $outfile.bed > $outfile.sorted.bed");
+system("LC_COLLATE=C sort -k1,1 -k2,2n $outfile.bed > $outfile.sorted.bed");
 
 #Get chromosome size file
 my $ucsc_name = $meta_container->single_value_by_key('assembly.ucsc_alias');
@@ -139,6 +139,9 @@ print_bgp_definition_file($bgp_def_file);
 
 #Make bigBed (bigGenePred) file
 system("bedToBigBed -type=bed12+10 -as=$bgp_def_file -extraIndex=name $outfile.sorted.bed $ucsc_name.chrom.sizes $outfile.bb");
+unless (-e "$outfile.bb"){
+  die "The $outfile.bb file couldn't be created";
+}
 
 #Compress BED files
 system("gzip $outfile.bed $outfile.sorted.bed");
@@ -211,8 +214,13 @@ sub get_transcript_line {
   $mod_num =~ s/1/-/;
   $colour ||= $colour0;
   my $ltrans = $ta->fetch_by_stable_id_version($ltrans_id, $lversion);
-  my $seq_region = $ltrans->seq_region_name;
-  $seq_region = "chr".$seq_region;
+  my $seq_region_name;
+  if (scalar @{$ltrans->slice->get_all_synonyms('UCSC')}){
+    $seq_region_name = $ltrans->slice->get_all_synonyms('UCSC')->[0]->name;
+  }
+  else{
+    $seq_region_name = "chr".$ltrans->slice->seq_region_name;
+  }
   my ($cds_start_stat, $cds_end_stat) = ($ltrans->coding_region_start, $ltrans->coding_region_end);
   $cds_start_stat = $cds_start_stat ? 'cmpl' : 'none';
   $cds_end_stat   = $cds_end_stat   ? 'cmpl' : 'none';
@@ -261,7 +269,7 @@ sub get_transcript_line {
   my $modif_date = strftime("%d-%b-%Y"."_%H:%M:%S", localtime($ltrans->modified_date));
 
   my $score = $tgene->biotype eq 'protein_coding' ? 100 : 1000;
-  return join("\t", $seq_region, 
+  return join("\t", $seq_region_name, 
                     ($ltrans->seq_region_start - 1), 
                     $ltrans->seq_region_end, 
                     ($mod_gene_name || $trans_name),
