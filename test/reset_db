@@ -1,0 +1,16 @@
+HOST=mysql-ens-havana-prod-1
+PORT=4581
+USER=ottcron
+DBNAME=tagene_test
+
+mysql -h$HOST -P$PORT -u$USER -p$PASS -e "DROP DATABASE $DBNAME"
+
+mysql -h$HOST -P$PORT -u$USER -p$PASS -e "CREATE DATABASE IF NOT EXISTS $DBNAME"
+
+mysql -h$HOST -P$PORT -u$USER -p$PASS -D$DBNAME < db/havana_schema.sql
+
+zcat db/havana_human.meta.sql.gz | mysql -h$HOST -P$PORT -u$USER -p$PASS -D$DBNAME
+
+mysql -h$HOST -P$PORT -u$USER -p$PASS -D$DBNAME -e "LOAD DATA LOCAL INFILE 'db/gene.txt' INTO TABLE gene; LOAD DATA LOCAL INFILE 'db/gene_attrib.txt' INTO TABLE gene_attrib; LOAD DATA LOCAL INFILE 'db/transcript.txt' INTO TABLE transcript; LOAD DATA LOCAL INFILE 'db/transcript_attrib.txt' INTO TABLE transcript_attrib; LOAD DATA LOCAL INFILE 'db/translation.txt' INTO TABLE translation; LOAD DATA LOCAL INFILE 'db/translation_attrib.txt' INTO TABLE translation_attrib; LOAD DATA LOCAL INFILE 'db/exon_transcript.txt' INTO TABLE exon_transcript; LOAD DATA LOCAL INFILE 'db/exon.txt' INTO TABLE exon; LOAD DATA LOCAL INFILE 'db/gene_author.txt' INTO TABLE gene_author; LOAD DATA LOCAL INFILE 'db/transcript_author.txt' INTO TABLE transcript_author; LOAD DATA LOCAL INFILE 'db/author.txt' INTO TABLE author;"
+
+
