@@ -537,8 +537,8 @@ print "XCXCXCXCX-2\n" if $t_name =~ /anchIC_000000168991/;
 
  Arg[1]    : list of Bio::Vega::Gene objects
  Arg[2]    : preserve host gene biotype, eg. ignore non-coding host gene if transcript is coding
- Arg[3]    : list of ignored host gene biotypes, i.e. transcripts will not be added to a gene with one of these biotypes
-             but may form part of an overlapping novel gene
+ Arg[3]    : list of ignored host gene biotypes, i.e. transcripts will not be added to a gene with one of these
+             biotypes but may form part of an overlapping novel gene
  Function  : Find the most suitable existing gene(s) to host the transcripts of the given genes, 
              split the input genes into as many genes as host genes were found and set the new gene stable id(s);
              return the transformed input genes
@@ -548,28 +548,35 @@ print "XCXCXCXCX-2\n" if $t_name =~ /anchIC_000000168991/;
 
 sub assign_host_gene_multi {
     my ($self, $genes, $preserve_biotype, $ignored_biotypes) = @_;
-    my %host_by_transcript;
+    #my %host_by_transcript;
     my @all_db_genes;
     my @new_genes;
+    my %ignored_biotypes;
+    if ($ignored_biotypes){
+      %ignored_biotypes = map {$_=>1} split(/,/, $ignored_biotypes);
+    }
     
     foreach my $gene (@$genes){
         #Fetch database genes overlapping our gene
         #Exclude 'not for VEGA' genes, artifact genes, ...
         my @db_genes = @{get_valid_overlapping_genes($gene, 1)};
-        ###22-1-2024
+        #Add genes created for other transcripts in the same cluster
         push(@db_genes, @new_genes);
-        ###
+
+        my @filt_db_genes;
         foreach my $db_gene (@db_genes){
-          push(@all_db_genes, $db_gene) unless grep {$_->stable_id eq $db_gene->stable_id} @all_db_genes;
+          if ($db_gene->seq_region_strand == $gene->seq_region_strand){
+            push(@filt_db_genes, $db_gene);
+          }
         }
-          
+        
         foreach my $transcript (@{$gene->get_all_Transcripts}){
             my $host_gene;
             my $tid = $transcript->get_all_Attributes('hidden_remark')->[0]->value;
             #Check intron match - find gene with the most matching introns
             my @candidates;
             my $max_n_introns = 0;
-            foreach my $db_gene (@db_genes){
+            foreach my $db_gene (@filt_db_genes){
                 #EXPERIMENTAL: exclude pseudogenes so that spliced transcripts are assigned to new (lncRNA) genes
                 if (scalar @{$transcript->get_all_Introns} > 1 and $db_gene->biotype =~ /pseudogene/){
                     next;
@@ -580,6 +587,11 @@ sub assign_host_gene_multi {
                         next;
                     }
                 }
+                #If gene has a biotype in the list of ignored biotypes, skip it
+                if ($ignored_biotypes{$db_gene->biotype}){
+                  next;
+                }
+
                 my $n_introns = 0; #Number of matching introns
                 foreach my $db_intron (sort {$a->start <=> $b->start} @{$db_gene->get_all_Introns}){           
                     foreach my $intron (@{$transcript->get_all_Introns}){
@@ -591,20 +603,20 @@ sub assign_host_gene_multi {
                 if ($n_introns > $max_n_introns){
                     @candidates = ();
                     push(@candidates, $db_gene);
-                    $max_n_introns = $n_introns;  #print "0-AAA ".$transcript->start."-".$transcript->end."  ".$db_gene->stable_id."  ".$n_introns."\n";
+                    $max_n_introns = $n_introns;
                 }
                 elsif ($n_introns >= 1 and $n_introns == $max_n_introns){
-                    push(@candidates, $db_gene);  #print "0-BBB ".$transcript->start."-".$transcript->end."  ".$db_gene->stable_id."  ".$n_introns."\n";    
+                    push(@candidates, $db_gene);   
                 }
             }
             #If only one host gene with the highest number of matching introns, choose that
             if (scalar(@candidates) == 1){
-                $host_gene = $candidates[0]; #print "AAA ".$transcript->start."-".$transcript->end."\n";
+                $host_gene = $candidates[0];
             }
             #Else, select the host gene with the largest exonic overlap
             else{
                 if (scalar(@candidates) == 0){
-                    @candidates = grep {!($_->biotype =~ /pseudogene/)} @db_genes; #print "BBB ".$transcript->start."-".$transcript->end."\n";
+                    @candidates = grep {!($_->biotype =~ /pseudogene/)} @filt_db_genes;
                 }
                 my %tr_loc; #Store genomic positions of transcript's exons
                 foreach my $exon (@{$transcript->get_all_Exons}){
@@ -629,13 +641,13 @@ sub assign_host_gene_multi {
                 }                
             }
             #Store most suitable host gene for the transcript, if any
-            if ($host_gene){
-                #my $tid = $transcript->get_all_Attributes('hidden_remark')->[0]->value;
-                #$host_by_transcript{$tid} = $host_gene->stable_id;    
+            my $found = 0;
+            if ($host_gene){   
                 print "Assigning transcript $tid to host gene ".$host_gene->stable_id."\n";
 
                 #Search for new gene with this stable id
-                my $found = 0;
+                #i.e. a new gene created for another input transcript which had the same host gene
+                #my $found = 0;
                 foreach my $new_gene (@new_genes){
                     if ($new_gene->stable_id eq $host_gene->stable_id){
                         $new_gene->add_Transcript($transcript);
@@ -663,13 +675,26 @@ sub assign_host_gene_multi {
             else{
                 #If no host gene, ...
                 print "No host gene for transcript $tid\n";
-                ###22-1-2024
-                $gene->stable_id("tmp_1234");
-                push(@db_genes, $gene);
-                ###
+                #Assign random identifier and add to db genes array so other transcripts can be assigned to this gene
+                my $new_gene = Bio::Vega::Gene->new(
+                                      -stable_id  => "tmp_".int(rand(1000)),
+                                      -biotype    => $gene->biotype,
+                                      -analysis   => $gene->analysis,
+                                      -source     => $gene->source,
+                                      -status     => $gene->status
+                                    );
+                $new_gene->gene_author($gene->gene_author);
+                $new_gene->add_Attributes(@{$gene->get_all_Attributes});
+                $new_gene->add_Transcript($transcript);   
+                push (@new_genes, $new_gene);
+                #Remove transcript from old gene
+                my $array = $gene->{_transcript_array};
+                @$array = grep {$_->get_all_Attributes('hidden_remark')->[0]->value ne $tid} @$array;
+                
+                push(@db_genes, $new_gene); 
+                
             }
-my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
-print "XCXCXCXCX-1\n" if $t_name =~ /anchIC_000000168991/;   
+ 
         }
         #Add the old gene to the set of new genes if it still has any unassigned transcript
         if (scalar @{$gene->get_all_Transcripts}){
@@ -679,105 +704,6 @@ print "XCXCXCXCX-1\n" if $t_name =~ /anchIC_000000168991/;
 
     return \@new_genes;
 
-
-#########    
-    
-    ##How many different host genes were found? Split input gene if necessary
-    #my @host_gene_ids = uniq(values %host_by_transcript);
-    #my @host_genes;
-    #foreach my $gid (@host_gene_ids){
-        #push(@host_genes, grep {$_->stable_id eq $gid} @all_db_genes);
-    #}
-    ##Multiple host genes: split the input gene into as many new genes as host genes there are
-    ##if (scalar @host_gene_ids > 1){
-    #if (scalar @host_gene_ids){
-        ##Make new empty genes
-        #my @new_genes;
-        #foreach my $host_gene_id (@host_gene_ids){
-            #my $new_gene = Bio::Vega::Gene->new(
-                                    #-stable_id  => $host_gene_id,
-                                    ##-biotype    => $gene->biotype,
-                                    ##-analysis   => $gene->analysis,
-                                    ##-source     => $gene->source,
-                                    ##-status     => $gene->status
-                                    #);
-            ##$new_gene->gene_author($gene->gene_author);
-            ##$new_gene->add_Attributes(@{$gene->get_all_Attributes});  #add TAGENE_gene remark?       
-            #push (@new_genes, $new_gene);
-        #}
-        ##Add input transcripts to new genes
-        #foreach my $gene (@$genes){
-          #foreach my $transcript (@{$gene->get_all_Transcripts}){
-            #my $tid = $transcript->get_all_Attributes('hidden_remark')->[0]->value;
-            #if ($host_by_transcript{$tid}){
-                #foreach my $new_gene (@new_genes){
-                    #if ($new_gene->stable_id eq $host_by_transcript{$tid}){
-                        #$new_gene->add_Transcript($transcript);
-#if ($tid =~ /anchIC_000000168991/){
-  #print "anchIC_000000168991 - ".$new_gene->stable_id."\n";
-#}
-                        ##Remove transcript from old gene
-                        #my $array = $gene->{_transcript_array};
-                        #@$array = grep { $_->get_all_Attributes('hidden_remark')->[0]->value ne $tid } @$array;
-                        #last;
-                    #}                
-                #}            
-            #}
-            ##If transcript had no host gene, take the closest or max overlap host gene
-            #else{
-                #my $host_gene;
-                ##First, find overlapping genes
-                #my @ovlp_host_genes = grep {$_->seq_region_start <= $transcript->seq_region_end and $_->seq_region_end >= $transcript->seq_region_start and $_->seq_region_strand >= $transcript->seq_region_strand} @host_genes;
-                #if (scalar @ovlp_host_genes){
-                    #my $max_overlap = 0;
-                    #foreach my $db_gene (@ovlp_host_genes){
-                        #my $overlap = min($transcript->seq_region_end, $db_gene->seq_region_end) - max($transcript->seq_region_start, $db_gene->seq_region_start) + 1;
-                        #if ($overlap > $max_overlap){
-                            #$host_gene = $db_gene;
-                            #$max_overlap = $overlap;
-                        #}
-                    #}
-                #}
-                #else{
-                    #my $min_distance = 10000000;
-                    #foreach my $db_gene (@host_genes){
-                        #my $distance = max($transcript->seq_region_start, $db_gene->seq_region_start) - min($transcript->seq_region_end, $db_gene->seq_region_end) + 1;
-                        #if ($distance < $min_distance){
-                            ##$host_gene = $db_gene; #I don't think that assigning a non-overlapping host gene is correct
-                            #$min_distance = $distance;
-                        #}
-                    #}
-                #}
-                #if ($host_gene){
-                    #foreach my $new_gene (@new_genes){
-                        #if ($new_gene->stable_id eq $host_gene->stable_id){
-                            #$new_gene->add_Transcript($transcript);
-                            #print "Assigning transcript $tid to host gene ".$host_gene->stable_id." (2nd round)\n";
-                            ##Remove transcript from old gene
-                            #my $array = $host_gene->{_transcript_array};
-                            #@$array = grep { $_->get_all_Attributes('hidden_remark')->[0]->value ne $tid } @$array;
-                            #last;
-                        #}                
-                    #}
-                #}
-                #else{
-                    #print "No host gene for transcript $tid\n";
-                #}
-            #}
-          #}
-        #}
-        #return \@new_genes;
-    #}
-    ##A single host gene: just set stable id and return
-    ##elsif (scalar @host_gene_ids == 1){
-    ##    $gene->stable_id($host_gene_ids[0]);
-    ##    return [$gene];    
-    ##}
-    #else{
-        #return $genes;    
-    #}
-    
-    #return undef;
 }
 
 

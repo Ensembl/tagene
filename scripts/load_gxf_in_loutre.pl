@@ -188,6 +188,7 @@ if ($assembly_version){
   }
   $gene_objects = \@transf_genes;
 }
+print "000000=".scalar(@$gene_objects)."\n";
 
 #Long artifact transcripts, spanning multiple real loci, make long artificial genes
 unless ($no_artifact_check){
@@ -206,6 +207,7 @@ if ($max_overlapped_loci){
     print "TR2: $tid: max allowed number of overlapped loci exceeded\n";
   }
 }
+print "AAAAAA=".scalar(@$gene_objects)."\n";
 
 #Remove trancripts that overlap a gene having an unallowed biotype
 if ($no_overlap_biotype){
@@ -216,7 +218,7 @@ if ($no_overlap_biotype){
     print "TR2: $tid: overlapped locus with unallowed biotype\n";
   }
 }
-
+print "BBBBBB=".scalar(@$gene_objects)."\n";
 
 #Add source info
 #my $gene_objects_3;
@@ -224,11 +226,25 @@ if ($source_info){
   $gene_objects = LoutreWrite::InputParsing->add_sources($gene_objects, $source_info);
 }
 
+#Assign host genes
+foreach my $go (@$gene_objects){
+  foreach my $tr (@{$go->get_all_Transcripts}){
+    print "Gene1 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
+  }
+}
+$gene_objects = LoutreWrite::GeneFilter->assign_host_gene_multi($gene_objects, 1);
+print "CCCCCC=".scalar(@$gene_objects)."\n";
+foreach my $go (@$gene_objects){
+  foreach my $tr (@{$go->get_all_Transcripts}){
+    print "Gene2 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
+  }
+}
+
 my $count = 1;
 my $total = scalar(@$gene_objects);
 #Process gene objects
-foreach my $gene_obj (@$gene_objects){
-    print "##########\n\nLOOKING AT GENE IN ".$gene_obj->seq_region_name.":".$gene_obj->start."-".$gene_obj->end."  ($count/$total)\n\n";
+GENE:foreach my $new_gene_obj (@$gene_objects){
+    print "##########\n\nLOOKING AT GENE IN ".$new_gene_obj->seq_region_name.":".$new_gene_obj->start."-".$new_gene_obj->end."  ($count/$total)\n\n";
     $count++;
 
     #Check whether add as novel gene or merge with existing gene
@@ -241,12 +257,17 @@ foreach my $gene_obj (@$gene_objects){
    #IT HAS TO BE DONE BY SPLITTING GENES    
     #Readthrough genes -> should be split and assign host genes independently by transcript
     #Why not replace "find_host_gene" with "assign_host_gene" which would return an array of gene objects, each one with their new stable id if they have a host gene?
-    my $new_gene_objects = LoutreWrite::GeneFilter->assign_host_gene($gene_obj, 1);
+#    my $new_gene_objects = LoutreWrite::GeneFilter->assign_host_gene_multi($gene_obj, 1);
+#foreach my $go (@$new_gene_objects){
+#  foreach my $tr (@{$go->get_all_Transcripts}){
+#    print "Gene3 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
+#  }
+#}
     my %allowed_biotypes;
     if ($host_biotype){
       %allowed_biotypes = map {$_=>1} split(/,/, $host_biotype);
     }
-    GENE:foreach my $new_gene_obj (@$new_gene_objects){
+    #GENE:foreach my $new_gene_obj (@$new_gene_objects){
         print "HOST: ".($new_gene_obj->stable_id || "NONE")."\n";
 
         #Find biotype of host gene
@@ -413,7 +434,7 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
                 }
             }
         #}
-    }
+    #}
 }
 
 
