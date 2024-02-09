@@ -34,6 +34,7 @@ my $no_intron_check;
 my $host_biotype;
 my $no_overlap_biotype;
 my $max_overlapped_loci;
+my $protected_loci_list;
 my $filter_introns;
 my $platinum;
 my $only_chr;
@@ -56,6 +57,7 @@ my $die_if_locked_clone;
             'host_biotype=s'    => \$host_biotype,
             'no_overlap_biotype=s' => \$no_overlap_biotype,
             'max_ov_loc=i'      => \$max_overlapped_loci,
+            'protected_loci=s'  => \$protected_loci_list,
             'filter_introns!'   => \$filter_introns,
             'platinum!'         => \$platinum,
             'readseqdir=s'      => \$READSEQDIR,
@@ -101,6 +103,7 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -host_biotype   restrict host genes by biotype (comma-separated list)
  -no_overlap_biotype skip overlapped genes by biotype (comma-separated list) 
  -max_ov_loc     maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
+ -protected_loci file with a list of annotated genes that must not be updated
  -filter_introns assess introns and ignore transcript if at least an intron does not pass the filters
  -platinum       add a 'platinum' hidden remark to all transcripts
  -chr            restrict to annotation on this chromosome
@@ -226,6 +229,17 @@ if ($source_info){
   $gene_objects = LoutreWrite::InputParsing->add_sources($gene_objects, $source_info);
 }
 
+#Read protected gene list
+my %protected_loci;
+if ($protected_loci_list and -e $protected_loci_list){
+  open (IN, $protected_loci_list) or die "Can't open file $protected_loci_list: $!";
+  while (<IN>){
+    chomp;
+    $protected_loci{$_} = 1;
+  }
+  close (IN);
+}
+
 #Assign host genes
 foreach my $go (@$gene_objects){
   foreach my $tr (@{$go->get_all_Transcripts}){
@@ -269,9 +283,19 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
     }
     #GENE:foreach my $new_gene_obj (@$new_gene_objects){
         print "HOST: ".($new_gene_obj->stable_id || "NONE")."\n";
-
-        #Find biotype of host gene
+        
         if ($new_gene_obj->stable_id =~ /^ENS/){
+            #Ignore genes in the protected loci list
+            if ($protected_loci{$new_gene_obj->stable_id}){
+              print "Gene ".$new_gene_obj->stable_id." will be ignored as it is a protected locus\n";
+              foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
+                my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+                print "TR2: $t_name: host gene is protected\n";
+              }
+              next GENE;
+            }
+
+            #Check biotype of host gene
             my $wrong_host;
             my $host_gene = $ga->fetch_by_stable_id($new_gene_obj->stable_id);
             if (!$host_gene){
@@ -287,6 +311,7 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
                 print "Gene ".$host_gene->stable_id." will be ignored as it has an ASB_protein_coding remark\n";
                 $wrong_host = 1;
             }
+
             #Double check that the gene does not have a coding transcript
             #There are a few cases in loutre_human
             else{

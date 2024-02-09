@@ -86,7 +86,7 @@ sub default_options {
     no_intron_check => 0,
     host_biotype => '',
     no_overlap_biotype => '',
-    max_ov_loci => 0,
+    max_ov_loc => 0,
     filter_introns => 0,
     platinum => 0,
     die_locked => 0,
@@ -264,7 +264,8 @@ sub pipeline_analyses {
        #   .' -no_intron_check '.$self->o('no_intron_check')
           .' -host_biotype '.$self->o('host_biotype')
           .' -no_overlap_biotype '.$self->o('no_overlap_biotype')
-          .' -max_ov_loc '.$self->o('max_ov_loci')
+          .' -max_ov_loc '.$self->o('max_ov_loc')
+          .' #protected_loci#'
       #    .' -filter_introns '.$self->o('filter_introns')
           .' #filter_introns#'
           #.' -platinum '.$self->o('platinum')
@@ -289,6 +290,7 @@ sub pipeline_analyses {
         no_artifact_check => ($self->o('no_artifact_check') ? ' -no_check ' : ''),
         no_nfv => ($self->o('no_NFV') ? '-no_NFV' : ''),
         no_cds => ($self->o('no_CDS') ? '-no_CDS' : ''),
+        protected_loci => ($self->o('protected_loci') ? '-protected_loci '.$self->o('protected_loci') : ''),
         filter_introns => ($self->o('filter_introns') ? '-filter_introns' : ''),
         platinum => ($self->o('platinum') ? '-platinum' : ''),
         die_locked => ($self->o('die_locked') ? '-die_locked' : ''),
@@ -312,7 +314,7 @@ sub pipeline_analyses {
           .' -dataset '.$self->o('dataset')
           .' -author '.$self->o('author')
        #   .' -source '.$self->o('source')
-           .' #source#'
+          .' #source#'
           .' -remark "'.$self->o('remark').'"'
        #   .' -readseqdir '.$self->o('read_seq_dir')
           .' #readseqdir#'
@@ -330,7 +332,8 @@ sub pipeline_analyses {
        #   .' -no_intron_check '.$self->o('no_intron_check')
           .' -host_biotype '.$self->o('host_biotype')
           .' -no_overlap_biotype '.$self->o('no_overlap_biotype')
-          .' -max_ov_loc '.$self->o('max_ov_loci')
+          .' -max_ov_loc '.$self->o('max_ov_loc')
+          .' #protected_loci#'
       #    .' -filter_introns '.$self->o('filter_introns')
           .' #filter_introns#'
           #.' -platinum '.$self->o('platinum')
@@ -355,6 +358,7 @@ sub pipeline_analyses {
         no_artifact_check => ($self->o('no_artifact_check') ? ' -no_check ' : ''),
         no_nfv => ($self->o('no_NFV') ? '-no_NFV' : ''),
         no_cds => ($self->o('no_CDS') ? '-no_CDS' : ''),
+        protected_loci => ($self->o('protected_loci') ? '-protected_loci '.$self->o('protected_loci') : ''),
         filter_introns => ($self->o('filter_introns') ? '-filter_introns' : ''),
         platinum => ($self->o('platinum') ? '-platinum' : ''),
         die_locked => ($self->o('die_locked') ? '-die_locked' : ''),
