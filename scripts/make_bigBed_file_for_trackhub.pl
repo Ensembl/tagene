@@ -81,6 +81,7 @@ foreach my $slice (sort {
                             $a->seq_region_name cmp $b->seq_region_name;
                           }
                         }
+                   grep { $_->coord_system->is_default }
               @{$sa->fetch_all('toplevel', undef, 0, 1)}){
 
   print $slice->seq_region_name."...";
