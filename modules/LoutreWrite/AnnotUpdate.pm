@@ -223,10 +223,13 @@ print "SUBMODE: $submode\n";
                         DBTR:foreach my $db_tr_id (keys %tr_comp){
                             if ($tr_comp{$db_tr_id}->{'exon'} == 1){
                                 if ($tr_comp{$db_tr_id}->{'merge'} == 1){
-                                    my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
+                                    my ($db_tr) = grep {$_->stable_id and $_->stable_id eq $db_tr_id} @{$db_gene->get_all_Transcripts};
+                                    #Commented out as this will fetch the transcript from the database, ignoring modifications done in this session and not stored yet
+                                    #my $db_tr = $dba->get_TranscriptAdaptor->fetch_by_stable_id($db_tr_id);
                                     unless ($db_tr){ #if not found, probably because it doesn't have a stable id yet, fetch it using the transcript name
                                         $db_tr = fetch_from_gene_by_transcript_name($db_tr_id, $db_gene);
                                     }
+                                    #
                                     #Do not merge with MANE transcripts
                                     if (scalar grep {$_->value eq "MANE_select" or $_->value eq "MANE_plus_clinical"} @{$db_tr->get_all_Attributes('remark')}){
                                         print "Skipping transcript as partially redundant with a MANE transcript\n";
@@ -972,7 +975,7 @@ sub pick_db_tr {
             $max_n_introns = $shared_intron_count;
         }
         elsif ($shared_intron_count == $max_n_introns){
-            push(@best_candidates, $db_tr);        
+            push(@best_candidates, $db_tr);
         }
     }
     #If only one, pick it
@@ -986,14 +989,16 @@ sub pick_db_tr {
         }
         my %tr_loc; #Store genomic positions of transcript's exons
         foreach my $exon (@{$tr->get_all_Exons}){
+          print "TR EXON: ".$exon->seq_region_start."-".$exon->seq_region_end."\n";
             for (my $i = $exon->seq_region_start; $i <= $exon->seq_region_end; $i++){
                 $tr_loc{$i} = 1;
             }
         }
         my $max = 0;
         foreach my $db_tr (@best_candidates){
-            my %seen; #Store genomic positions where novel transcript's exons overlaps database transcript's exons
+            my %seen; #Store genomic positions where novel transcript's exons overlap database transcript's exons
             foreach my $db_exon (@{$db_tr->get_all_Exons}){
+              print "DB_TR EXON: ".$db_exon->seq_region_start."-".$db_exon->seq_region_end."\n";
                 for (my $i = $db_exon->seq_region_start; $i <= $db_exon->seq_region_end; $i++){
                     if ($tr_loc{$i}){
                         $seen{$i} = 1;
