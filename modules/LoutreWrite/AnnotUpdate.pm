@@ -905,40 +905,69 @@ sub exon_novelty {
 
  Arg[1]    : Bio::Vega::Transcript object (novel transcript)
  Arg[2]    : Bio::Vega::Transcript object (database transcript)
- Function  : Returns true if transcripts can be merged, i.e. they have exon-exon overlap but no exon-intron overlap
+ Function  : Returns true if transcripts can be merged, i.e. they have exon-exon overlap but no exon-intron overlap.
+             If both transcripts are multi-exonic, they must share at least an intron.
  Returntype: Boolean
 
 =cut
 
 sub can_be_merged {
-    my ($tr, $db_tr) = @_;
-    my $ex_ovlp = 0;
-    EX:foreach my $exon (@{$tr->get_all_Exons}){
-        #Exon-exon overlap: required
-        foreach my $db_exon (@{$db_tr->get_all_Exons}){
-            if ($exon->seq_region_start <= $db_exon->seq_region_end and $exon->seq_region_end >= $db_exon->seq_region_start){
-                $ex_ovlp = 1;
-            }
-        }
-        #Exon-intron overlap: not allowed
-        foreach my $db_intron (@{$db_tr->get_all_Introns}){
-            if ($exon->seq_region_start <= $db_intron->seq_region_end and $exon->seq_region_end >= $db_intron->seq_region_start){
-              return 0;
-            }
-        }
+  my ($tr, $db_tr) = @_;
+    
+  #Exon-exon overlap: required
+  my $exon_ovlp = 0;
+  EXON:foreach my $exon (@{$tr->get_all_Exons}){
+    foreach my $db_exon (@{$db_tr->get_all_Exons}){
+      if ($exon->seq_region_start <= $db_exon->seq_region_end and $exon->seq_region_end >= $db_exon->seq_region_start){
+        $exon_ovlp = 1;
+        last EXON;
+      }
     }
-    #Intron-exon overlap: not allowed
-    INT:foreach my $intron (@{$tr->get_all_Introns}){
-        foreach my $db_exon (@{$db_tr->get_all_Exons}){
-            if ($intron->seq_region_start <= $db_exon->seq_region_end and $intron->seq_region_end >= $db_exon->seq_region_start){
-                return 0;
-            }
-        }
+  }
+  unless ($exon_ovlp){
+    return 0;
+  }
+    
+  #Exon-intron overlap: not allowed
+  foreach my $intron (@{$tr->get_all_Introns}){
+    foreach my $db_exon (@{$db_tr->get_all_Exons}){
+      if ($intron->seq_region_start <= $db_exon->seq_region_end and $intron->seq_region_end >= $db_exon->seq_region_start){
+        return 0;
+      }
     }
-    if ($ex_ovlp == 1){
+  }
+  foreach my $db_intron (@{$db_tr->get_all_Introns}){
+    foreach my $exon (@{$tr->get_all_Exons}){
+      if ($db_intron->seq_region_start <= $exon->seq_region_end and $db_intron->seq_region_end >= $exon->seq_region_start){
+        return 0;
+      }
+    }
+  }
+  
+  #Intron match required if both are multi-exonic transcripts
+  my $intron_match = 0;
+  INTRON:foreach my $intron (@{$tr->get_all_Introns}){
+    foreach my $db_intron (@{$db_tr->get_all_Introns}){
+      if ($intron->seq_region_start == $db_intron->seq_region_start and $intron->seq_region_end >= $db_intron->seq_region_end){
+        $intron_match = 1;
+        last INTRON;
+      }
+    }
+  }
+
+  if ($exon_ovlp == 1){
+    if (scalar @{$tr->get_all_Introns} and scalar @{$db_tr->get_all_Introns}){
+      if ($intron_match){
+        return 1;
+      }
+      else{
+        return 0;
+      }
+    }
+    else{
       return 1;
     }
-    return 0;
+  }
 }
 
 
