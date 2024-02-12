@@ -392,12 +392,13 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
             #else{
             #    $mode = "add";
             #}
-            if ($new_gene_obj->stable_id =~ /^ENS/){
+            if ($new_gene_obj->stable_id =~ /^ENS([A-Z]{3})?G/){
                 $mode = "update";
             }
             else{
                 $mode = "add";
-            }        
+                $new_gene_obj->stable_id(undef); #reset stable id if any (eg. tmp_XXX)
+            }
             my $novel_gene = $new_gene_obj->stable_id ? 0 : 1;
             print "\nMODE: $mode\n";
             my ($msg, $log) = LoutreWrite::AnnotUpdate->process_gene_2($new_gene_obj, $mode, "aggr", $dataset_name, $otter_dba, $no_intron_check, $use_comp_pipe_biotype, $no_NFV, $do_not_add_cds, $platinum);
