@@ -52,10 +52,13 @@ close (G);
 
 mkdir($assembly_version);
 
+my ($annot_filename) = $annot_file =~ /\/(\w+.bb)$/;
+my ($input_filename) = $input_file =~ /\/(\w+.bb)$/;
+
 open (T, ">$assembly_version/trackDb.txt") or die "Can't open trackDb.txt: $!";
 print T "track TAGENE_annotation\n".
         "type bigBed 12 + 10\n".
-        "bigDataUrl $annot_file\n".
+        "bigDataUrl ../data/$annot_filename\n".
         "shortLabel havana_annotation\n".
         "longLabel Havana + TAGENE annotation\n".
         "noScoreFilter on\n".
@@ -64,7 +67,7 @@ print T "track TAGENE_annotation\n".
         
 print T "track input_annotation\n".
         "type bigBed 12 + 6\n".
-        "bigDataUrl $input_file\n".
+        "bigDataUrl ../data/$input_filename\n".
         "shortLabel input_annotation\n".
         "longLabel Input gene annotation\n".
         "noScoreFilter on\n".
