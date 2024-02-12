@@ -132,7 +132,9 @@ system("LC_COLLATE=C sort -k1,1 -k2,2n $outfile.bed > $outfile.sorted.bed");
 
 #Get chromosome size file
 my $ucsc_name = $meta_container->single_value_by_key('assembly.ucsc_alias');
-system("wget https://hgdownload.soe.ucsc.edu/goldenPath/$ucsc_name/bigZips/$ucsc_name.chrom.sizes");
+unless (-e "$ucsc_name.chrom.sizes"){
+  system("wget https://hgdownload.soe.ucsc.edu/goldenPath/$ucsc_name/bigZips/$ucsc_name.chrom.sizes");
+}
 
 #Create bigGenePred definition file
 my $bgp_def_file = "genes.as";
@@ -192,7 +194,7 @@ sub is_tagene {
 sub is_created_on_date {
   my ($transcript, $date) = @_;
   my $created_date = strftime("%Y%m%d", localtime($transcript->created_date));
-  if ($created_date eq $date){
+  if ($created_date ge $date){
     return 1;
   }
   return 0;
@@ -202,7 +204,7 @@ sub is_created_on_date {
 sub is_modified_on_date {
   my ($transcript, $date) = @_;
   my $modified_date = strftime("%Y%m%d", localtime($transcript->modified_date));
-  if ($modified_date eq $date){
+  if ($modified_date ge $date){
     return 1;
   }
   return 0;
