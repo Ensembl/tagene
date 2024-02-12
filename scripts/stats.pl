@@ -11,10 +11,12 @@ $| = 1;
 my $dataset_name;
 my $outfile;
 my $date;
+my $remark;
 
 &GetOptions(
             'dataset=s'  => \$dataset_name,
             'date=s'     => \$date,
+            'remark=s'   => \$remark,
             'out=s'      => \$outfile,
             );
 
@@ -75,7 +77,7 @@ my $multiple_tagene_ms_count = 0;
 foreach my $slice (@{$sa->fetch_all("toplevel")}){
   print $slice->seq_region_name."...";
   foreach my $gene (@{$slice->get_all_Genes}){
-    next unless $gene->source =~ /havana/;
+    next unless $gene->source =~ /ensembl|havana/;
     my $gene_modif_date = Bio::EnsEMBL::Utils::ConversionSupport->date_format($gene->modified_date, "%y-%m-%d");
     if ($date){
       next unless $gene_modif_date ge $date;
@@ -102,32 +104,35 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
       if (scalar(@{$gene->get_all_Transcripts}) == 1 and scalar(@{$transcript->get_all_Exons}) == 1){
         $is_single_exon_gene = 1;
       }
-      foreach my $att (@{$transcript->get_all_Attributes}){
-        #Was the transcript created or extended by the TAGENE pipeline?
-        if ($att->code eq "remark" and $att->value eq "TAGENE_transcript"
-            and $transcript->transcript_author->name eq "tagene"){
-          $is_tagene = 1;
-          if ($date and 
-              Bio::EnsEMBL::Utils::ConversionSupport->date_format($transcript->modified_date, "%y-%m-%d") lt $date){
-            $is_tagene = 0;
-          }
-        }
+      #Was the transcript created or extended by the TAGENE pipeline?
+      if (scalar grep {$_->value eq "TAGENE_transcript"} @{$transcript->get_all_Attributes('remark')} and $transcript->transcript_author->name eq "tagene"){
+        $is_tagene = 1;
       }
+      #Check modification date if provided
+      if ($date and Bio::EnsEMBL::Utils::ConversionSupport->date_format($transcript->modified_date, "%y-%m-%d") lt $date){
+        $is_tagene = 0;
+      }
+      #Check TAGENE run remark if provided
+      if ($remark and scalar(grep {$_->value eq $remark} @{$transcript->get_all_Attributes('remark')}) == 0){
+        $is_tagene = 0;
+      }
+      
       if ($is_tagene){
         foreach my $att (@{$transcript->get_all_Attributes}){
           #Increase the count of different long read models that made up the transcript
-          if ($att->code eq "hidden_remark" and $att->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_|PB)/){
+          if ($att->code eq "hidden_remark" and $att->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_|PB|anchIC)/){
             $tagene_models++;
           }
           #Increase the count of different long read datasets involved in making the transcript
           if ($att->code eq "remark" and 
-              ($att->value =~ /^Assembled from PacBio CLS reads - .+\(GSE93848\)$/ or 
-               $att->value eq "Assembled from PacBio CLS3 reads" or
-               $att->value eq "Assembled from SLRseq reads (SRP049776)" or 
-               $att->value eq "Assembled from RACEseq reads" or
-               $att->value =~ /^Assembled from LRGASP.+reads.+/ or
-               $att->value =~ /^Assembled from PacBio reads/
-              )){
+              #($att->value =~ /^Assembled from PacBio CLS reads - .+\(GSE93848\)$/ or 
+               #$att->value eq "Assembled from PacBio CLS3 reads" or
+               #$att->value eq "Assembled from SLRseq reads (SRP049776)" or 
+               #$att->value eq "Assembled from RACEseq reads" or
+               #$att->value =~ /^Assembled from LRGASP.+reads.+/ or
+               #$att->value =~ /^Assembled from PacBio reads/
+               $att->value =~ /Assembled from (.+) reads/
+              ){
             $tagene_datasets++;
             my ($dataset) = $att->value =~ /Assembled from (.+) reads/;
             $tsources{$dataset}++;
@@ -156,7 +161,7 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
                      $att->value =~ /^Assembled from PacBio reads/ 
                      ) or
                     ($att->code eq "remark" and $att->value eq "not for VEGA") or
-                    ($att->code eq "hidden_remark" and $att->value =~ /^ID: .+(align|compmerge|NAM_TM)/) or
+                    ($att->code eq "hidden_remark" and $att->value =~ /^ID:.+(align|compmerge|NAM_TM|anchIC)/) or
                     ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq/) or
                     ($att->code eq "hidden_remark" and $att->value =~ /^SLR-seq/) or
                     ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_raceseq/) or
@@ -180,7 +185,7 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
         }
         if ($tagene_models > 1){
           $multiple_tagene_ms_count++; 
-          print "MULTI: ".$transcript->stable_id."\n";
+          #print "MULTI: ".$transcript->stable_id."\n";
         }
         #Extended existing one? - look at evidence list
         if (scalar @{$transcript->evidence_list} or $extended_flag == 1){
@@ -230,7 +235,7 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
                         ($extended_flag ? "extended" : "novel"),
                         join(", ", keys %tsources),
                         scalar(@{$transcript->get_all_Attributes('cds_end_NF')}) ? "cds_end_NF" : "NA",
-                        join(", ", map {$_->value} grep {$_->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_|PB)/} @{$transcript->get_all_Attributes('hidden_remark')}),
+                        join(", ", map {$_->value} grep {$_->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_|PB|anchIC)/} @{$transcript->get_all_Attributes('hidden_remark')}),
                         $is_unique_cds,
                         ($tn_length || "NA"),
                         scalar(@{$transcript->get_all_Exons}),

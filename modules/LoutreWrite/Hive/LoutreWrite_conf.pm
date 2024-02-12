@@ -394,6 +394,7 @@ sub pipeline_analyses {
         cmd => 'perl #stats_script#'     
           .' -dataset '.$self->o('dataset')
           .' -date '.$self->o('date')
+          .' -remark "'.$self->o('remark').'"'
           .' -out #output_file#',
         stats_script => $self->o('db_stats_script'),
         output_file => catfile($self->o('output_dir'), join('_', 'db', 'stats', $self->o('dataset'), $self->o('date'))),
