@@ -33,10 +33,10 @@ sub get_havana_db_adaptor {
   my $user = 'ensro';
   my $dbname = "havana_".$SPECIES;
   if ($SPECIES eq "human"){
-    $host = 'mysql-ens-havana-prod-2';
-    $port = 4682;
-    #$dbname = "havana_".$SPECIES."_backup";
-    $dbname = "havana_".$SPECIES."_tagene_test_1"; #temporarily to avoid failures when the backup database is being updated
+  #  $host = 'mysql-ens-havana-prod-2';
+  #  $port = 4682;
+  #  $dbname = "havana_".$SPECIES."_backup";
+    #$dbname = "havana_".$SPECIES."_tagene_test_1"; #temporarily to avoid failures when the backup database is being updated
   }
   elsif ($SPECIES eq "rat"){
     $dbname = "havana_rattus_norvegicus";
