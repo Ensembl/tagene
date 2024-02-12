@@ -135,7 +135,7 @@ sub exonerate_support {
 sub is_novel {
   my $intron = shift;
   my $chr = $intron->seq_region_name;
-  my $sa = $DBA{'otter'}->get_SliceAdaptor();
+  my $sa = $DBA{'havana'}->get_SliceAdaptor();
   my $intron_slice = $sa->fetch_by_region("toplevel", $chr, $intron->seq_region_start, $intron->seq_region_end);
   foreach my $tr (@{$intron_slice->get_all_Transcripts}){
     if ($tr->source =~ /(ensembl|havana)/ and $tr->biotype ne "artifact" and
@@ -153,7 +153,7 @@ sub is_novel {
 
 sub get_ss_seq {
   my $intron = shift;
-  my $sa = $DBA{'otter'}->get_SliceAdaptor();
+  my $sa = $DBA{'havana'}->get_SliceAdaptor();
   my $intron_slice = $sa->fetch_by_region("toplevel", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
   my $donor = substr($intron_slice->seq, 0, 2);
   my $acceptor = substr($intron_slice->seq, -2);
@@ -171,7 +171,7 @@ sub get_ss_antisense_overlap {
   my @as_exon_overlaps;
   my $padding = 10; #Number of nucleotides each side of the splice site that will define the slices 
   my $donor_as = 0;
-  my $sa = $DBA{'otter'}->get_SliceAdaptor();
+  my $sa = $DBA{'havana'}->get_SliceAdaptor();
   my $donor_slice = $sa->fetch_by_region("toplevel", $intron->seq_region_name, $intron->seq_region_start-$padding, $intron->seq_region_start+$padding-1);
   if (scalar(grep {$_->seq_region_strand != $intron->seq_region_strand} @{$donor_slice->get_all_Exons})){
     $donor_as = 1;
@@ -219,7 +219,7 @@ sub get_processed_pseudogene_overlap {
   my @as_exon_overlaps;
   my $padding = 10; #Number of nucleotides each side of the splice site that will define the slices 
   my $donor_as = 0;
-  my $sa = $DBA{'otter'}->get_SliceAdaptor();
+  my $sa = $DBA{'havana'}->get_SliceAdaptor();
   my $slice = $sa->fetch_by_region("toplevel", $intron->seq_region_name, $intron->seq_region_start-$padding, $intron->seq_region_end+$padding);
   TR:foreach my $tr (@{$slice->get_all_Transcripts}){
     if ($tr->biotype eq "processed_pseudogene"){
@@ -527,7 +527,7 @@ sub parse_vulgar {
 sub add_ss_seq {
   my $coord = shift;
   my ($chr, $start, $end, $strand) = split(/:/, $coord);
-  my $sa = $DBA{'otter'}->get_SliceAdaptor();
+  my $sa = $DBA{'havana'}->get_SliceAdaptor();
   my $intron_slice = $sa->fetch_by_region("toplevel", $chr, $start, $end);
   my $donor = substr($intron_slice->seq, 0, 2);
   my $acceptor = substr($intron_slice->seq, -2);
