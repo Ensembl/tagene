@@ -467,7 +467,7 @@ sub pipeline_analyses {
         trackhub_script => $self->o('trackhub_script'),
         outdir => catdir($self->o('output_dir'), "trackhub"),
         input_file => catfile('#outdir#', "input_annot.bb"),
-        annot_file => catfile('#outdir#', $self->o('dataset')),
+        annot_file => catfile('#outdir#', $self->o('dataset').".bb"),
       },
       -max_retry_count => 0,
       -rc_name => 'default',
