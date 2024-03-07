@@ -28,24 +28,26 @@ my $port = 4581;
 my $user = "ensro";
 my $dbname;
 my $analysis;
+my $read_bed_path;
 my $read_files;
+my $read_list;
 my $outfile;
 
-my $read_bed_path = "/nfs/production/panda/ensembl/havana/jmgonzalez/TAGENE/read_BEDs";
-
 &GetOptions(
-            'in=s'        => \$infile,
-            'host=s'      => \$host,
-            'port=s'      => \$port,
-            'user=s'      => \$user,
-            'dbname=s'    => \$dbname,
-            'analysis=s'  => \$analysis,
-            'readfiles=s' => \$read_files,
-            'out=s'       => \$outfile,
+            'in=s'          => \$infile,
+            'host=s'        => \$host,
+            'port=s'        => \$port,
+            'user=s'        => \$user,
+            'dbname=s'      => \$dbname,
+            'analysis=s'    => \$analysis,
+            'readbedpath=s' => \$read_bed_path,
+            'readfiles=s'   => \$read_files,
+            'readlist=s'    => \$read_list,
+            'out=s'         => \$outfile,
            );
 
 
-
+#Fetch database transcripts
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -host => $host,
     -port => $port,    
@@ -55,11 +57,62 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 my $sa = $db->get_SliceAdaptor();
 my $ta = $db->get_TranscriptAdaptor();
 my @transcripts = @{$ta->fetch_all_by_logic_name($analysis)};
+print "Fetch all transcripts DONE\n";
+
+
+#Read list of selected reads (if any)
+my %selected_reads;
+if ($read_list){
+  open (RL, $read_list) or die "Cant open file $read_list\n";
+  while (<RL>){
+    chomp;
+    my $read = $_;
+    $read =~ s/\//_/g;
+    $selected_reads{$read} = 1;
+  }
+  close (RL);
+}
+print "Select reads DONE\n";
+
+
+#First pass read of source file
+#Needed if the number of reads in the BED files is too large,
+#so as not to store all BED lines in memory
+my %all_source_info; my $x=0;
+open (IN, $infile) or die "Cant open file $infile\n";
+while (<IN>){
+  chomp;
+  my ($transcript_id, $source_info) = read_source_line($_);
+  foreach my $library (keys %$source_info){
+    foreach my $read (keys %{$source_info->{$library}}){
+      #$read =~ s/\//_/g; #Otter issue with '/' in read names
+      if ($read_list){
+        next unless $selected_reads{$read};
+      }
+      $all_source_info{$library}{$read} = 1; $x++;
+    }
+  }
+}
+close (IN);
+print "First pass source file DONE\n$x reads\n";
+
 
 #Store read BED files in memory
-my @read_files = split(",", $read_files);
-my $read_libraries = read_bed_files(\@read_files);
-
+unless (-d $read_bed_path){
+  die "Can't find directory $read_bed_path";
+}
+my @read_files;
+if ($read_files){
+  @read_files = split(",", $read_files);
+}
+else{
+  opendir (my($dh), $read_bed_path) or die "Couldn't open $read_bed_path: $!";
+  @read_files = sort grep {$_ =~ /\.bed(.gz)?$/} readdir $dh;
+  closedir $dh;
+}
+@read_files = map {$read_bed_path."/".$_} @read_files;
+my $read_libraries = read_bed_files(\@read_files, \%all_source_info);
+print "Read BED files DONE\n";
 
 open (OUT, ">$outfile") or die "Can't open $outfile\n";
 
@@ -72,6 +125,9 @@ while (<IN>){
   my $n_reads;
   foreach my $library (keys %$source_info){
     foreach my $read (keys %{$source_info->{$library}}){
+      if ($read_list){
+        next unless $selected_reads{$read};
+      }
       my $read_lines = find_bed_lines($read, $library);
       push(@read_beds, @{$read_lines}); 
       $n_reads++;  
@@ -137,18 +193,36 @@ close (OUT);
 
 
 sub read_bed_files {
-  my $files = shift;
+  my ($files, $s_info) = @_;
+#foreach my $a (keys %{$s_info}){
+#  foreach my $b (keys %{$s_info->{$a}}){
+#    print "$a  $b\n";
+#  }
+#}
+  
   my %libraries;
   foreach my $file (@$files){
-    my $lib_name = basename($file, ".bed.gz");
-    open (BED, "gunzip -dc $file |") or die "Can't open file $file\n";
+    my $lib_name;
+    if ($file =~ /\.bed$/){
+      $lib_name = basename($file, ".bed");
+      open (BED, $file) or die "Can't open file $file\n";
+    }
+    else{
+      $lib_name = basename($file, ".bed.gz"); print "LIB=".$lib_name."\n";
+      open (BED, "gunzip -dc $file |") or die "Can't open file $file\n";
+    }
     while (<BED>){
       chomp;
       my @fs = split(/\t/);
-      my $read_name = $fs[3];
-      push(@{$libraries{$lib_name}{$read_name}}, $_);
+      my $read_name = $fs[3]; #print "Finding $read_name\n";
+      if ($s_info->{$lib_name}{$read_name}){
+        push(@{$libraries{$lib_name}{$read_name}}, $_); #print "Found $read_name\n";
+      }
     }
     close (BED);
+    if ($libraries{$lib_name}){
+      print "Stored ".scalar(keys %{$libraries{$lib_name}})." reads from $lib_name\n";
+    }
   }
   return \%libraries;
 }
@@ -160,7 +234,8 @@ sub read_source_line {
   my %source_info;
   foreach my $item (split(/ ; /, $sources)){
     my ($library, $reads) = split(/ : /, $item);
-    foreach my $read (split(/, /, $reads)){
+    foreach my $read (split(/,/, $reads)){
+      $read =~ s/\//_/g; #Otter issue with '/' in read names
       $source_info{$library}{$read} = 1;  
     }  
   }
@@ -195,7 +270,20 @@ sub make_transcript_from_bed_line {
   my ($chr, $tstart, $tend, $name, $score, $strand, $cstart, $cend, $rgb, $nexons, $elengths, $estarts) = split(/\t/, $line);
   $chr =~ s/^chr//;
   $chr = "MT" if $chr eq "M"; #Some multimappers are aligned to chrM
-  my $slice = $sa->fetch_by_region("toplevel", $chr);
+  my $slice;
+  $slice = $sa->fetch_by_region("toplevel", $chr);
+  unless ($slice){
+    $chr = "chr".$chr;
+    foreach my $sl (@{$sa->fetch_all('toplevel')}){
+      foreach my $synonym (@{$sl->get_all_synonyms('UCSC')}){
+        if ($synonym->name eq $chr){
+          $slice = $sl;
+          last;
+        }
+      }
+    }
+  }
+    
   my @exon_starts = split(/,/, $estarts);
   my @exon_lengths = split(/,/, $elengths);
   for (my $i=0; $i<$nexons; $i++){
@@ -217,6 +305,8 @@ sub are_compatible {
   #The read must fit in the merged model (only exon-exon and intron-intron overlap)
   #Overhangs are allowed: some some reads were truncated because of small terminal exons, so the transcript models
   #can be shorter than the reads (this script uses the original reads)
+  print $read_tr->slice->seq_region_name."\n";
+  print $db_tr->slice->seq_region_name."\n";
   if ($read_tr->slice->seq_region_name ne $db_tr->slice->seq_region_name){
     return 0;
   }
