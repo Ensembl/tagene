@@ -555,8 +555,9 @@ sub assign_host_gene_multi {
     if ($ignored_biotypes){
       %ignored_biotypes = map {$_=>1} split(/,/, $ignored_biotypes);
     }
-    
-    foreach my $gene (@$genes){
+
+    #Sort input genes by decreasing genomic span - hopefully it will improve the host gene assignment
+    foreach my $gene (sort {($b->seq_region_end - $b->seq_region_start) <=> ($a->seq_region_end - $a->seq_region_start)} @$genes){
         #Fetch database genes overlapping our gene
         #Exclude 'not for VEGA' genes, artifact genes, ...
         my @db_genes = @{get_valid_overlapping_genes($gene, 1)};
@@ -566,7 +567,9 @@ sub assign_host_gene_multi {
         my @filt_db_genes;
         foreach my $db_gene (@db_genes){
           if ($db_gene->seq_region_strand == $gene->seq_region_strand){
-            push(@filt_db_genes, $db_gene);
+            unless ($ignored_biotypes{$db_gene->biotype}){
+              push(@filt_db_genes, $db_gene);
+            }
           }
         }
         
@@ -587,11 +590,6 @@ sub assign_host_gene_multi {
                         next;
                     }
                 }
-                #If gene has a biotype in the list of ignored biotypes, skip it
-                if ($ignored_biotypes{$db_gene->biotype}){
-                  next;
-                }
-
                 my $n_introns = 0; #Number of matching introns
                 foreach my $db_intron (sort {$a->start <=> $b->start} @{$db_gene->get_all_Introns}){           
                     foreach my $intron (@{$transcript->get_all_Introns}){
