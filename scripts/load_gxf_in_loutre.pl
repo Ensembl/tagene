@@ -246,7 +246,12 @@ foreach my $go (@$gene_objects){
     print "Gene1 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
   }
 }
-$gene_objects = LoutreWrite::GeneFilter->assign_host_gene_multi($gene_objects, 1);
+#Ignore host genes with the following biotypes, i.e. creating new overlapping lncRNA genes is allowed
+my $ignored_biotype_list = join(",", qw(unprocessed_pseudogene processed_pseudogene transcribed_processed_pseudogene unitary_pseudogene
+                                        transcribed_unprocessed_pseudogene translated_processed_pseudogene pseudogene rRNA_pseudogene transcribed_unitary_pseudogene
+                                        rRNA snRNA misc_RNA snoRNA rRNA_pseudogene miRNA scaRNA ribozyme sRNA scrna macro_lncrna vault_rna srna)
+                                );
+$gene_objects = LoutreWrite::GeneFilter->assign_host_gene_multi($gene_objects, 1, $ignored_biotype_list);
 print "CCCCCC=".scalar(@$gene_objects)."\n";
 foreach my $go (@$gene_objects){
   foreach my $tr (@{$go->get_all_Transcripts}){
