@@ -1515,7 +1515,7 @@ sub assign_biotypes {
                 }
                 elsif ($gene->biotype eq "antisense"){
                     if (scalar keys %other_strand_genes){
-                        $gene->description("novel transcript, antisense to ".join("and ", keys %other_strand_genes)); 
+                        $gene->description("novel transcript, antisense to ".join(" and ", keys %other_strand_genes)); 
                     }
                     else{
                         $gene->description("novel transcript");
@@ -1523,7 +1523,7 @@ sub assign_biotypes {
                 }
                 elsif ($gene->biotype eq "sense_overlapping"){
                     if (scalar keys %intronic_genes){
-                        $gene->description("novel transcript, sense overlapping ".join("and ", keys %intronic_genes));   
+                        $gene->description("novel transcript, sense overlapping ".join(" and ", keys %intronic_genes));   
                     }
                     else{
                         $gene->description("novel transcript");
@@ -1531,7 +1531,7 @@ sub assign_biotypes {
                 }    
                 elsif ($gene->biotype eq "sense_intronic"){
                     if (scalar keys %in_intron_genes){
-                        $gene->description("novel transcript, sense intronic to ".join("and ", keys %in_intron_genes));
+                        $gene->description("novel transcript, sense intronic to ".join(" and ", keys %in_intron_genes));
                     } 
                     else{
                         $gene->description("novel transcript");
