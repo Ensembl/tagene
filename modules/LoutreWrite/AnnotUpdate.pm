@@ -396,10 +396,10 @@ print "SUBMODE: $submode\n";
                           "\n";
                     #If the db_tr was not stored yet (ie. no ENS stable id), its exons will still be on local region slices and the coordinates of the merged transcript will get messed up
                     #Transform the db_tr to toplevel before merging it with the new transcript
-                    unless ($sel_db_tr->stable_id =~ /^ENST/){
+                #    unless ($sel_db_tr->stable_id =~ /^ENST/){
                         $sel_db_tr = $sel_db_tr->transform("toplevel");
                         print "SLICES=".$sel_db_tr->slice->name."  ".join(", ", map {$_->slice->name} @{$sel_db_tr->get_all_Exons})."\n";
-                    }
+                #    }
                     #Merge transcripts
                     my $merged_transcript = merge_transcripts($tr, $sel_db_tr );
                     print "CCC=".$merged_transcript->seq_region_start."-".$merged_transcript->seq_region_end.":".$merged_transcript->seq_region_strand."  ".
