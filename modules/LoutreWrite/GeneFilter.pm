@@ -557,7 +557,7 @@ sub assign_host_gene_multi {
     }
 
     #Sort input genes by decreasing genomic span - hopefully it will improve the host gene assignment
-    foreach my $gene (sort {($b->seq_region_end - $b->seq_region_start) <=> ($a->seq_region_end - $a->seq_region_start)} @$genes){
+    foreach my $gene (sort {$b->length <=> $a->length} @$genes){
         #Fetch database genes overlapping our gene
         #Exclude 'not for VEGA' genes, artifact genes, ...
         my @db_genes = @{get_valid_overlapping_genes($gene, 1)};
@@ -591,13 +591,17 @@ sub assign_host_gene_multi {
                     }
                 }
                 my $n_introns = 0; #Number of matching introns
-                foreach my $db_intron (sort {$a->start <=> $b->start} @{$db_gene->get_all_Introns}){           
+                my %seen_db_introns;
+                foreach my $db_intron (sort {$a->start <=> $b->start} @{$db_gene->get_all_Introns}){
+                    next if $seen_db_introns{$db_intron->seq_region_start."-".$db_intron->seq_region_end};
+                    $seen_db_introns{$db_intron->seq_region_start."-".$db_intron->seq_region_end} = 1;
                     foreach my $intron (@{$transcript->get_all_Introns}){
-                        if ($db_intron->seq_region_start == $intron->start and $db_intron->seq_region_end == $intron->end){
+                        if ($db_intron->seq_region_start == $intron->seq_region_start and $db_intron->seq_region_end == $intron->seq_region_end){
                             $n_introns++;
                         }
                     }
                 }
+          
                 if ($n_introns > $max_n_introns){
                     @candidates = ();
                     push(@candidates, $db_gene);
@@ -607,6 +611,7 @@ sub assign_host_gene_multi {
                     push(@candidates, $db_gene);   
                 }
             }
+
             #If only one host gene with the highest number of matching introns, choose that
             if (scalar(@candidates) == 1){
                 $host_gene = $candidates[0];
@@ -616,6 +621,7 @@ sub assign_host_gene_multi {
                 if (scalar(@candidates) == 0){
                     @candidates = grep {!($_->biotype =~ /pseudogene/)} @filt_db_genes;
                 }
+                my @final_candidates;
                 my %tr_loc; #Store genomic positions of transcript's exons
                 foreach my $exon (@{$transcript->get_all_Exons}){
                     for (my $i = $exon->seq_region_start; $i <= $exon->seq_region_end; $i++){
@@ -624,19 +630,37 @@ sub assign_host_gene_multi {
                 }
                 my $max = 0;
                 foreach my $db_gene (@candidates){
-                    my %seen; #Store genomic positions where transcript's exons overlap host gene's exons
+                    my %seen_pos; #Store genomic positions where transcript's exons overlap host gene's exons
                     foreach my $db_exon (@{$db_gene->get_all_Exons}){
                         for (my $i = $db_exon->seq_region_start; $i <= $db_exon->seq_region_end; $i++){
                             if ($tr_loc{$i}){
-                                $seen{$i} = 1;
+                                $seen_pos{$i} = 1;
                             }
                         }
                     }
-                    if (scalar(keys %seen) > $max){
-                        $host_gene = $db_gene;
-                        $max = scalar(keys %seen);
+                    if (scalar(keys %seen_pos) > $max){
+                        @final_candidates = ($db_gene);
+                        $max = scalar(keys %seen_pos);
                     }
-                }                
+                    elsif (scalar(keys %seen_pos) == $max and $max > 0){
+                       push(@final_candidates, $db_gene);
+                    }
+
+                }
+                if (scalar @final_candidates == 1){
+                  $host_gene = $final_candidates[0];
+                }
+                else{
+                  #If two host genes are tied, prioritise the gene with the oldest ENS stable id
+                  #or the longest gene if none has ENS stable id
+                  if (scalar grep {$_->stable_id =~ /^ENS/} @final_candidates){
+                    ($host_gene) = sort {$a->stable_id cmp $b->stable_id} grep {$_->stable_id =~ /^ENS/} @final_candidates;
+                  }
+                  else{
+                    ($host_gene) = sort {$b->length <=> $a->length} @final_candidates;
+                  }
+                }
+             
             }
             #Store most suitable host gene for the transcript, if any
             my $found = 0;
@@ -718,8 +742,9 @@ sub assign_host_gene_multi {
 sub get_valid_overlapping_genes {
   my ($feat, $incl_self) = @_;
   my @genes = ();
-  my $slice = $feat->slice->adaptor->fetch_by_region("toplevel", $feat->seq_region_name, $feat->start, $feat->end);
+  my $slice = $feat->slice->adaptor->fetch_by_region("toplevel", $feat->seq_region_name, $feat->start, $feat->end); #print "FEAT=".$feat->seq_region_name.":".$feat->start."-".$feat->end."\n";
   foreach my $gene (@{$slice->get_all_Genes}){
+    #print "OVLP=".$gene->stable_id." ".$gene->seq_region_name." ".$gene->seq_region_start."\n";
     if ($gene->seq_region_strand == $feat->strand and
         $gene->source =~ /(ensembl|havana)/ and
         $gene->biotype ne "artifact" and
@@ -733,7 +758,7 @@ sub get_valid_overlapping_genes {
             $transcript->biotype ne "artifact" and
             $transcript->biotype ne "comp_pipe" and        
             scalar (grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')}) == 0){	  
-          push(@genes, $gene);
+          push(@genes, $gene); #print "Adding gene ".$gene->stable_id."\n";
           last TR;
         }
       }
@@ -741,6 +766,92 @@ sub get_valid_overlapping_genes {
   }
   return \@genes;
 }
+
+
+
+=head2 reassign_host_genes
+
+ Arg[1]    : list of Bio::Vega::Gene objects
+ Arg[2]    : include genes from the database
+ Arg[3]    : hashref of allowed biotypes for the host genes
+ Function  : Finds the most suitable gene(s) to host the transcripts of the given genes, taking into account the whole set of transcripts in all genes.
+             This should improve the original gene assignment and minimise the number of overlapping novel genes that should be merged
+ Returntype: list of Bio::Vega::Gene objects
+
+=cut
+
+sub reassign_host_genes {
+  my ($self, $genes, $incl_dbgenes, $allowed_biotypes) = @_;
+
+  #Find mergeable genes (must share a splice site)
+  my %mergeable_genes;
+  my @gene_clusters;
+  foreach my $gene (@$genes){
+    my @other_genes = grep {$_->stable_id ne $gene->stable_id and $_->seq_region_strand == $gene->seq_region_strand} @$genes;
+    if ($incl_dbgenes){
+      push(@other_genes, @{get_valid_overlapping_genes($gene)});
+    }
+    G2:foreach my $gene2 (@other_genes){
+      if (scalar keys %{$allowed_biotypes}){
+        next unless $allowed_biotypes->{$gene2->biotype};
+      }
+      foreach my $transcript (@{$gene->get_all_Transcripts}){
+        foreach my $transcript2 (@{$gene2->get_all_Transcripts}){
+          next if $transcript2->biotype eq "artifact" or $transcript->biotype eq "comp_pipe" or scalar (grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')}); 
+          foreach my $intron (@{$transcript->get_all_Introns}){
+            foreach my $intron2 (@{$transcript2->get_all_Introns}){
+              if ($intron->seq_region_start == $intron2->seq_region_start or $intron->seq_region_end == $intron2->seq_region_end){
+                my $seen = 0;
+                foreach my $cluster (@gene_clusters){
+                  if (grep {$_ eq $gene->stable_id or $_ eq $gene2->stable_id} @{$cluster}){
+                    my @extended = uniq(@{$cluster}, $gene->stable_id, $gene2->stable_id);
+                    $cluster = \@extended;
+                    $seen = 1;
+                  }
+                }
+                unless ($seen){
+                  my @cluster = ($gene->stable_id, $gene2->stable_id);
+                  push(@gene_clusters, \@cluster);
+                }
+                $mergeable_genes{$gene->stable_id}{$gene2->stable_id} = 1;
+                print "MERGEABLE\t".$gene->stable_id."\t".$gene2->stable_id."\n";
+                next G2;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  foreach my $gene_id (keys %mergeable_genes){
+    if (!($gene_id =~ /^ENS/)){ #do not merge an existing gene into another (yet)
+      #if (scalar keys %{$mergeable_genes{$gene_id}} == 1){
+        my ($gene) = grep {$_->stable_id eq $gene_id} @$genes;
+        my ($target_gene_id) = sort {$b cmp $a} keys %{$mergeable_genes{$gene_id}}; #prioritise novel genes (tmp_*) vs existing ones (ENS*)
+        my ($target_gene) = grep {$_->stable_id eq $target_gene_id} @$genes;
+        if ($target_gene){
+          next unless scalar @{$target_gene->get_all_Transcripts}; #do not return transcripts to a gene that was just emptied
+        }
+        print "Merging gene $gene_id into gene $target_gene_id\n";
+        if ($target_gene){
+          foreach my $transcript (@{$gene->get_all_Transcripts}){
+            $target_gene->add_Transcript($transcript);
+          }
+          $gene->flush_Transcripts;
+        }
+        else{
+          $gene->stable_id($target_gene_id);
+        }
+      #}
+    }
+  }
+  #return non-empty genes only
+  @$genes = grep {scalar @{$_->get_all_Transcripts}} @$genes;
+
+  return $genes;
+}
+
 
 
 1;

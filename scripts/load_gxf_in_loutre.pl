@@ -191,7 +191,7 @@ if ($assembly_version){
   }
   $gene_objects = \@transf_genes;
 }
-print "000000=".scalar(@$gene_objects)."\n";
+print "Number of genes (initial) = ".scalar(@$gene_objects)."\n";
 
 #Long artifact transcripts, spanning multiple real loci, make long artificial genes
 unless ($no_artifact_check){
@@ -210,7 +210,7 @@ if ($max_overlapped_loci){
     print "TR2: $tid: max allowed number of overlapped loci exceeded\n";
   }
 }
-print "AAAAAA=".scalar(@$gene_objects)."\n";
+print "Number of genes (after max overlapping loci) =".scalar(@$gene_objects)."\n";
 
 #Remove trancripts that overlap a gene having an unallowed biotype
 if ($no_overlap_biotype){
@@ -221,7 +221,7 @@ if ($no_overlap_biotype){
     print "TR2: $tid: overlapped locus with unallowed biotype\n";
   }
 }
-print "BBBBBB=".scalar(@$gene_objects)."\n";
+print "Number of genes (after unallowed biotype overlap) =".scalar(@$gene_objects)."\n";
 
 #Add source info
 #my $gene_objects_3;
@@ -243,7 +243,7 @@ if ($protected_loci_list and -e $protected_loci_list){
 #Assign host genes
 foreach my $go (@$gene_objects){
   foreach my $tr (@{$go->get_all_Transcripts}){
-    print "Gene1 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
+    print "Gene0 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
   }
 }
 #Ignore host genes with the following biotypes, i.e. creating new overlapping lncRNA genes is allowed
@@ -252,12 +252,41 @@ my $ignored_biotype_list = join(",", qw(unprocessed_pseudogene processed_pseudog
                                         rRNA snRNA misc_RNA snoRNA rRNA_pseudogene miRNA scaRNA ribozyme sRNA scrna macro_lncrna vault_rna srna)
                                 );
 $gene_objects = LoutreWrite::GeneFilter->assign_host_gene_multi($gene_objects, 1, $ignored_biotype_list);
-print "CCCCCC=".scalar(@$gene_objects)."\n";
+print "Number of genes (after 1st round of host assignment) =".scalar(@$gene_objects)."\n";
+foreach my $go (@$gene_objects){
+  foreach my $tr (@{$go->get_all_Transcripts}){
+    print "Gene1 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
+  }
+}
+
+#Assigning transcripts to genes one by one can lead to the creation of several novel genes
+#that are found to overlap after all input transcripts have been added.
+#Improve the host gene assignment, merging novel genes that have exonic overlap.
+#NOTE: a potential problem caused by this is that the transcript that links two genes
+#may be filtered out down the line, so the resulting gene would have a transcript gap.
+$gene_objects = LoutreWrite::GeneFilter->reassign_host_genes($gene_objects);
+print "Number of genes (after 2nd round of host assignment) =".scalar(@$gene_objects)."\n";
 foreach my $go (@$gene_objects){
   foreach my $tr (@{$go->get_all_Transcripts}){
     print "Gene2 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
   }
 }
+
+#Do another round of host gene assignment including transcripts stored in the database
+#that belong to genes with allowed biotypes. This step aims to merge novel genes with
+#existing genes if there is exonic overlap and at least a shared splice site.
+my %allowed_biotypes;
+if ($host_biotype){
+  %allowed_biotypes = map {$_=>1} split(/,/, $host_biotype);
+}
+$gene_objects = LoutreWrite::GeneFilter->reassign_host_genes($gene_objects, 1, \%allowed_biotypes);
+print "Number of genes (after 3rd round of host assignment) =".scalar(@$gene_objects)."\n";
+foreach my $go (@$gene_objects){
+  foreach my $tr (@{$go->get_all_Transcripts}){
+    print "Gene3 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
+  }
+}
+
 
 my $count = 1;
 my $total = scalar(@$gene_objects);
@@ -282,10 +311,7 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
 #    print "Gene3 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
 #  }
 #}
-    my %allowed_biotypes;
-    if ($host_biotype){
-      %allowed_biotypes = map {$_=>1} split(/,/, $host_biotype);
-    }
+
     #GENE:foreach my $new_gene_obj (@$new_gene_objects){
         print "HOST: ".($new_gene_obj->stable_id || "NONE")."\n";
         
