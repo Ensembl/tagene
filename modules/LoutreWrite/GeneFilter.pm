@@ -583,7 +583,7 @@ sub assign_host_gene_multi {
                 #EXPERIMENTAL: exclude pseudogenes so that spliced transcripts are assigned to new (lncRNA) genes
                 if (scalar @{$transcript->get_all_Introns} > 1 and $db_gene->biotype =~ /pseudogene/){
                     next;
-                }
+                }               
                 #If input transcript has a translation, skip non-coding host genes
                 if ($preserve_biotype){
                     if ($transcript->translation and $db_gene->biotype ne "protein_coding"){
@@ -592,12 +592,16 @@ sub assign_host_gene_multi {
                 }
                 my $n_introns = 0; #Number of matching introns
                 my %seen_db_introns;
-                foreach my $db_intron (sort {$a->start <=> $b->start} @{$db_gene->get_all_Introns}){
-                    next if $seen_db_introns{$db_intron->seq_region_start."-".$db_intron->seq_region_end};
-                    $seen_db_introns{$db_intron->seq_region_start."-".$db_intron->seq_region_end} = 1;
-                    foreach my $intron (@{$transcript->get_all_Introns}){
-                        if ($db_intron->seq_region_start == $intron->seq_region_start and $db_intron->seq_region_end == $intron->seq_region_end){
-                            $n_introns++;
+                foreach my $db_transcript (@{$db_gene->get_all_Transcripts}){
+                    next if scalar (grep {$_->value eq "not for VEGA"} @{$db_transcript->get_all_Attributes('remark')});
+                    next if $db_transcript->biotype eq "artifact";
+                    foreach my $db_intron (@{$db_transcript->get_all_Introns}){
+                        next if $seen_db_introns{$db_intron->seq_region_start."-".$db_intron->seq_region_end};
+                        $seen_db_introns{$db_intron->seq_region_start."-".$db_intron->seq_region_end} = 1;
+                        foreach my $intron (@{$transcript->get_all_Introns}){
+                            if ($db_intron->seq_region_start == $intron->seq_region_start and $db_intron->seq_region_end == $intron->seq_region_end){
+                                $n_introns++;
+                            }
                         }
                     }
                 }
@@ -631,10 +635,14 @@ sub assign_host_gene_multi {
                 my $max = 0;
                 foreach my $db_gene (@candidates){
                     my %seen_pos; #Store genomic positions where transcript's exons overlap host gene's exons
-                    foreach my $db_exon (@{$db_gene->get_all_Exons}){
-                        for (my $i = $db_exon->seq_region_start; $i <= $db_exon->seq_region_end; $i++){
-                            if ($tr_loc{$i}){
-                                $seen_pos{$i} = 1;
+                    foreach my $db_transcript (@{$db_gene->get_all_Transcripts}){
+                        next if scalar (grep {$_->value eq "not for VEGA"} @{$db_transcript->get_all_Attributes('remark')});
+                        next if $db_transcript->biotype eq "artifact";
+                        foreach my $db_exon (@{$db_transcript->get_all_Exons}){
+                            for (my $i = $db_exon->seq_region_start; $i <= $db_exon->seq_region_end; $i++){
+                                if ($tr_loc{$i}){
+                                    $seen_pos{$i} = 1;
+                                }
                             }
                         }
                     }
