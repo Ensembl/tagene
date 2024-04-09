@@ -1369,178 +1369,173 @@ sub assign_biotypes {
     
     #Alternative: long non-coding RNA
     if ($gene->biotype ne "protein_coding"){
-        if ($gene->length >= 200){
-            #Get gene slice and overlapping genes
-            my $gene_slice = $gene->slice->adaptor->fetch_by_region("toplevel", $gene->seq_region_name, $gene->start, $gene->end);
-            my @other_genes = grep {$_->stable_id ne $gene->stable_id} @{$gene_slice->get_all_Genes};
-            
-            my $trans_count;
-            my %readthrough;
-            
-            #1-Check same strand
-            my $is_in_intron = 0;
-            my %in_intron_genes;
-            my $has_intronic_genes = 0;
-            my %intronic_genes;
-            
-            #Look at pseudogenes overlapping gene
-            foreach my $other_gene (grep {$_->seq_region_strand == $gene->seq_region_strand} @other_genes){
-                if ($other_gene->biotype =~ /pseudo/){
-                      #last; #?
-                }
-            }
-            
-            #Check for protein-coding genes in introns
-            TRANSCRIPT1:
-            foreach my $transcript (@{$gene->get_all_Transcripts}){
-                $trans_count++;
-                #Set default transcript biotype - can be changed later
-                $transcript->biotype("processed_transcript");
-                #Ignore readthrough transcripts
-                if (scalar grep {$_->code eq "remark" and $_->value eq "readthrough"} @{$transcript->get_all_Attributes} ) {
-                    $readthrough{$transcript->stable_id} = 1;
-                    next TRANSCRIPT1;
-                }
-            
-                foreach my $intron (@{$transcript->get_all_Introns}){
-                    my $intron_slice = $gene->slice->adaptor->fetch_by_region("toplevel", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
-                    my @intron_genes = grep {$_->stable_id ne $gene->stable_id and $_->seq_region_strand == $intron->seq_region_strand} @{$intron_slice->get_all_Genes_by_type("protein_coding")};
-                    foreach my $other_gene (@intron_genes){
-                        #check overlap
-                        if ($other_gene->seq_region_start > $intron->seq_region_start and $other_gene->seq_region_end < $intron->seq_region_end){
-                            $has_intronic_genes = 1;
-                            if (scalar @{$other_gene->get_all_Attributes('name')}){
-                                $intronic_genes{$other_gene->get_all_Attributes('name')->[0]->value} = 1;
-                            }
-                            last TRANSCRIPT1;
-                        }
-                    }
-                }
-            }
-
-            if (scalar keys %readthrough == $trans_count){
-                print "All Read-Throughs!\n";
-                $has_intronic_genes = 0; #check this makes sense 
-            }
-
-            #Check if gene is in a protein-coding gene's intron
-            GENE2:
-            foreach my $other_gene (grep {$_->seq_region_strand == $gene->seq_region_strand and $_->biotype eq "protein_coding"} @other_genes){
-                INTRON:
-                foreach my $other_intron (@{$other_gene->get_all_Introns}){
-                    if ($other_intron->seq_region_start < $gene->seq_region_start and $other_intron->seq_region_end > $gene->seq_region_end){
-                        $is_in_intron = 1;
-                        if (scalar @{$other_gene->get_all_Attributes('name')}){
-                            $in_intron_genes{$other_gene->get_all_Attributes('name')->[0]->value} = 1;
-                        }
-                        last INTRON;
-                    }
-                }
-                #make sure it's not overlapping any other exons
-                foreach my $other_exon (@{$other_gene->get_all_Exons}){
-                    if ($other_exon->seq_region_end >= $gene->seq_region_start and $other_exon->seq_region_start <= $gene->seq_region_end){
-                        $is_in_intron = 0;
-                        last GENE2;
-                    }
-                }
-            }    
-            
-            
-            
-            #2-Check opposite strand
-            #Antisense: transcripts overlapping one or more coding loci on the opposite strand, based on either exonic or intronic sequences.
-            my $has_other_strand_genes = 0;
-            my %other_strand_genes;            
-             
-            foreach my $other_gene (grep {$_->seq_region_strand != $gene->seq_region_strand and $_->biotype eq "protein_coding"} @other_genes){
-                my $has_other_strand_transcripts = 0;
-                TRANSCRIPT3:
-                foreach my $other_trans (@{$other_gene->get_all_Transcripts}){
-                    #ignore non-coding transcripts
-                    if (!($other_trans->coding_region_start and $other_trans->coding_region_end)){
-                        next TRANSCRIPT3;
-                    }
-                    #ignore read-thrus
-                    if (scalar grep {$_->code eq "remark" and $_->value eq "readthrough"} @{$other_trans->get_all_Attributes}){
-                        next TRANSCRIPT3;
-                    }
-                    #check overlap
-                    if ($other_trans->seq_region_end > $gene->start and $other_trans->seq_region_start < $gene->end){
-                        $has_other_strand_transcripts = 1;
-                        last TRANSCRIPT3;
-                    }
-                }
-
-                if ($has_other_strand_transcripts){
-                    $has_other_strand_genes = 1;
-                    if (scalar @{$other_gene->get_all_Attributes('name')}){
-						print $other_gene->stable_id."\n";
-                        $other_strand_genes{$other_gene->get_all_Attributes('name')->[0]->value} = 1;
-                    }
-                }
-            }
-            
+        #Get gene slice and overlapping genes
+        my $gene_slice = $gene->slice->adaptor->fetch_by_region("toplevel", $gene->seq_region_name, $gene->start, $gene->end);
+        my @other_genes = grep {$_->stable_id ne $gene->stable_id} @{$gene_slice->get_all_Genes};
         
-            #Assign biotypes
-            #Add 'overlapping locus' attribute if sense_intronic, sense_overlapping, 3'_overlapping_ncRNA
-            #Antisense takes precedence over any other non-coding biotype with the exception of bidirectional_promoter_lncRNA
-            my $biotype;
-            if ($has_other_strand_genes){
-                $biotype = "antisense";
+        my $trans_count;
+        my %readthrough;
+        
+        #1-Check same strand
+        my $is_in_intron = 0;
+        my %in_intron_genes;
+        my $has_intronic_genes = 0;
+        my %intronic_genes;
+        
+        #Look at pseudogenes overlapping gene
+        foreach my $other_gene (grep {$_->seq_region_strand == $gene->seq_region_strand} @other_genes){
+            if ($other_gene->biotype =~ /pseudo/){
+                  #last; #?
             }
-            elsif ($has_intronic_genes){
-                $biotype = "sense_overlapping";
-                $gene->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'remark', -value => 'overlapping locus'));
+        }
+        
+        #Check for protein-coding genes in introns
+        TRANSCRIPT1:
+        foreach my $transcript (@{$gene->get_all_Transcripts}){
+            $trans_count++;
+            #Set default transcript biotype - can be changed later
+            $transcript->biotype("processed_transcript");
+            #Ignore readthrough transcripts
+            if (scalar grep {$_->code eq "remark" and $_->value eq "readthrough"} @{$transcript->get_all_Attributes} ) {
+                $readthrough{$transcript->stable_id} = 1;
+                next TRANSCRIPT1;
             }
-            elsif ($is_in_intron){
-                $biotype = "sense_intronic";
-                $gene->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'remark', -value => 'overlapping locus'));            
-            }
-            else{
-                $biotype = "lincRNA";
-            }
-            
-            $gene->biotype($biotype);
-            foreach my $transcript (@{$gene->get_all_Transcripts}){
-                $transcript->biotype($biotype);
-            }    
-                
-            #Add gene description, eg.
-            #novel transcript, antisense to ARHGAP1 and DST
-            #novel transcript, sense overlapping XBOX1
-            #novel transcript, sense intronic to RPS3
-            if (!$gene->description){
-                if ($gene->biotype eq "lincRNA"){
-                    $gene->description("novel transcript");
-                }
-                elsif ($gene->biotype eq "antisense"){
-                    if (scalar keys %other_strand_genes){
-                        $gene->description("novel transcript, antisense to ".join(" and ", keys %other_strand_genes)); 
+        
+            foreach my $intron (@{$transcript->get_all_Introns}){
+                my $intron_slice = $gene->slice->adaptor->fetch_by_region("toplevel", $intron->seq_region_name, $intron->seq_region_start, $intron->seq_region_end);
+                my @intron_genes = grep {$_->stable_id ne $gene->stable_id and $_->seq_region_strand == $intron->seq_region_strand} @{$intron_slice->get_all_Genes_by_type("protein_coding")};
+                foreach my $other_gene (@intron_genes){
+                    #check overlap
+                    if ($other_gene->seq_region_start > $intron->seq_region_start and $other_gene->seq_region_end < $intron->seq_region_end){
+                        $has_intronic_genes = 1;
+                        if (scalar @{$other_gene->get_all_Attributes('name')}){
+                            $intronic_genes{$other_gene->get_all_Attributes('name')->[0]->value} = 1;
+                        }
+                        last TRANSCRIPT1;
                     }
-                    else{
-                        $gene->description("novel transcript");
-                    }	               
-                }
-                elsif ($gene->biotype eq "sense_overlapping"){
-                    if (scalar keys %intronic_genes){
-                        $gene->description("novel transcript, sense overlapping ".join(" and ", keys %intronic_genes));   
-                    }
-                    else{
-                        $gene->description("novel transcript");
-                    }             
-                }    
-                elsif ($gene->biotype eq "sense_intronic"){
-                    if (scalar keys %in_intron_genes){
-                        $gene->description("novel transcript, sense intronic to ".join(" and ", keys %in_intron_genes));
-                    } 
-                    else{
-                        $gene->description("novel transcript");
-                    }             
                 }
             }
         }
+
+        if (scalar keys %readthrough == $trans_count){
+            print "All Read-Throughs!\n";
+            $has_intronic_genes = 0; #check this makes sense 
+        }
+
+        #Check if gene is in a protein-coding gene's intron
+        GENE2:
+        foreach my $other_gene (grep {$_->seq_region_strand == $gene->seq_region_strand and $_->biotype eq "protein_coding"} @other_genes){
+            INTRON:
+            foreach my $other_intron (@{$other_gene->get_all_Introns}){
+                if ($other_intron->seq_region_start < $gene->seq_region_start and $other_intron->seq_region_end > $gene->seq_region_end){
+                    $is_in_intron = 1;
+                    if (scalar @{$other_gene->get_all_Attributes('name')}){
+                        $in_intron_genes{$other_gene->get_all_Attributes('name')->[0]->value} = 1;
+                    }
+                    last INTRON;
+                }
+            }
+            #make sure it's not overlapping any other exons
+            foreach my $other_exon (@{$other_gene->get_all_Exons}){
+                if ($other_exon->seq_region_end >= $gene->seq_region_start and $other_exon->seq_region_start <= $gene->seq_region_end){
+                    $is_in_intron = 0;
+                    last GENE2;
+                }
+            }
+        }    
+        
+        
+        
+        #2-Check opposite strand
+        #Antisense: transcripts overlapping one or more coding loci on the opposite strand, based on either exonic or intronic sequences.
+        my $has_other_strand_genes = 0;
+        my %other_strand_genes;            
+         
+        foreach my $other_gene (grep {$_->seq_region_strand != $gene->seq_region_strand and $_->biotype eq "protein_coding"} @other_genes){
+            my $has_other_strand_transcripts = 0;
+            TRANSCRIPT3:
+            foreach my $other_trans (@{$other_gene->get_all_Transcripts}){
+                #ignore non-coding transcripts
+                if (!($other_trans->coding_region_start and $other_trans->coding_region_end)){
+                    next TRANSCRIPT3;
+                }
+                #ignore read-thrus
+                if (scalar grep {$_->code eq "remark" and $_->value eq "readthrough"} @{$other_trans->get_all_Attributes}){
+                    next TRANSCRIPT3;
+                }
+                #check overlap
+                if ($other_trans->seq_region_end > $gene->start and $other_trans->seq_region_start < $gene->end){
+                    $has_other_strand_transcripts = 1;
+                    last TRANSCRIPT3;
+                }
+            }
+
+            if ($has_other_strand_transcripts){
+                $has_other_strand_genes = 1;
+                if (scalar @{$other_gene->get_all_Attributes('name')}){
+        print $other_gene->stable_id."\n";
+                    $other_strand_genes{$other_gene->get_all_Attributes('name')->[0]->value} = 1;
+                }
+            }
+        }
+        
+    
+        #Assign biotypes
+        #Add 'overlapping locus' attribute if sense_intronic, sense_overlapping, 3'_overlapping_ncRNA
+        #Antisense takes precedence over any other non-coding biotype with the exception of bidirectional_promoter_lncRNA
+        my $biotype;
+        if ($has_other_strand_genes){
+            $biotype = "antisense";
+        }
+        elsif ($has_intronic_genes){
+            $biotype = "sense_overlapping";
+            $gene->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'remark', -value => 'overlapping locus'));
+        }
+        elsif ($is_in_intron){
+            $biotype = "sense_intronic";
+            $gene->add_Attributes(new Bio::EnsEMBL::Attribute(-code => 'remark', -value => 'overlapping locus'));            
+        }
         else{
-            #What if gene length < 200bp ?
+            $biotype = "lincRNA";
+        }
+        
+        $gene->biotype($biotype);
+        foreach my $transcript (@{$gene->get_all_Transcripts}){
+            $transcript->biotype($biotype);
+        }    
+            
+        #Add gene description, eg.
+        #novel transcript, antisense to ARHGAP1 and DST
+        #novel transcript, sense overlapping XBOX1
+        #novel transcript, sense intronic to RPS3
+        if (!$gene->description){
+            if ($gene->biotype eq "lincRNA"){
+                $gene->description("novel transcript");
+            }
+            elsif ($gene->biotype eq "antisense"){
+                if (scalar keys %other_strand_genes){
+                    $gene->description("novel transcript, antisense to ".join(" and ", keys %other_strand_genes)); 
+                }
+                else{
+                    $gene->description("novel transcript");
+                }	               
+            }
+            elsif ($gene->biotype eq "sense_overlapping"){
+                if (scalar keys %intronic_genes){
+                    $gene->description("novel transcript, sense overlapping ".join(" and ", keys %intronic_genes));   
+                }
+                else{
+                    $gene->description("novel transcript");
+                }             
+            }    
+            elsif ($gene->biotype eq "sense_intronic"){
+                if (scalar keys %in_intron_genes){
+                    $gene->description("novel transcript, sense intronic to ".join(" and ", keys %in_intron_genes));
+                } 
+                else{
+                    $gene->description("novel transcript");
+                }             
+            }
         }
           
     }
