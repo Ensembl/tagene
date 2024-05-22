@@ -21,7 +21,7 @@ sub new {
 
 sub predict_outcome {
     my ($self, $intron, $transcript, $only_novel) = @_;
-    my $intron_score_cutoff = 25;
+    my $intron_score_cutoff = 50;
     my $rel_score_cutoff = -7;
     my $length_cutoff = 50;
     #my $source;
