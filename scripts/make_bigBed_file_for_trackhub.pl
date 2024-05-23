@@ -54,7 +54,7 @@ my $meta_container = $db->get_MetaContainer();
 my $sa = $db->get_SliceAdaptor();
 my $ta = $db->get_TranscriptAdaptor();
 
-my @sources = ('ensembl', 'havana', 'ensembl_havana'); # fetch only these gene sources from the Havana database
+my @sources = ('ensembl', 'havana', 'ensembl_havana', 'ensembl_havana_tagene', 'havana_tagene', 'mirbase'); # fetch only these gene sources from the Havana database
 
 #Read list of gene stable ids
 my %selected_genes;
