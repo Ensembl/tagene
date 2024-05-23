@@ -90,13 +90,13 @@ foreach my $slice (sort {
       next unless $selected_genes{$gene->stable_id};
     }
     next if $gene->biotype eq "artifact";
-    #next if grep {$_->value eq "not for VEGA"} @{$gene->get_all_Attributes('remark')};
+    next if grep {$_->value eq "not for VEGA"} @{$gene->get_all_Attributes('remark')};
     next unless grep {$_ eq $gene->source} @sources;
     my $mod_num = 1; # number for appending to gene_name (for display in ensembl)
     
     foreach my $transcript (@{$gene->get_all_Transcripts}){
 	    next if $transcript->biotype eq "artifact";
-	    #next if grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')};
+	    next if grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')};
 	    next unless grep {$_ eq $transcript->source} @sources;
 		
 	    #Assign colour based on TAGENE remark and created/modified date
