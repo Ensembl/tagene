@@ -16,6 +16,7 @@ use List::Util qw[min max];
 use List::MoreUtils qw(uniq);
 use LoutreWrite::CDSCreation qw(assign_cds_to_transcripts has_complete_cds);
 use LoutreWrite::Config;
+use LoutreWrite::GeneFilter qw(get_valid_overlapping_genes);
 use base 'Exporter';
 
 our @EXPORT = qw( $WRITE );
@@ -1370,8 +1371,9 @@ sub assign_biotypes {
     #Alternative: long non-coding RNA
     if ($gene->biotype ne "protein_coding"){
         #Get gene slice and overlapping genes
-        my $gene_slice = $gene->slice->adaptor->fetch_by_region("toplevel", $gene->seq_region_name, $gene->start, $gene->end);
-        my @other_genes = grep {$_->stable_id ne $gene->stable_id} @{$gene_slice->get_all_Genes};
+        my @other_genes = @{LoutreWrite::GeneFilter::get_valid_overlapping_genes($gene)};
+        #my $gene_slice = $gene->slice->adaptor->fetch_by_region("toplevel", $gene->seq_region_name, $gene->start, $gene->end);
+        #my @other_genes = grep {$_->stable_id ne $gene->stable_id} @{$gene_slice->get_all_Genes};
         
         my $trans_count;
         my %readthrough;
