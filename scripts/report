@@ -3,35 +3,53 @@
 
 
 echo -e "\nNumber of genes"
-cat $@ | grep ^LOOKING | wc -l
+grep -R ^LOOKING $@ | awk '{print $5}' | sort -u | wc -l
 
 echo -e "\nTranscripts ignored as gene didn't transform to default assembly"
-cat $@ | grep ^TR2 | grep "did not transform" | awk '{print $3}' | sort -u | wc -l
+grep -R ^TR2 $@ | grep "did not transform" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts ignored as overlapping multiple loci"
-cat $@ | grep ^TR2 | grep "max allowed number" | awk '{print $3}' | sort -u | wc -l
+grep -R ^TR2 $@ | grep "max allowed number" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as overlapping locus with unallowed biotype"
+grep -R ^TR2 $@ | grep "overlapped locus with unallowed biotype" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts ignored as host gene biotype not allowed"
-cat $@ | grep ^TR2 | grep "host gene biotype not allowed" | awk '{print $3}' | sort -u | wc -l
+grep -R ^TR2 $@ | grep "host gene biotype not allowed" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as host gene is protected"
+grep -R ^TR2 $@ | grep "host gene is protected" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts rejected as intron didn't pass the filter"
-cat $@ | grep ^TR2 | grep "intron did not pass the filter" | awk '{print $3}' | sort -u | wc -l
+grep -R ^TR2 $@ | grep "intron did not pass the filter" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts rejected as intron chain exists in annotation"
-cat $@ | grep ^TR2 | grep "Rejected" | awk '{print $3}' | sort -u | wc -l
+grep -R ^TR2 $@ | grep -P "Rejected.+as intron chain exists" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts rejected as no exon novelty provided"
+grep -R ^TR2 $@ | grep -P "Rejected.+as no exon novelty" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts rejected as as partially redundant with a coding transcript"
+grep -R ^TR2 $@ | grep -P "Rejected.+as partially redundant with a coding transcript" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts rejected as as partially redundant with a MANE transcript"
+grep -R ^TR2 $@ | grep -P "Rejected.+as partially redundant with a MANE transcript" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts skipped as clones could not be unlocked"
-cat $@ | grep "could not be unlocked" | wc -l
+grep -R ^TR2 $@ | grep "Transcript slice could not be unlocked" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts could not be processed because of an error"
+grep -R ^TR2 $@ | grep "Transcript could not be processed because of an error" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts added (novel)"
-cat $@ | grep ^TR2 | grep "Added" | awk '{print $3}' | sort -u | wc -l
+grep -R ^TR2 $@ | grep "Added" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts extended"
-cat $@ | grep ^TR2 | grep "Extended" | awk '{print $3}' | sort -u | wc -l
+grep -R ^TR2 $@ | grep "Extended" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nNovel genes"
-cat $@ | grep -P "RESULT: novel gene .+ was created" | wc -l
+grep -R -P "RESULT: novel gene .+ was created" $@ | wc -l
 
 echo -e "\nModified genes"
-cat $@ | grep -P "RESULT: gene .+ was modified" | sort -u | wc -l 
+grep -R -P "RESULT: gene .+ was modified" $@ | sort -u | wc -l 
 

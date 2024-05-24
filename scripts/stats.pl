@@ -11,31 +11,43 @@ $| = 1;
 my $dataset_name;
 my $outfile;
 my $date;
+my $remark;
 
 &GetOptions(
             'dataset=s'  => \$dataset_name,
             'date=s'     => \$date,
+            'remark=s'   => \$remark,
             'out=s'      => \$outfile,
             );
 
 open (OUT, ">$outfile") or die "Can't open $outfile:$!";
 open (EXT, ">$outfile.tsv") or die "Can't open $outfile.tsv:$!";
 
-print OUT join("\t", "gene_id",
+print OUT join("\t", "chromosome",
+                     "start",
+                     "end",
+                     "strand",
+                     "gene_id",
                      "gene_symbol",
                      "gene_biotype",
                      "modified_date",
-                     "",
+                     "new/modified",
+                     "single_exon",
                      "novel_transcripts",
                      "extended_transcripts",
                      "transcript_info",
                      "data_source",
               )."\n";
 
-print EXT join("\t", "gene_id",
+print EXT join("\t", "chromosome",
+                     "start",
+                     "end",
+                     "strand",
+                     "gene_id",
                      "gene_symbol",
                      "gene_biotype",
                      "transcript_id",
+                     "transcript_name",
                      "transcript_biotype",
                      "previous_transcript_biotype",
                      "novel/extended",
@@ -44,6 +56,7 @@ print EXT join("\t", "gene_id",
                      "model_name",
                      "unique_CDS?",
                      "translation_length",
+                     "exon_count"
               )."\n";
 
 #Connect to loutre database
@@ -55,15 +68,16 @@ my $sa = $otter_dba->get_SliceAdaptor();
 
 
 my $new_gene_count = 0;
+my $new_se_gene_count = 0;
 my $modified_gene_count = 0;
 my $added_tr_count = 0;
 my $extended_tr_count = 0;
 my $multiple_tagene_ds_count = 0;
 my $multiple_tagene_ms_count = 0;
-foreach my $slice (@{$sa->fetch_all("chromosome")}){
+foreach my $slice (@{$sa->fetch_all("toplevel")}){
   print $slice->seq_region_name."...";
   foreach my $gene (@{$slice->get_all_Genes}){
-    next unless $gene->source =~ /havana/;
+    next unless $gene->source =~ /ensembl|havana/;
     my $gene_modif_date = Bio::EnsEMBL::Utils::ConversionSupport->date_format($gene->modified_date, "%y-%m-%d");
     if ($date){
       next unless $gene_modif_date ge $date;
@@ -79,6 +93,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
     my $extended_c = 0; #Extended by TAGENE pipeline
     my $pre_c = 0; #Pre-existing transcript, not extended by TAGENE pipeline
     my $is_tagene_gene = 0; #Has a TAGENE transcript
+    my $is_single_exon_gene = 0;
     my %report;
     foreach my $transcript (@{$gene->get_all_Transcripts}){
       my $is_tagene = 0;
@@ -86,29 +101,39 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
       my $tagene_models = 0;
       my $extended_flag = 0;
       my %tsources;
-      foreach my $att (@{$transcript->get_all_Attributes}){
-        #Was the transcript created or extended by the TAGENE pipeline?
-        if ($att->code eq "remark" and $att->value eq "TAGENE_transcript"
-            and $transcript->transcript_author->name eq "tagene"){
-          $is_tagene = 1;
-          if ($date and 
-              Bio::EnsEMBL::Utils::ConversionSupport->date_format($transcript->modified_date, "%y-%m-%d") lt $date){
-            $is_tagene = 0;
-          }
-        }
+      if (scalar(@{$gene->get_all_Transcripts}) == 1 and scalar(@{$transcript->get_all_Exons}) == 1){
+        $is_single_exon_gene = 1;
       }
+      #Was the transcript created or extended by the TAGENE pipeline?
+      if (scalar grep {$_->value eq "TAGENE_transcript"} @{$transcript->get_all_Attributes('remark')} and $transcript->transcript_author->name eq "tagene"){
+        $is_tagene = 1;
+      }
+      #Check modification date if provided
+      if ($date and Bio::EnsEMBL::Utils::ConversionSupport->date_format($transcript->modified_date, "%y-%m-%d") lt $date){
+        $is_tagene = 0;
+      }
+      #Check TAGENE run remark if provided
+      if ($remark and scalar(grep {$_->value eq $remark} @{$transcript->get_all_Attributes('remark')}) == 0){
+        $is_tagene = 0;
+      }
+      
       if ($is_tagene){
         foreach my $att (@{$transcript->get_all_Attributes}){
           #Increase the count of different long read models that made up the transcript
-          if ($att->code eq "hidden_remark" and $att->value =~ /^ID: .+(align|compmerge|NAM_TM)/){
+          if ($att->code eq "hidden_remark" and $att->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_|PB|anchIC)/){
             $tagene_models++;
           }
           #Increase the count of different long read datasets involved in making the transcript
           if ($att->code eq "remark" and 
-              ($att->value =~ /^Assembled from PacBio CLS reads - .+\(GSE93848\)$/ or 
-               $att->value eq "Assembled from PacBio CLS3 reads" or
-               $att->value eq "Assembled from SLRseq reads (SRP049776)" or 
-               $att->value eq "Assembled from RACEseq reads")){
+              #($att->value =~ /^Assembled from PacBio CLS reads - .+\(GSE93848\)$/ or 
+               #$att->value eq "Assembled from PacBio CLS3 reads" or
+               #$att->value eq "Assembled from SLRseq reads (SRP049776)" or 
+               #$att->value eq "Assembled from RACEseq reads" or
+               #$att->value =~ /^Assembled from LRGASP.+reads.+/ or
+               #$att->value =~ /^Assembled from PacBio reads/
+               $att->value =~ /Assembled from (.+) reads/ or
+               $att->value eq "CLS3 project"
+              ){
             $tagene_datasets++;
             my ($dataset) = $att->value =~ /Assembled from (.+) reads/;
             $tsources{$dataset}++;
@@ -132,9 +157,13 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
                     ($att->value =~ /^Assembled from PacBio CLS reads -.+\(GSE93848\)$/ or 
                      $att->value eq "Assembled from PacBio CLS3 reads" or
                      $att->value eq "Assembled from SLRseq reads (SRP049776)" or 
-                     $att->value eq "Assembled from RACEseq reads")) or
+                     $att->value eq "Assembled from RACEseq reads" or
+                     $att->value =~ /^Assembled from LRGASP.+reads.+/) or
+                     $att->value =~ /^Assembled from PacBio reads/ or
+                     $att->value eq "CLS3 project"
+                     ) or
                     ($att->code eq "remark" and $att->value eq "not for VEGA") or
-                    ($att->code eq "hidden_remark" and $att->value =~ /^ID: .+(align|compmerge|NAM_TM)/) or
+                    ($att->code eq "hidden_remark" and $att->value =~ /^ID:.+(align|compmerge|NAM_TM|anchIC)/) or
                     ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_capture_seq/) or
                     ($att->code eq "hidden_remark" and $att->value =~ /^SLR-seq/) or
                     ($att->code eq "hidden_remark" and $att->value =~ /^pacbio_raceseq/) or
@@ -158,7 +187,7 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
         }
         if ($tagene_models > 1){
           $multiple_tagene_ms_count++; 
-          print "MULTI: ".$transcript->stable_id."\n";
+          #print "MULTI: ".$transcript->stable_id."\n";
         }
         #Extended existing one? - look at evidence list
         if (scalar @{$transcript->evidence_list} or $extended_flag == 1){
@@ -193,18 +222,25 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
           }
         }
         
-        print EXT join("\t", $gene->stable_id, 
-                           ($gene->get_all_Attributes('name')->[0]->value || "NA"),
-                           $gene->biotype, 
-                           $transcript->stable_id, 
-                           $transcript->biotype,
-                           (previous_biotype($transcript) || "NA"),
-                           ($extended_flag ? "extended" : "novel"),
-                           join(", ", keys %tsources),
-                           scalar(@{$transcript->get_all_Attributes('cds_end_NF')}) ? "cds_end_NF" : "NA",
-                           join(", ", map {$_->value} grep {$_->value =~ /^ID: .+(align|compmerge|NAM_TM)/} @{$transcript->get_all_Attributes('hidden_remark')}),
-                           $is_unique_cds,
-                           ($tn_length || "NA")
+        print EXT join("\t",
+                        $transcript->seq_region_name,
+                        $transcript->seq_region_start,
+                        $transcript->seq_region_end,
+                        $transcript->seq_region_strand,
+                        $gene->stable_id, 
+                        ($gene->get_all_Attributes('name')->[0]->value || "NA"),
+                        $gene->biotype, 
+                        $transcript->stable_id,
+                        ($transcript->get_all_Attributes('name')->[0]->value || "NA"),
+                        $transcript->biotype,
+                        (previous_biotype($transcript) || "NA"),
+                        ($extended_flag ? "extended" : "novel"),
+                        join(", ", keys %tsources),
+                        scalar(@{$transcript->get_all_Attributes('cds_end_NF')}) ? "cds_end_NF" : "NA",
+                        join(", ", map {$_->value} grep {$_->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_|PB|anchIC|anchUC)/} @{$transcript->get_all_Attributes('hidden_remark')}),
+                        $is_unique_cds,
+                        ($tn_length || "NA"),
+                        scalar(@{$transcript->get_all_Exons}),
                       )."\n";
       
       }
@@ -213,6 +249,9 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
       if ($added_c > 0 and $extended_c == 0 and $pre_c == 0){
         $new_gene_count++;
         $report{$gene->stable_id} = "new";
+        if ($is_single_exon_gene){
+          $new_se_gene_count++;
+        }
       }
       else{
         $modified_gene_count++;
@@ -222,20 +261,28 @@ foreach my $slice (@{$sa->fetch_all("chromosome")}){
     $added_tr_count += $added_c;
     $extended_tr_count += $extended_c;
     if (scalar keys %report){
-      print OUT join(", ", map {$_} grep {/ENS(MUS)?G|OTT(HUM|MUS)G/} keys %report)."\t".
-                ($gene->get_all_Attributes('name')->[0]->value || " ")."\t".
-                $gene->biotype."\t".
-                $gene_modif_date."\t".
-                join(", ", map {$report{$_}} grep {/ENS(MUS)?G/} keys %report)."\t".
-                scalar(grep {/novel/} values(%report))."\t". 
-                scalar(grep {/extended/} values(%report))."\t". 
-                join(", ", map {$_.":".$report{$_}} grep {/ENS(MUS)?T/} keys %report)."\t". 
-                join(", ", keys %{$report{'sources'}})."\n";
+      print OUT join("\t",
+                  $gene->seq_region_name,
+                  $gene->seq_region_start,
+                  $gene->seq_region_end,
+                  $gene->seq_region_strand,
+                  join(", ", map {$_} grep {/ENS([A-Z]{3})?G|OTT([A-Z]{3})G/} keys %report),
+                  ($gene->get_all_Attributes('name')->[0]->value || " "),
+                  $gene->biotype,
+                  $gene_modif_date,
+                  join(", ", map {$report{$_}} grep {/ENS([A-Z]{3})?G/} keys %report),
+                  ($is_single_exon_gene ? "yes" : "no"),
+                  scalar(grep {/novel/} values(%report)),
+                  scalar(grep {/extended/} values(%report)),
+                  join(", ", map {$_.":".$report{$_}} grep {/ENS([A-Z]{3})?T/} keys %report),
+                  join(", ", keys %{$report{'sources'}})
+                )."\n";
     }
   }
 }
 
 print OUT "\nNew genes: $new_gene_count\n".
+          "New single exon genes: $new_se_gene_count\n".
           "Modified genes: $modified_gene_count\n".
           "Novel transcripts: $added_tr_count\n".
           "Extended transcripts: $extended_tr_count\n".

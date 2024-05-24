@@ -11,7 +11,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use LoutreWrite::Default qw( exon_novelty intron_novelty can_be_merged merge_transcripts $OTTER_DBA $OTTER_SA $WRITE );
+use LoutreWrite::AnnotUpdate qw( exon_novelty intron_novelty can_be_merged merge_transcripts $OTTER_DBA $OTTER_SA $WRITE );
 use Bio::Otter::Lace::Defaults;
 use Bio::Otter::Server::Config;
 use Bio::EnsEMBL::Attribute;
@@ -187,7 +187,7 @@ while (<IN>){
         $local_server->authorized_user($gene->gene_author->name); # preserve authorship
         my $n = 0;
         while (($g_msg eq " " or $g_msg =~ /write failed/) and $n<10){
-            $g_msg = LoutreWrite::Default::write_gene_region($region_action, $region);
+            $g_msg = LoutreWrite::AnnotUpdate::write_gene_region($region_action, $region);
             sleep(int(rand(3)));
             $n++;
         }

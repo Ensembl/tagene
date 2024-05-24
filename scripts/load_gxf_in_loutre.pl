@@ -10,7 +10,9 @@ use Getopt::Long;
 use Bio::Otter::Lace::Defaults;
 use Bio::Otter::Server::Config;
 use LoutreWrite::Config;
-use LoutreWrite::Default;
+use LoutreWrite::InputParsing;
+use LoutreWrite::GeneFilter;
+use LoutreWrite::AnnotUpdate;
 use LoutreWrite::IntronFilter;
 $| = 1;
 
@@ -30,10 +32,13 @@ my $no_NFV;
 my $do_not_add_cds;
 my $no_intron_check;
 my $host_biotype;
+my $no_overlap_biotype;
 my $max_overlapped_loci;
+my $protected_loci_list;
 my $filter_introns;
 my $platinum;
 my $only_chr;
+my $die_if_locked_clone;
 
 &GetOptions(
             'file=s'            => \$file,
@@ -50,21 +55,29 @@ my $only_chr;
             'no_CDS!'           => \$do_not_add_cds,
             'no_intron_check!'  => \$no_intron_check,
             'host_biotype=s'    => \$host_biotype,
-            'max_ov_loc=s'      => \$max_overlapped_loci,
+            'no_overlap_biotype=s' => \$no_overlap_biotype,
+            'max_ov_loc=i'      => \$max_overlapped_loci,
+            'protected_loci=s'  => \$protected_loci_list,
             'filter_introns!'   => \$filter_introns,
             'platinum!'         => \$platinum,
             'readseqdir=s'      => \$READSEQDIR,
             'chr=s'             => \$only_chr,
+            'die_locked!'       => \$die_if_locked_clone,
             'write!'            => \$WRITE,
             );
 
 #die unless $dataset_name && $dataset_name =~ /test/;
 
 #Find chromosome name if it has been passed as a job array index
-$only_chr ||= $ENV{LSB_JOBINDEX};
+#$only_chr ||= $ENV{LSB_JOBINDEX};
 if ($only_chr){
   $only_chr = "X" if $only_chr eq "23";
   $only_chr = "Y" if $only_chr eq "24";
+}
+
+#Fix the input file name if it is meant to include the LSF job array index
+if ($file =~ /^(.+)\%I(.+)$/){
+  $file = $1.$ENV{LSB_JOBINDEX}.$2;
 }
 
 
@@ -88,7 +101,9 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -no_CDS         do not try to add a CDS if the transcript falls in a coding gene
  -no_intron_check  allow transcripts with intron chains fully or partially identical to others in the database
  -host_biotype   restrict host genes by biotype (comma-separated list)
+ -no_overlap_biotype skip overlapped genes by biotype (comma-separated list) 
  -max_ov_loc     maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
+ -protected_loci file with a list of annotated genes that must not be updated
  -filter_introns assess introns and ignore transcript if at least an intron does not pass the filters
  -platinum       add a 'platinum' hidden remark to all transcripts
  -chr            restrict to annotation on this chromosome
@@ -119,10 +134,10 @@ if (defined($SPECIES)){
 
 
 #Read data file
-my $genes = LoutreWrite::Default->parse_gxf_file($file);
+my $genes = LoutreWrite::InputParsing->parse_gxf_file($file);
 
 #Make gene objects
-my $gene_objects = LoutreWrite::Default->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $tsource, $no_NFV, $only_chr, $assembly_version);
+my $gene_objects = LoutreWrite::InputParsing->make_vega_objects($genes, $otter_dba, $author_name, $remark, $use_comp_pipe_biotype, $analysis_name, $tsource, $no_NFV, $only_chr, $assembly_version);
 
 #Transform coordinates to a different assembly if required
 if ($assembly_version){
@@ -164,7 +179,7 @@ if ($assembly_version){
 	    }
 	    else{
 	      foreach my $transcript (@{$gene->get_all_Transcripts}){
-			my $tname = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+            my $tname = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
             print "TR2: ".$tname.": did not transform to $default_assembly_version assembly version\n";
           }
         }
@@ -176,37 +191,109 @@ if ($assembly_version){
   }
   $gene_objects = \@transf_genes;
 }
+print "Number of genes (initial) = ".scalar(@$gene_objects)."\n";
 
 #Long artifact transcripts, spanning multiple real loci, make long artificial genes
 unless ($no_artifact_check){
   #Generate a kill list of "artifact" transcripts (those with long introns spanning multiple genes, likely caused by misalignments)
-  my $kill_list = LoutreWrite::Default->check_artifact_transcripts($gene_objects);
+  my $kill_list = LoutreWrite::GeneFilter->check_artifact_transcripts($gene_objects);
 
   #Remove artifacts and split genes left with genomic gaps
-  $gene_objects = LoutreWrite::Default->recluster_transcripts($gene_objects, $kill_list);
+  $gene_objects = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list);
 }
 
 #Remove transcripts overlapping more than the allowed number of existing loci at the exon level
-my $gene_objects_2;
 if ($max_overlapped_loci){
-  my $kill_list_2 = LoutreWrite::Default->check_overlapped_loci($gene_objects, $max_overlapped_loci);
-  $gene_objects_2 = LoutreWrite::Default->recluster_transcripts($gene_objects, $kill_list_2);
+  my $kill_list_2 = LoutreWrite::GeneFilter->check_max_overlapped_loci($gene_objects, $max_overlapped_loci);
+  $gene_objects = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list_2);
   foreach my $tid (keys %{$kill_list_2}){
     print "TR2: $tid: max allowed number of overlapped loci exceeded\n";
   }
 }
+print "Number of genes (after max overlapping loci) =".scalar(@$gene_objects)."\n";
+
+#Remove trancripts that overlap a gene having an unallowed biotype
+if ($no_overlap_biotype){
+  my %excluded_biotypes = map {$_=>1} split(/,/, $no_overlap_biotype);
+  my $kill_list_3 = LoutreWrite::GeneFilter->check_overlapped_gene_biotypes($gene_objects, \%excluded_biotypes);
+  $gene_objects = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list_3);
+  foreach my $tid (keys %{$kill_list_3}){
+    print "TR2: $tid: overlapped locus with unallowed biotype\n";
+  }
+}
+print "Number of genes (after unallowed biotype overlap) =".scalar(@$gene_objects)."\n";
 
 #Add source info
 #my $gene_objects_3;
 if ($source_info){
-    $gene_objects_2 = LoutreWrite::Default->add_sources($gene_objects_2, $source_info);
+  $gene_objects = LoutreWrite::InputParsing->add_sources($gene_objects, $source_info);
 }
 
+#Read protected gene list
+my %protected_loci;
+if ($protected_loci_list and -e $protected_loci_list){
+  open (IN, $protected_loci_list) or die "Can't open file $protected_loci_list: $!";
+  while (<IN>){
+    chomp;
+    $protected_loci{$_} = 1;
+  }
+  close (IN);
+}
+
+#Assign host genes
+foreach my $go (@$gene_objects){
+  foreach my $tr (@{$go->get_all_Transcripts}){
+    print "Gene0 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
+  }
+}
+#Ignore host genes with the following biotypes, i.e. creating new overlapping lncRNA genes is allowed
+my $ignored_biotype_list = join(",", qw(unprocessed_pseudogene processed_pseudogene transcribed_processed_pseudogene unitary_pseudogene
+                                        transcribed_unprocessed_pseudogene translated_processed_pseudogene pseudogene rRNA_pseudogene transcribed_unitary_pseudogene
+                                        tec
+                                        rRNA snRNA misc_RNA snoRNA rRNA_pseudogene miRNA scaRNA ribozyme sRNA scrna macro_lncrna vault_rna srna)
+                                );
+$gene_objects = LoutreWrite::GeneFilter->assign_host_gene_multi($gene_objects, 1, $ignored_biotype_list);
+print "Number of genes (after 1st round of host assignment) =".scalar(@$gene_objects)."\n";
+foreach my $go (@$gene_objects){
+  foreach my $tr (@{$go->get_all_Transcripts}){
+    print "Gene1 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
+  }
+}
+
+#Assigning transcripts to genes one by one can lead to the creation of several novel genes
+#that are found to overlap after all input transcripts have been added.
+#Improve the host gene assignment, merging novel genes that have exonic overlap.
+#NOTE: a potential problem caused by this is that the transcript that links two genes
+#may be filtered out down the line, so the resulting gene would have a transcript gap.
+$gene_objects = LoutreWrite::GeneFilter->reassign_host_genes($gene_objects);
+print "Number of genes (after 2nd round of host assignment) =".scalar(@$gene_objects)."\n";
+foreach my $go (@$gene_objects){
+  foreach my $tr (@{$go->get_all_Transcripts}){
+    print "Gene2 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
+  }
+}
+
+#Do another round of host gene assignment including transcripts stored in the database
+#that belong to genes with allowed biotypes. This step aims to merge novel genes with
+#existing genes if there is exonic overlap and at least a shared splice site.
+my %allowed_biotypes;
+if ($host_biotype){
+  %allowed_biotypes = map {$_=>1} split(/,/, $host_biotype);
+}
+$gene_objects = LoutreWrite::GeneFilter->reassign_host_genes($gene_objects, 1, \%allowed_biotypes);
+print "Number of genes (after 3rd round of host assignment) =".scalar(@$gene_objects)."\n";
+foreach my $go (@$gene_objects){
+  foreach my $tr (@{$go->get_all_Transcripts}){
+    print "Gene3 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
+  }
+}
+
+
 my $count = 1;
-my $total = scalar(@$gene_objects_2);
+my $total = scalar(@$gene_objects);
 #Process gene objects
-foreach my $gene_obj (@$gene_objects_2){
-    print "##########\n\nLOOKING AT GENE IN ".$gene_obj->seq_region_name.":".$gene_obj->start."-".$gene_obj->end."  ($count/$total)\n\n";
+GENE:foreach my $new_gene_obj (@$gene_objects){
+    print "##########\n\nLOOKING AT GENE IN ".$new_gene_obj->seq_region_name.":".$new_gene_obj->start."-".$new_gene_obj->end."  ($count/$total)\n\n";
     $count++;
 
     #Check whether add as novel gene or merge with existing gene
@@ -219,23 +306,35 @@ foreach my $gene_obj (@$gene_objects_2){
    #IT HAS TO BE DONE BY SPLITTING GENES    
     #Readthrough genes -> should be split and assign host genes independently by transcript
     #Why not replace "find_host_gene" with "assign_host_gene" which would return an array of gene objects, each one with their new stable id if they have a host gene?
-    my $new_gene_objects = LoutreWrite::Default->assign_host_gene($gene_obj, 1);
-    my %allowed_biotypes;
-    if ($host_biotype){
-      %allowed_biotypes = map {$_=>1} split(/,/, $host_biotype);
-    }
-    GENE:foreach my $new_gene_obj (@$new_gene_objects){
-        print "HOST: ".($new_gene_obj->stable_id || "NONE")."\n";
+#    my $new_gene_objects = LoutreWrite::GeneFilter->assign_host_gene_multi($gene_obj, 1);
+#foreach my $go (@$new_gene_objects){
+#  foreach my $tr (@{$go->get_all_Transcripts}){
+#    print "Gene3 ".$go->stable_id."\t".$tr->get_all_Attributes('hidden_remark')->[0]->value."\n";
+#  }
+#}
 
-        #Find biotype of host gene
+    #GENE:foreach my $new_gene_obj (@$new_gene_objects){
+        print "HOST: ".($new_gene_obj->stable_id || "NONE")."\n";
+        
         if ($new_gene_obj->stable_id =~ /^ENS/){
+            #Ignore genes in the protected loci list
+            if ($protected_loci{$new_gene_obj->stable_id}){
+              print "Gene ".$new_gene_obj->stable_id." will be ignored as it is a protected locus\n";
+              foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
+                my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+                print "TR2: $t_name: host gene is protected\n";
+              }
+              next GENE;
+            }
+
+            #Check biotype of host gene
             my $wrong_host;
             my $host_gene = $ga->fetch_by_stable_id($new_gene_obj->stable_id);
             if (!$host_gene){
               print "Couldn't fetch host gene with stable_id ".$new_gene_obj->stable_id."\n";
               $wrong_host = 1;
             }
-            if ($host_biotype and !($allowed_biotypes{$host_gene->biotype})){
+            elsif ($host_biotype and !($allowed_biotypes{$host_gene->biotype})){
                 print "Gene ".$host_gene->stable_id." will be ignored as its biotype (".$host_gene->biotype.") is not allowed\n";
                 $wrong_host = 1;
             }
@@ -244,6 +343,7 @@ foreach my $gene_obj (@$gene_objects_2){
                 print "Gene ".$host_gene->stable_id." will be ignored as it has an ASB_protein_coding remark\n";
                 $wrong_host = 1;
             }
+
             #Double check that the gene does not have a coding transcript
             #There are a few cases in loutre_human
             else{
@@ -266,6 +366,7 @@ foreach my $gene_obj (@$gene_objects_2){
             
             #$new_gene_obj = LoutreWrite::Default->assign_cds_to_transcripts($new_gene_obj, $host_gene);
         }
+ 
         
         #Predict intron outcome
         #Only if novel intron?
@@ -323,15 +424,16 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
             #else{
             #    $mode = "add";
             #}
-            if ($new_gene_obj->stable_id =~ /^ENS/){
+            if ($new_gene_obj->stable_id =~ /^ENS([A-Z]{3})?G/){
                 $mode = "update";
             }
             else{
                 $mode = "add";
-            }        
+                $new_gene_obj->stable_id(undef); #reset stable id if any (eg. tmp_XXX)
+            }
             my $novel_gene = $new_gene_obj->stable_id ? 0 : 1;
             print "\nMODE: $mode\n";
-            my ($msg, $log) = LoutreWrite::Default->process_gene_2($new_gene_obj, $mode, "aggr", $dataset_name, $otter_dba, $no_intron_check, $use_comp_pipe_biotype, $no_NFV, $do_not_add_cds, $platinum);
+            my ($msg, $log) = LoutreWrite::AnnotUpdate->process_gene_2($new_gene_obj, $mode, "aggr", $dataset_name, $otter_dba, $no_intron_check, $use_comp_pipe_biotype, $no_NFV, $do_not_add_cds, $platinum);
         #print "HOST_CDS_SET_B=".scalar(keys %HOST_CDS_SET)."\n";
         #print "HOST_START_CODON_SET_B=".scalar(keys %HOST_START_CODON_SET)."\n";
             if ($msg =~ /lock ok,write ok,unlock ok(,(.+))?/){
@@ -350,16 +452,47 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
                     print join("\n", @$log)."\n";
                 }
             }
-            else{
+            elsif ($msg =~ /lock ok,write failed/){
+                if ($WRITE){
+                    print "\nRESULT: gene ".$new_gene_obj->stable_id." could not be modified because of an error\n";
+                    foreach my $log_message (@$log){
+                      if ($log_message =~ /^TR2: .+ (Added|Extended) transcript/){
+                        $log_message =~ s/^(TR2: ID: .+:) (.+)$/$1 Transcript could not be processed because of an error/;
+                      }
+                      print $log_message."\n";
+                    }
+                    #print join("\n", map {s/^(TR2: ID: .+:) (.+)$/$1 Transcript could not be processed because of an error/; $_} @$log)."\n";
+                }
+                else{
+                    print "\nRESULT: gene ".$new_gene_obj->stable_id." not modified (WRITE = 0)\n";
+                }
+            }
+            elsif ($msg =~ /lock failed/){
                 if ($WRITE){
                     print "\nRESULT: gene ".$new_gene_obj->stable_id." could not be unlocked\n";
+                    foreach my $log_message (@$log){
+                      if ($log_message =~ /^TR2: .+ (Added|Extended) transcript/){
+                        $log_message =~ s/^(TR2: ID: .+:) (.+)$/$1 Transcript slice could not be unlocked/;
+                      }
+                      print $log_message."\n";
+                    }
+                    #print join("\n", map {s/^(TR2: ID: .+:) (.+)$/$1 Transcript slice could not be unlocked/; $_} @$log)."\n";
+                }
+                else{
+                    print "\nRESULT: gene ".$new_gene_obj->stable_id." not modified (WRITE = 0)\n";
+                }
+                die "Dying as slice is locked" if $die_if_locked_clone;
+            }
+            else{
+                if ($WRITE){
+                    print "\nRESULT: gene ".$new_gene_obj->stable_id." - undetermined outcome\n";
                 }
                 else{
                     print "\nRESULT: gene ".$new_gene_obj->stable_id." not modified (WRITE = 0)\n";
                 }
             }
         #}
-    }
+    #}
 }
 
 

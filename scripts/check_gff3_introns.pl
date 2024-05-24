@@ -82,8 +82,8 @@ foreach my $tid (keys %trs){
     my $intron_start = $ends[$i]+1;
     my $intron_end = $starts[$i+1]-1;
     #Get intron sequence
-    my $istart_slice = $sa->fetch_by_region("chromosome", $trs{$tid}{chr}, $intron_start, $intron_start+1, $trs{$tid}{strand});
-    my $iend_slice = $sa->fetch_by_region("chromosome", $trs{$tid}{chr}, $intron_end-1, $intron_end, $trs{$tid}{strand});
+    my $istart_slice = $sa->fetch_by_region("toplevel", $trs{$tid}{chr}, $intron_start, $intron_start+1, $trs{$tid}{strand});
+    my $iend_slice = $sa->fetch_by_region("toplevel", $trs{$tid}{chr}, $intron_end-1, $intron_end, $trs{$tid}{strand});
     next unless $istart_slice and $iend_slice;
     my $isite_seq;
     if ($trs{$tid}{strand}==1){

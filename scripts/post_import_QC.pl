@@ -11,7 +11,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use LoutreWrite::Default qw ( exon_novelty can_be_merged );
+use LoutreWrite::AnnotUpdate qw ( exon_novelty can_be_merged );
 use Bio::Otter::Lace::Defaults;
 use Bio::Otter::Server::Config;
 $| = 1;
