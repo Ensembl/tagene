@@ -86,6 +86,7 @@ sub default_options {
     no_intron_check => 0,
     host_biotype => '',
     no_overlap_biotype => '',
+    protected_loci => '',
     max_ov_loc => 0,
     filter_introns => 0,
     platinum => 0,
