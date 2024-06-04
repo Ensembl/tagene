@@ -129,7 +129,7 @@ my $ta = $otter_dba->get_TranscriptAdaptor();
 $DBA{'otter'} = $otter_dba;
 $SPECIES = lc($otter_dba->get_MetaContainer->get_display_name);
 if (defined($SPECIES)){
-  LoutreWrite::Config::get_db_adaptadors();
+  LoutreWrite::Config::get_db_adaptors();
 }
 
 
