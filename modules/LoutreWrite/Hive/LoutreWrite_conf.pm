@@ -219,7 +219,7 @@ sub pipeline_analyses {
       -flow_into => {
         1 => ['create_individual_jobs'],
       },
-      -rc_name => '2GB',
+      -rc_name => '40GB',
     },
 
     {
@@ -493,6 +493,8 @@ sub resource_classes {
     '2GB' => { LSF => '-q short -M 2000 -R"select[mem>2000] rusage[mem=2000]"'},    
     '4GB' => { LSF => '-q short -M 4000 -R"select[mem>4000] rusage[mem=4000]"'},
     '6GB' => { LSF => '-q standard -M 6000 -R"select[mem>6000] rusage[mem=6000]"'},
+    '20GB' => { LSF => '-q standard -M 20000 -R"select[mem>20000] rusage[mem=20000]"'},
+    '40GB' => { LSF => '-q short -M 40000 -R"select[mem>40000] rusage[mem=40000]"'},
   };
 }
 
