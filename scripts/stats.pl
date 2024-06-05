@@ -299,12 +299,15 @@ sub previous_biotype {
   my $prev_biotype;
   my $sth;
   if ($date){
-    $sth = $otter_dba->dbc->prepare("select biotype from transcript where stable_id=? and modified_date < ? order by modified_date desc limit 1");
-    $sth->execute($transcript->stable_id, $date);
+    $sth = $otter_dba->dbc->prepare("select biotype from transcript join seq_region using (seq_region_id)
+                                      where stable_id = ? and modified_date < ? and name = ? and seq_region_start < ? and seq_region_end > ?
+                                      order by modified_date desc limit 1");
+    $sth->execute($transcript->stable_id, $date, $transcript->slice->seq_region_name, $transcript->seq_region_end, $transcript->seq_region_start);
   }
   else{
-    $sth = $otter_dba->dbc->prepare("select biotype from transcript where stable_id=? and version=?");
-    $sth->execute($transcript->stable_id, $transcript->version - 1);
+    $sth = $otter_dba->dbc->prepare("select biotype from transcript join seq_region using (seq_region_id)
+                                      where stable_id=? and version=? and name = ? and seq_region_start < ? and seq_region_end > ?");
+    $sth->execute($transcript->stable_id, $transcript->version - 1, $transcript->slice->seq_region_name, $transcript->seq_region_end, $transcript->seq_region_start);
   }
   while (my @cols = $sth->fetchrow_array()) {
     $prev_biotype = $cols[0];
