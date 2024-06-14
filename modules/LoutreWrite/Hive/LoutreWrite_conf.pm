@@ -25,7 +25,7 @@ sub default_options {
   my $date = DateTime->now()->strftime("%Y_%m_%d");
   my $date2 = DateTime->now()->strftime("%Y-%m-%d");
   my $date3 = DateTime->now()->strftime("%Y%m%d");
-  
+
   return {
     %{$self->SUPER::default_options()},
 
@@ -137,6 +137,11 @@ sub pipeline_wide_parameters {
 sub pipeline_analyses {
   my ($self) = @_;
 
+  #Check that 'reset_target_db' is not being used with a production database
+  if (($self->o('dataset') =~ /^(human|mouse)$/ or $self->o('target_db') =~ /^havana_(human|mouse)$/) and $self->o('reset_target_db') == 1){
+    die "Attempting to reset the ".$self->o('dataset')." production database!";
+  }
+  
   my @analyses = (
     {
       -logic_name => 'create_working_directory',
