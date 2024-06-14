@@ -21,10 +21,23 @@ sub fetch_input {
   my ($self) = @_;
   my $file = $self->param('input_file');
 
+  my $filter_output_file = $self->param('filter_output_file');
+
   unless ($self->param_is_defined('cluster_by_gene_id')){
     $self->param('cluster_by_gene_id', 0);
   }
-  
+
+  #Read list of transcripts that failed filters
+  my %filtered_transcripts;
+  if (-e $filter_output_file){
+    open (F, $filter_output_file) or $self->throw("Can't open file $file");
+    while (<F>){
+      chomp;
+      $filtered_transcripts{$_} = 1;
+    }
+    close (F);
+  }
+
   #Read input annotation file
   my %transcript_data;
   my %seen;
@@ -65,10 +78,17 @@ sub fetch_input {
       }
       $attribs{$name} = $value;
     }
+    
     my $transcript_id = $attribs{'transcript_id'};
     if (!$transcript_id){
       die "No transcript id found: $_";
     }
+    else{
+      if ($filtered_transcripts{$transcript_id}){
+        next;
+      }
+    }
+    
     if ($self->param('cluster_by_gene_id')){
       if ($attribs{'gene_id'}){
         $transcript_id = $attribs{'gene_id'};

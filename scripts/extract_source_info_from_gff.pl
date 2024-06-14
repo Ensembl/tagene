@@ -13,18 +13,21 @@ my $infile;
 my $dataset_name;
 my $outfile;
 my $use_longest_FL_supporters;
+my $simple_format;
 
 &GetOptions(
-            'infile=s'   => \$infile,
-            'libname=s'  => \$dataset_name,
-            'outfile=s'  => \$outfile,
-            'use_longest_FL_supporters!' => \$use_longest_FL_supporters,
+            'infile=s'                    => \$infile,
+            'libname=s'                   => \$dataset_name,
+            'outfile=s'                   => \$outfile,
+            'use_longest_FL_supporters!'  => \$use_longest_FL_supporters,
+            'simple_format!'              => \$simple_format,
             );            
 
 
 open (OUT, ">$outfile") or die "Can't open $outfile: $!";
 my %seen_tids;
-open (GTF, "gunzip -dc $infile |") or die "Can't open gtf file:$!";
+my $command = ($infile =~ /\.gz$/ ? "gunzip -dc" : "cat");
+open (GTF, "$command $infile |") or die "Can't open file $infile:$!";
 while (<GTF>){
   chomp;
   if (/transcript_id \"(\S+)\"; contains \"(\S+)\";/){
@@ -39,7 +42,12 @@ while (<GTF>){
         $reads = $fl_reads;
       }
       $reads =~ s/\//_/g;
-      print OUT $tid."\t".$dataset_name." : ".join(", ", split(/,/, $reads))." ;\n";
+      if ($simple_format){
+        print OUT $tid."\t".$dataset_name."\t".join(",", split(/,/, $reads))."\n";
+      }
+      else{
+        print OUT $tid."\t".$dataset_name." : ".join(", ", split(/,/, $reads))." ;\n";
+      }
     }
     if (!$reads){
       warn "No FL reads for $tid\n";
