@@ -158,12 +158,56 @@ sub pipeline_analyses {
         species => $self->o('species'),
       }],
       -flow_into => {
-        '1->A' => ['do_prefilter_input_file', 'do_reset_database'],
+        '1->A' => ['do_reset_database','do_prefilter_input_file'],
         'A->1' => ['split_annotation_file'],
       },
       -rc_name => 'default',
     },
 
+    {
+      -logic_name => 'do_reset_database',
+      -module => 'Bio::EnsEMBL::Hive::RunnableDB::SystemCmd',
+      -parameters => {
+        cmd => 'if [ #reset_target_db# -eq 0 ]; then exit 42; fi',
+        return_codes_2_branches => {
+          42 => 2,
+        },
+        reset_target_db => $self->o('reset_target_db'),
+      },
+      -rc_name => 'default',
+      -flow_into => {
+        1 => ['reset_database'],
+      },
+    },
+
+    {
+      -logic_name => 'reset_database',
+      -module     => 'Bio::EnsEMBL::Analysis::Hive::RunnableDB::HiveCreateDatabase',
+      -parameters => {
+        source_db => $self->o('source_db'),
+        target_db => $self->o('target_db'),
+        force_drop => 1,
+        ignore_dna => 1,
+        create_type => 'copy',
+      },
+      -rc_name => 'default',
+      -flow_into => {
+        1 => ['remove_slice_locks'],
+      },
+    },
+    
+    {
+      -logic_name => 'remove_slice_locks',
+      -module     => 'Bio::EnsEMBL::Hive::RunnableDB::SqlCmd',
+      -parameters => {
+        db_conn => $self->o('target_db'),
+        sql => [
+          'TRUNCATE slice_lock',
+        ],
+      },            
+      -rc_name => 'default',
+    },
+    
     {
       -logic_name => 'do_prefilter_input_file',
       -module => 'Bio::EnsEMBL::Hive::RunnableDB::SystemCmd',
@@ -176,7 +220,7 @@ sub pipeline_analyses {
       },
       -rc_name => 'default',
       -flow_into => {
-        1 => ['get_chr_list'],  
+        1 => ['get_chr_list'],
       },
     },
 
@@ -184,7 +228,7 @@ sub pipeline_analyses {
       -logic_name => 'get_chr_list',
       -module => 'Bio::EnsEMBL::Hive::RunnableDB::JobFactory',
       -parameters => {
-        inputcmd => 'zcat #input_file# | cut -f1 | sort -u',
+        inputcmd => 'zcat #input_file# | grep -v ^# | cut -f1 | sort -u',
         input_file => $self->o('input_file'),
         column_names => ['chr'],
       },
@@ -246,10 +290,7 @@ sub pipeline_analyses {
         cmd => 'perl #pseudogene_overlap_script#'
               .' -gtf #input_file#'
               .' -chr #chr#'
-              .' -host '.$self->o('target_db_host')
-              .' -port '.$self->o('target_db_port')
-              .' -user '.$self->o('user_r')
-              .' -dbname '.$self->o('target_db_name')
+              .' -dataset '.$self->o('dataset')
               .' -utr5 180'
               .' -utr3 561'
               .' -out #output_file#',
@@ -257,7 +298,7 @@ sub pipeline_analyses {
         input_file => $self->o('input_file'),
         filter_dir => catdir($self->o('output_dir'), 'filters'),
         output_file => catfile('#filter_dir#', 'pseudogene_overlap_#chr#.txt'),
-      },
+      },   
       -rc_name => '4GB',
       -flow_into => {
         1 => ['opposite_strand_mismapping_filter'],
@@ -271,10 +312,7 @@ sub pipeline_analyses {
         cmd => 'perl #opp_strand_mismap_script#'
               .' -gtf #input_file#'
               .' -chr #chr#'
-              .' -host '.$self->o('target_db_host')
-              .' -port '.$self->o('target_db_port')
-              .' -user '.$self->o('user_r')
-              .' -dbname '.$self->o('target_db_name')
+              .' -dataset '.$self->o('dataset')
               .' -out #output_file#',
         opp_strand_mismap_script => $self->o('opp_strand_mismap_script'),
         input_file => $self->o('input_file'),
@@ -328,50 +366,7 @@ sub pipeline_analyses {
       -rc_name => 'default',
     },
 
-    {
-      -logic_name => 'do_reset_database',
-      -module => 'Bio::EnsEMBL::Hive::RunnableDB::SystemCmd',
-      -parameters => {
-        cmd => 'if [ #reset_target_db# -eq 0 ]; then exit 42; fi',
-        return_codes_2_branches => {
-          42 => 2,
-        },
-        reset_target_db => $self->o('reset_target_db'),
-      },
-      -rc_name => 'default',
-      -flow_into => {
-        1 => ['reset_database'],
-      },
-    },
 
-    {
-      -logic_name => 'reset_database',
-      -module     => 'Bio::EnsEMBL::Analysis::Hive::RunnableDB::HiveCreateDatabase',
-      -parameters => {
-        source_db => $self->o('source_db'),
-        target_db => $self->o('target_db'),
-        force_drop => 1,
-        ignore_dna => 1,
-        create_type => 'copy',
-      },
-      -rc_name => 'default',
-      -flow_into => {
-        1 => ['remove_slice_locks'],
-      },
-    },
-    
-    {
-      -logic_name => 'remove_slice_locks',
-      -module     => 'Bio::EnsEMBL::Hive::RunnableDB::SqlCmd',
-      -parameters => {
-        db_conn => $self->o('target_db'),
-        sql => [
-          'TRUNCATE slice_lock',
-        ],
-      },            
-      -rc_name => 'default',
-    },
-    
     {
       -logic_name => 'split_annotation_file',
       -module     => 'LoutreWrite::Hive::PreLoadGxfInLoutre',
@@ -649,6 +644,11 @@ sub pipeline_analyses {
   foreach my $analysis (@analyses) {
     $analysis->{'-max_retry_count'} = 0 unless (exists $analysis->{'-max_retry_count'});
     $analysis->{'-hive_capacity'} = $self->o('hive_capacity') if ($self->o('hive_capacity'));
+    if ($analysis->{'-logic_name'} eq 'pseudogene_overlap_filter'){
+      if ($self->o('prefilter_input_file') and $self->o('reset_target_db')){
+        $analysis->{'-wait_for'} = 'reset_database';
+      }
+    }
   }
 
   return \@analyses;
