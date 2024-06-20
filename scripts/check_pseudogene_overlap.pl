@@ -8,11 +8,13 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use Bio::Otter::Server::Config;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use List::Util qw( max sum );
 
 $|=1;
 
+my $dataset_name;
 my $host;
 my $port;
 my $user;
@@ -24,6 +26,7 @@ my $utr3_length;
 my $outfile;
 
 &GetOptions(
+            'dataset=s'  => \$dataset_name,
             'host=s'     => \$host,
             'port=i'     => \$port,
             'user=s'     => \$user,
@@ -35,14 +38,28 @@ my $outfile;
             'out=s'      => \$outfile,
            );
 
-my $core_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-    -host => $host,
-    -port => $port,    
-    -user => $user,
-    -dbname => $dbname,
-);
-my $sa = $core_db->get_SliceAdaptor();
-my $ta = $core_db->get_TranscriptAdaptor();
+
+my ($sa, $ta);
+if ($dataset_name){
+  my $dataset = Bio::Otter::Server::Config->SpeciesDat->dataset($dataset_name);
+  my $otter_dba = $dataset->otter_dba or die "can't get db adaptor\n";
+  $otter_dba->dbc->reconnect_when_lost(1);
+  $sa = $otter_dba->get_SliceAdaptor();
+  $ta = $otter_dba->get_TranscriptAdaptor();
+}
+elsif ($host and $port and $user and $dbname){
+  my $core_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+      -host => $host,
+      -port => $port,    
+      -user => $user,
+      -dbname => $dbname,
+  );
+  $sa = $core_db->get_SliceAdaptor();
+  $ta = $core_db->get_TranscriptAdaptor();
+}
+else{
+  die "Can't connect to an annotation database: $!";
+}
 
 print "Reading input GTF...\n";
 my @tids;
