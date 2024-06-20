@@ -256,7 +256,7 @@ sub pipeline_analyses {
         filter_dir => catdir($self->o('output_dir'), 'filters'),
         output_file => catfile('#filter_dir#', 'recount3_score_#chr#.txt'),
       },
-      -rc_name => '4GB',
+      -rc_name => '5GB',
       -flow_into => {
         1 => ['repeat_overlap_filter'],
       },
@@ -277,7 +277,7 @@ sub pipeline_analyses {
         filter_dir => catdir($self->o('output_dir'), 'filters'),
         output_file => catfile('#filter_dir#', 'repeat_overlap_#chr#.txt'),
       },
-      -rc_name => '4GB',
+      -rc_name => '5GB',
       -flow_into => {
         1 => ['pseudogene_overlap_filter'],
       },
@@ -299,7 +299,7 @@ sub pipeline_analyses {
         filter_dir => catdir($self->o('output_dir'), 'filters'),
         output_file => catfile('#filter_dir#', 'pseudogene_overlap_#chr#.txt'),
       },   
-      -rc_name => '4GB',
+      -rc_name => '5GB',
       -flow_into => {
         1 => ['opposite_strand_mismapping_filter'],
       },
@@ -319,7 +319,7 @@ sub pipeline_analyses {
         filter_dir => catdir($self->o('output_dir'), 'filters'),
         output_file => catfile('#filter_dir#', 'opp_strand_mismap_#chr#.txt'),
       },
-      -rc_name => '4GB',
+      -rc_name => '5GB',
       -flow_into => {
         1 => ['splice_site_misalignment_filter'],
       },
@@ -346,7 +346,7 @@ sub pipeline_analyses {
         filter_dir => catdir($self->o('output_dir'), 'filters'),
         output_file => catfile('#filter_dir#', 'splice_site_misali_#chr#.txt'),
       },
-      -rc_name => '4GB',
+      -rc_name => '5GB',
     },
 
     {
@@ -531,7 +531,7 @@ sub pipeline_analyses {
         write => ($self->o('write') ? '-write' : ''),
       },
       -max_retry_count => 0,
-      -rc_name => '6GB',
+      -rc_name => '10GB',
       -analysis_capacity => $self->o('job_limit'),
     },
 
@@ -659,12 +659,11 @@ sub resource_classes {
   my ($self) = @_;
 
   return {
-    'default' => { LSF => '-q short -M 1000 -R"select[mem>1000] rusage[mem=1000]"'},
-    '2GB' => { LSF => '-q short -M 2000 -R"select[mem>2000] rusage[mem=2000]"'},    
-    '4GB' => { LSF => '-q short -M 4000 -R"select[mem>4000] rusage[mem=4000]"'},
-    '6GB' => { LSF => '-q standard -M 6000 -R"select[mem>6000] rusage[mem=6000]"'},
-    '20GB' => { LSF => '-q standard -M 20000 -R"select[mem>20000] rusage[mem=20000]"'},
-    '40GB' => { LSF => '-q short -M 40000 -R"select[mem>40000] rusage[mem=40000]"'},
+    'default' => {SLURM => '--time=1:00:00 --mem=1000', LSF => '-q short -M 1000 -R"select[mem>1000] rusage[mem=1000]"'},   
+    '5GB' => {SLURM => '--time=2:00:00 --mem=5000', LSF => '-q short -M 5000 -R"select[mem>5000] rusage[mem=5000]"'},
+    '10GB' => {SLURM => '--time=3:00:00 --mem=10000', LSF => '-q standard -M 10000 -R"select[mem>10000] rusage[mem=10000]"'},
+    '20GB' => {SLURM => '--time=6:00:00 --mem=20000', LSF => '-q standard -M 20000 -R"select[mem>20000] rusage[mem=20000]"'},
+    '40GB' => {SLURM => '--time=12:00:00 --mem=40000', LSF => '-q short -M 40000 -R"select[mem>40000] rusage[mem=40000]"'},
   };
 }
 
