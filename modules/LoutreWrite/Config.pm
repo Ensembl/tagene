@@ -5,6 +5,7 @@ use strict;
 use warnings;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Registry;
 
 use base 'Exporter';
 our @EXPORT = qw( %DBA $SPECIES );
@@ -17,8 +18,29 @@ if (defined($SPECIES)){
 }
 
 
+sub get_db_adaptors_from_registry {
+  my $registry_file = shift;
+
+  my $registry = 'Bio::EnsEMBL::Registry';
+  $registry->load_all($registry_file);
+  $registry->set_reconnect_when_lost();
+
+  $DBA{'havana'} = $registry->get_DBAdaptor('havana_'.$SPECIES, 'core');
+  unless ($DBA{'havana'}){
+    $DBA{'havana'} = $DBA{'otter'};
+  }
+  $DBA{'pipe'} = $registry->get_DBAdaptor('pipe_'.$SPECIES, 'core');
+  $DBA{'core'} = $registry->get_DBAdaptor('core_'.$SPECIES, 'core');
+  $DBA{'intron'} = $registry->get_DBAdaptor('intron_'.$SPECIES, 'core');
+  $DBA{'polyAseq'} = $registry->get_DBAdaptor('polyAseq_'.$SPECIES, 'core');
+}
+  
+
 sub get_db_adaptors{
   $DBA{'havana'} = get_havana_db_adaptor();
+  unless ($DBA{'havana'}){
+    $DBA{'havana'} = $DBA{'otter'};
+  }
   $DBA{'pipe'} =  get_pipe_db_adaptor();
   $DBA{'core'} = get_core_db_adaptor();
   $DBA{'intron'} = get_intron_db_adaptor();

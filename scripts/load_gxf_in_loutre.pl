@@ -39,6 +39,7 @@ my $filter_introns;
 my $platinum;
 my $only_chr;
 my $die_if_locked_clone;
+my $registry_file;
 
 &GetOptions(
             'file=s'            => \$file,
@@ -63,6 +64,7 @@ my $die_if_locked_clone;
             'readseqdir=s'      => \$READSEQDIR,
             'chr=s'             => \$only_chr,
             'die_locked!'       => \$die_if_locked_clone,
+            'registry=s'        => \$registry_file,
             'write!'            => \$WRITE,
             );
 
@@ -96,6 +98,7 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -analysis       analysis logic name (default is "Otter")
  -tsource        transcript source (default is "havana")
  -assembly       assembly version of the annotation in the file, if not the default one
+ -registry       registry file providing auxiliary database connection details
  -no_check       do no check for transcripts spanning a large number of genes
  -no_NFV         do not add the 'not for VEGA' attribute
  -no_CDS         do not try to add a CDS if the transcript falls in a coding gene
@@ -129,7 +132,12 @@ my $ta = $otter_dba->get_TranscriptAdaptor();
 $DBA{'otter'} = $otter_dba;
 $SPECIES = lc($otter_dba->get_MetaContainer->get_display_name);
 if (defined($SPECIES)){
-  LoutreWrite::Config::get_db_adaptors();
+  if (-e $registry_file){
+    LoutreWrite::Config::get_db_adaptors_from_registry($registry_file);
+  }
+  else{
+    LoutreWrite::Config::get_db_adaptors();
+  }
 }
 
 

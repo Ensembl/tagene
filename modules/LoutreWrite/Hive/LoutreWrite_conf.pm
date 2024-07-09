@@ -421,6 +421,7 @@ sub pipeline_analyses {
        #   .' -tsource '.$self->o('tsource')
        #   .' -assembly '.$self->o('assembly_version')
           .' #assembly#'
+          .' #registry#'
        #   .' -no_check '.$self->o('no_check')
           .' #no_artifact_check#'
        #   .' -no_NFV '.$self->o('no_NFV')
@@ -452,6 +453,7 @@ sub pipeline_analyses {
         source => ($self->o('source') ? '-source '.$self->o('source') : ''),
         readseqdir => ($self->o('read_seq_dir') ? '-readseqdir '.$self->o('read_seq_dir') : ''),
         assembly => ($self->o('assembly_version') ? '-assembly_version '.$self->o('assembly_version') : ''),
+        registry => ($self->o('registry') ? '-registry '.$self->o('registry') : ''),
         chr => ($self->o('chr') ? ' -chr '.$self->o('chr') : ''),
         no_artifact_check => ($self->o('no_artifact_check') ? ' -no_check ' : ''),
         no_nfv => ($self->o('no_NFV') ? '-no_NFV' : ''),
@@ -489,6 +491,7 @@ sub pipeline_analyses {
        #   .' -tsource '.$self->o('tsource')
        #   .' -assembly '.$self->o('assembly_version')
           .' #assembly#'
+          .' #registry#'
        #   .' -no_check '.$self->o('no_check')
           .' #no_artifact_check#'
        #   .' -no_NFV '.$self->o('no_NFV')
@@ -520,6 +523,7 @@ sub pipeline_analyses {
         source => ($self->o('source') ? '-source '.$self->o('source') : ''),
         readseqdir => ($self->o('read_seq_dir') ? '-readseqdir '.$self->o('read_seq_dir') : ''),
         assembly => ($self->o('assembly_version') ? '-assembly_version '.$self->o('assembly_version') : ''),
+        registry => ($self->o('registry') ? '-registry '.$self->o('registry') : ''),
         chr => ($self->o('chr') ? ' -chr '.$self->o('chr') : ''),
         no_artifact_check => ($self->o('no_artifact_check') ? ' -no_check ' : ''),
         no_nfv => ($self->o('no_NFV') ? '-no_NFV' : ''),
