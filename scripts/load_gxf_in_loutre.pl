@@ -351,7 +351,6 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
                 print "Gene ".$host_gene->stable_id." will be ignored as it has an ASB_protein_coding remark\n";
                 $wrong_host = 1;
             }
-
             #Double check that the gene does not have a coding transcript
             #There are a few cases in loutre_human
             else{
@@ -370,6 +369,21 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
                     print "TR2: $t_name: host gene biotype not allowed\n";
                 }
                 next GENE;
+            }
+
+            
+            #Ignore readthrough genes
+            foreach my $tr (@{$host_gene->get_all_Transcripts}){
+              next if $tr->biotype eq "artifact";
+              next if scalar grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')};
+              if (scalar grep {$_->value eq "readthrough"} @{$tr->get_all_Attributes("remark")}){
+                print "Gene ".$host_gene->stable_id." will be ignored as it has readthrough transcripts\n";
+                foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
+                  my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+                  print "TR2: $t_name: host gene is readthrough\n";
+                }
+                next GENE;
+              }
             }
             
             #$new_gene_obj = LoutreWrite::Default->assign_cds_to_transcripts($new_gene_obj, $host_gene);
