@@ -72,6 +72,15 @@ sub check_max_overlapped_loci {
         # next if $db_gene->biotype =~ /^(miRNA|misc_RNA|ribozyme|rRNA|rRNA_pseudogene|scaRNA|snoRNA|snRNA|sRNA|vault_rna)$/i;  #Ignore small RNA genes
         # next if $db_gene->biotype =~ /ig_pseudogene|processed_pseudogene|pseudoexon|pseudogene|transcribed_.+_pseudogene|tr_pseudogene|unitary_pseudogene/; #Ignore pseudogenes
         if ($db_gene->biotype =~ /antisense|bidirectional_promoter_lncrna|ig_gene|IG_V_gene|lincRNA|macro_lncrna|overlapping_ncrna|polymorphic_pseudogene|processed_transcript|protein_coding|sense_intronic|sense_overlapping|tec|tr_gene/i){
+#EXCLUDE READTHROUGH GENES? (DIFFERENT FILTER)
+          foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
+            next if $db_tr->biotype eq "artifact";
+            next if scalar grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')};
+            if (scalar grep {$_->value eq "readthrough"} @{$db_tr->get_all_Attributes("remark")}){
+              next DBG;
+            }
+          }
+#         
           foreach my $db_exon (@{$db_gene->get_all_Exons}){
             foreach my $exon (@{$transcript->get_all_Exons}){
               if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
@@ -85,6 +94,7 @@ sub check_max_overlapped_loci {
         }
       }
       #Instead of counting overlapped genes, count clusters of overlapped genes
+#REFINE THE DEFINITION OF CLUSTERS: ONE GENE INCLUDED IN THE OTHER, OR SUBSTANTIAL OVERLAP, OR SHARED SPLICE SITES!
       my @clusters;
       foreach my $db_gene (sort {$a->seq_region_start <=> $b->seq_region_start} @overlapped_db_genes){
         my $clustered = 0;
@@ -117,6 +127,41 @@ sub check_max_overlapped_loci {
         print "KILL_2: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@clusters)." loci: $message\n";
         $list{$t_name} = 1;
       }
+
+###
+      #In addition, check if the transcript shares splice sites with two genes
+      #and these splice sites are beyond the other gene's boundaries
+      #If one of them is a readthrough gene, it should be ignored (filtered previously)
+      my %shared_splice_sites;
+      foreach my $intron (@{$transcript->get_all_Introns}){
+        foreach my $db_gene (@overlapped_db_genes){
+          foreach my $db_intron (@{$db_gene->get_all_Introns}){
+            if ($intron->seq_region_start == $db_intron->seq_region_start){
+              $shared_splice_sites{$intron->seq_region_start}{$db_gene->stable_id} = 1;
+            }
+            if ($intron->seq_region_end == $db_intron->seq_region_end){
+              $shared_splice_sites{$intron->seq_region_end}{$db_gene->stable_id} = 1;
+            }
+          }
+        }
+      }
+      my %genes_not_overlapping_splice_site;
+      foreach my $ss_site (keys %shared_splice_sites){
+        if (scalar keys %{$shared_splice_sites{$ss_site}} == 1){
+          foreach my $db_gene (grep {$_->stable_id ne $shared_splice_sites{$ss_site}} @overlapped_db_genes){
+            unless ($db_gene->seq_region_start < $ss_site and $db_gene->seq_region_end > $ss_site){
+              $genes_not_overlapping_splice_site{$db_gene->stable_id} = 1;
+            }
+          }
+        }
+      }
+      if (scalar keys %genes_not_overlapping_splice_site == scalar @overlapped_db_genes){
+        my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+        print "KILL_2b: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@overlapped_db_genes)." loci: $message\n";
+        $list{$t_name} = 1;
+      }
+###      
+       
     }
   }
 
