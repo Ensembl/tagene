@@ -190,6 +190,7 @@ sub assign_cds_to_transcripts {
         #If stop codon is upstream of retained intron, do not make it retained_intron (it will probably be NMD)
         if (is_retained_intron($transcript, $host_gene, 5, $cds_end)){
           print "Found retained_intron before stop codon at $cds_end\n";
+          $transcript->biotype("retained_intron");
           next TR;
         }
         #Full length CDS?
@@ -396,11 +397,11 @@ sub get_host_gene_cds_set {
 
  Arg[1]    : arrayref of Bio::Vega::Transcript objects
  Function  : sorts coding transcripts according to the categories below:
-             1 - APPRIS principal 1 to 4, 
-             2 - CCDS (5'-most ATG first), 
-             3 - Other complete CDS (5'-most ATG first),
-             4 - Complete CDS NMD (5'-most ATG first),
-             5 - ...
+             1 - MANE Select,
+             2 - APPRIS principal 1 to 4, 
+             3 - CCDS (5'-most ATG first), 
+             4 - Other complete CDS (5'-most ATG first),
+             5 - Complete CDS NMD (5'-most ATG first)
  Returntype: arrayref of Bio::Vega::Transcript objects
 
 =cut
@@ -410,39 +411,33 @@ sub sort_by_categ {
   my $transcripts = shift;
 
   my @sorted_transcripts = sort {
+    my $a_mane_select = scalar grep {$_->value eq "MANE_select"} @{$a->get_all_Attributes("remark")};
+    my $b_mane_select = scalar grep {$_->value eq "MANE_select"} @{$b->get_all_Attributes("remark")};
     my $a_appris = get_appris_tag($a);
     my $b_appris = get_appris_tag($b);
     my $a_ccds = get_ccds_tag($a);
     my $b_ccds = get_ccds_tag($b);
     my $a_cds_start = $a->coding_region_start;
     my $b_cds_start = $b->coding_region_start;
-  
-    if ($a_appris and $b_appris and $a_appris=~/principal(1|2|3|4)/ and $b_appris=~/principal(1|2|3|4)/){
-      return $a_appris cmp $b_appris;
-    }
-    elsif ($a_appris and $a_appris=~/principal(1|2|3|4)/){
+
+    if ($a_mane_select){
       return -1;
     }
-    elsif ($b_appris and $b_appris=~/principal(1|2|3|4)/){
+    elsif ($b_mane_select){
       return 1;
-    }
+    }    
     else{
-      if ($a_ccds and $b_ccds){
-        if ($a->seq_region_strand == 1){
-          return $a_cds_start <=> $b_cds_start;
-        }
-        else{
-          return $b_cds_start <=> $a_cds_start;
-        }
+      if ($a_appris and $b_appris and $a_appris=~/principal(1|2|3|4)/ and $b_appris=~/principal(1|2|3|4)/){
+        return $a_appris cmp $b_appris;
       }
-      elsif ($a_ccds){
+      elsif ($a_appris and $a_appris=~/principal(1|2|3|4)/){
         return -1;
       }
-      elsif ($b_ccds){
+      elsif ($b_appris and $b_appris=~/principal(1|2|3|4)/){
         return 1;
       }
       else{
-        if ($a->biotype eq $b->biotype){
+        if ($a_ccds and $b_ccds){
           if ($a->seq_region_strand == 1){
             return $a_cds_start <=> $b_cds_start;
           }
@@ -450,45 +445,28 @@ sub sort_by_categ {
             return $b_cds_start <=> $a_cds_start;
           }
         }
-        elsif ($a->biotype eq "protein_coding"){
-           return -1;
+        elsif ($a_ccds){
+          return -1;
         }
-        elsif ($a->biotype eq "nonsense_mediated_decay"){
-           return 1;
+        elsif ($b_ccds){
+          return 1;
         }
-        
-        
-      
-#         if ($a->biotype eq "protein_coding" and $b->biotype eq "protein_coding"){
-#           if ($a->seq_region_strand == 1){
-#             return $a_cds_start <=> $b_cds_start;
-#           }
-#           else{
-#             return $b_cds_start <=> $a_cds_start;
-#           }
-#         }
-#         elsif ($a->biotype eq "protein_coding"){
-#           return -1;
-#         }
-#         elsif ($b->biotype eq "protein_coding"){
-#           return 1;
-#         }
-#         else{
-#           if ($a->biotype eq "nonsense_mediated_decay" and $b->biotype eq "nonsense_mediated_decay"){
-#             if ($a->seq_region_strand == 1){
-#               return $a_cds_start <=> $b_cds_start;
-#             }
-#             else{
-#               return $b_cds_start <=> $a_cds_start;
-#             }
-#           }
-#           elsif ($a->biotype eq "nonsense_mediated_decay"){
-#             return -1;
-#           }
-#           elsif ($b->biotype eq "nonsense_mediated_decay"){
-#             return 1;
-#           }
-#         }
+        else{
+          if ($a->biotype eq $b->biotype){
+            if ($a->seq_region_strand == 1){
+              return $a_cds_start <=> $b_cds_start;
+            }
+            else{
+              return $b_cds_start <=> $a_cds_start;
+            }
+          }
+          elsif ($a->biotype eq "protein_coding"){
+             return -1;
+          }
+          elsif ($a->biotype eq "nonsense_mediated_decay"){
+             return 1;
+          }
+        }
       }
     }
   } grep {$_->translate} @$transcripts;
@@ -805,9 +783,10 @@ sub get_host_gene_start_codon_set {
 
  Arg[1]    : arrayref of Bio::Vega::Transcript objects
  Function  : sorts coding transcripts according to the categories below:
-             1 - APPRIS principal 1 to 3, 
-             2 - CCDS (5'-most ATG first), 
-             3 - Other 5'-complete CDS (5'-most ATG first)
+             1 - MANE Select,
+             2 - APPRIS principal 1 to 3, 
+             3 - CCDS (5'-most ATG first), 
+             4 - Other 5'-complete CDS (5'-most ATG first)
  Returntype: arrayref of Bio::Vega::Transcript objects
 
 =cut
@@ -816,43 +795,53 @@ sub sort_by_categ_2 {
   my $transcripts = shift;
 
   my @sorted_transcripts = sort {
+    my $a_mane_select = scalar grep {$_->value eq "MANE_select"} @{$a->get_all_Attributes("remark")};
+    my $b_mane_select = scalar grep {$_->value eq "MANE_select"} @{$b->get_all_Attributes("remark")};
     my $a_appris = get_appris_tag($a);
     my $b_appris = get_appris_tag($b);
     my $a_ccds = get_ccds_tag($a);
     my $b_ccds = get_ccds_tag($b);
     my $a_cds_start = $a->coding_region_start;
     my $b_cds_start = $b->coding_region_start;
-  
-    if ($a_appris and $b_appris and $a_appris=~/principal(1|2|3)/ and $b_appris=~/principal(1|2|3)/){
-      return $a_appris cmp $b_appris;
-    }
-    elsif ($a_appris and $a_appris=~/principal(1|2|3)/){
+
+    if ($a_mane_select){
       return -1;
     }
-    elsif ($b_appris and $b_appris=~/principal(1|2|3)/){
+    elsif ($b_mane_select){
       return 1;
     }
     else{
-      if ($a_ccds and $b_ccds){
-        if ($a->seq_region_strand == 1){
-          return $a_cds_start <=> $b_cds_start;
-        }
-        else{
-          return $b_cds_start <=> $a_cds_start;
-        }
+      if ($a_appris and $b_appris and $a_appris=~/principal(1|2|3)/ and $b_appris=~/principal(1|2|3)/){
+        return $a_appris cmp $b_appris;
       }
-      elsif ($a_ccds){
+      elsif ($a_appris and $a_appris=~/principal(1|2|3)/){
         return -1;
       }
-      elsif ($b_ccds){
+      elsif ($b_appris and $b_appris=~/principal(1|2|3)/){
         return 1;
       }
       else{
-        if ($a->seq_region_strand == 1){
-          return $a_cds_start <=> $b_cds_start;
+        if ($a_ccds and $b_ccds){
+          if ($a->seq_region_strand == 1){
+            return $a_cds_start <=> $b_cds_start;
+          }
+          else{
+            return $b_cds_start <=> $a_cds_start;
+          }
+        }
+        elsif ($a_ccds){
+          return -1;
+        }
+        elsif ($b_ccds){
+          return 1;
         }
         else{
-          return $b_cds_start <=> $a_cds_start;
+          if ($a->seq_region_strand == 1){
+            return $a_cds_start <=> $b_cds_start;
+          }
+          else{
+            return $b_cds_start <=> $a_cds_start;
+          }
         }
       }
     }
