@@ -231,8 +231,25 @@ sub process_gene_2 {
                     $db_tr = fetch_from_gene_by_transcript_name($db_tr_id, $db_gene);
                   }
                   #
+                  #Do not merge with transcripts having certain remarks
+                  my @unallowed_remarks = ("NMD exception", "non-ATG start", "sequence error",
+                                            "non canonical conserved",
+                                            "non canonical genome sequence error",
+                                            "non canonical other",
+                                            "non canonical polymorphism",
+                                            "non canonical U12",
+                                            "non canonical TEC");
+                  foreach my $remark (@unallowed_remarks){
+                    if (scalar grep {$_->value eq $remark} @{$db_tr->get_all_Attributes('remark')}){
+                      print "Skipping transcript as partially redundant with a '$remark' transcript\n";
+                      $add_transcript = 0;
+                      @merge_candidates = ();
+                      $outcome = "partially redundant with a '$remark' transcript";
+                      last DBTR;
+                    }
+                  }
                   #Do not merge with MANE transcripts
-                  if (scalar grep {$_->value eq "MANE_select" or $_->value eq "MANE_plus_clinical"} @{$db_tr->get_all_Attributes('remark')}){
+                  if (scalar grep {$_->value =~ /^(MANE_select|MANE_plus_clinical|MANE_plus)$/} @{$db_tr->get_all_Attributes('remark')}){
                     print "Skipping transcript as partially redundant with a MANE transcript\n";
                     $add_transcript = 0;
                     @merge_candidates = ();
