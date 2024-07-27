@@ -196,7 +196,10 @@ sub assign_cds_to_transcripts {
         #Full length CDS?
         if ($fl_cds){
           #PolyA support or know stop codon required if full-length CDS
-          unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500) or is_known_stop_codon($cds_end, $slice_offset, $host_gene)){
+          unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or
+                  LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500) or
+                  LoutreWrite::AnnotUpdate::has_last_exon_polyA_site_support($transcript, $host_gene) or
+                  is_known_stop_codon($cds_end, $slice_offset, $host_gene)){
             print "Stop codon at $cds_end has no polyA site support nor has been annotated before\n";
             next TR;
           }
@@ -321,7 +324,10 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_end > $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
                 #Check polyA site support
-                unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500)){
+                unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or
+                        LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500) or
+                        LoutreWrite::AnnotUpdate::has_last_exon_polyA_site_support($transcript, $host_gene) 
+                        ){
                   print "No polyA site support - will make a retained_intron\n";
                   return 1;
                 }
@@ -336,7 +342,10 @@ sub is_retained_intron {
                   print "FOUND POLYASEQ\n";
                 }
                 #Check polyA site support
-                unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500)){
+                unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or
+                        LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500) or
+                        LoutreWrite::AnnotUpdate::has_last_exon_polyA_site_support($transcript, $host_gene)
+                        ){
                   print "No polyA site support - will make a retained_intron\n";
                   return 1;
                 }
