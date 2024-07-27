@@ -351,6 +351,16 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
                 print "Gene ".$host_gene->stable_id." will be ignored as it has an ASB_protein_coding remark\n";
                 $wrong_host = 1;
             }
+            #Ignore genes having these locus-level attributes
+            elsif (scalar(grep {$_->value eq "reference genome error"} @{$host_gene->get_all_Attributes('remark')})){
+              print "Gene ".$host_gene->stable_id." will be ignored as it has a 'reference genome error' remark\n";
+              $wrong_host = 1;
+            }
+            elsif (scalar(grep {$_->value eq "Selenoprotein"} @{$host_gene->get_all_Attributes('remark')})){
+              print "Gene ".$host_gene->stable_id." will be ignored as it has a Selenoprotein remark\n";
+              $wrong_host = 1;
+            }
+            
             #Double check that the gene does not have a coding transcript
             #There are a few cases in loutre_human
             else{
