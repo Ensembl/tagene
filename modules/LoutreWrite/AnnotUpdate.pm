@@ -1202,7 +1202,9 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_end > $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
                 #Check polyA site support
-            unless (has_polyA_site_support($transcript, 500) or has_polyAseq_support($transcript, 500)){
+            unless (has_polyA_site_support($transcript, 500) or
+                    has_polyAseq_support($transcript, 500) or
+                    has_last_exon_polyA_site_support($transcript, $host_gene)){
               print "No polyA site support - will make a retained_intron\n";
               return 1;
             }
@@ -1212,7 +1214,9 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_end <= $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
             #Check polyA site support
-            unless (has_polyA_site_support($transcript, 500) or has_polyAseq_support($transcript, 500)){
+            unless (has_polyA_site_support($transcript, 500) or
+                    has_polyAseq_support($transcript, 500) or
+                    has_last_exon_polyA_site_support($transcript, $host_gene)){
               print "No polyA site support - will make a retained_intron\n";
               return 1;
             }
@@ -1286,6 +1290,32 @@ sub has_polyAseq_support {
     }
     if (scalar keys %anames >= 4){
       return 1;
+    }
+  }
+  return 0;
+}
+
+
+
+=head2 has_last_exon_polyA_site_support
+
+ Arg[1]    : Bio::Vega::Transcript object
+ Arg[2]    : Bio::Vega::Gene object 
+ Function  : Returns true if the transcript 3' end overlaps the last exon of the MANE Select transcript, if any, in the host gene (2nd argument)
+ Returntype: none
+
+=cut
+
+sub has_last_exon_polyA_site_support {
+  my ($transcript, $gene) = @_;
+  my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
+  foreach my $tr (@{$gene->get_all_Transcripts}){
+    if (scalar grep {$_->value eq "MANE_select"} @{$tr->get_all_Attributes("remark")}){
+      #print "FOUND MANE_SELECT: ".$tr->stable_id."(".$tr->end_Exon->seq_region_start.", ".$tr->end_Exon->seq_region_end.", ".$transcript_end.")\n";
+      if ($tr->end_Exon->seq_region_start <= $transcript_end and $tr->end_Exon->seq_region_end >= $transcript_end){
+        return 1;
+      }
+      last;
     }
   }
   return 0;
