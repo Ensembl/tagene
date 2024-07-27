@@ -185,6 +185,14 @@ sub assign_cds_to_transcripts {
       print "start_codon=".($unique_start_codon+$slice_offset)."; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
       my ($cds_start, $cds_end, $fl_cds) = start_codon_fits($transcript, $unique_start_codon + $slice_offset); 
       if ($cds_start and $cds_end){
+        #Found novel CDS from know start codon 
+        #Now, check for intron retention
+        #If stop codon is upstream of retained intron, do not make it retained_intron (it will probably be NMD)
+        if (is_retained_intron($transcript, $host_gene, 5, $cds_end)){
+          print "Found retained_intron before stop codon at $cds_end\n";
+          next TR;
+        }
+        #Full length CDS?
         if ($fl_cds){
           #PolyA support or know stop codon required if full-length CDS
           unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500) or is_known_stop_codon($cds_end, $slice_offset, $host_gene)){
@@ -192,11 +200,12 @@ sub assign_cds_to_transcripts {
             next TR;
           }
         }
-          
+        #Annotate CDS
         if (create_cds($transcript, $cds_start, $cds_end)){
           #Re-assign biotype and status
+          print "TTTTTTTT\n";
           if (predicted_nmd_transcript($transcript, $cds_end)){
-            $transcript->biotype("nonsense_mediated_decay");
+            $transcript->biotype("nonsense_mediated_decay"); print "XXXXXXX\n";
           }
           else{
             $transcript->biotype("protein_coding");
@@ -210,6 +219,12 @@ sub assign_cds_to_transcripts {
       }
     }
     print "No match for transcript ".$transcript->stable_id."\t".$transcript->biotype."\n";
+    #Non-coding transcript: check for intron retention 
+    print "\nChecking for intron retention...\n";
+    if (is_retained_intron($transcript, $host_gene, 5)){
+      $transcript->biotype("retained_intron");
+      print "Found retained_intron\n";
+    }
   }
 }
 
@@ -226,11 +241,17 @@ sub assign_cds_to_transcripts {
 =cut
 
 sub is_retained_intron {
-  my ($transcript, $host_gene, $min_overhang) = @_;
-  #i) Full intron retention: the model fully transcribes the sequence between the splice donor site and acceptor site of adjacent coding exons (i.e. a ‘CDS intron’) of a model in loutre. This could include scenarios where the TAGENE model retains multiple CDS introns of the same loutre model. 
-  #ii) Partial intron retention: the model has a start or end coordinate within a CDS intron of a loutre model, but not (respectively) a splice donor site or splice acceptor site within that same intron. Do we need some kind of size cut-off here? I.e. for fuzzy edges that are misalignments rather than real retained introns. Should we clip these? 
+  my ($transcript, $host_gene, $min_overhang, $stop_codon_coordinate) = @_;
+  #i) Full intron retention: the model fully transcribes the sequence between the splice donor site and
+  #   acceptor site of adjacent coding exons (i.e. a ‘CDS intron’) of an annotated transcript. This could include scenarios
+  #   where the TAGENE model retains multiple CDS introns of the same transcript. 
+  #ii) Partial intron retention: the model has a start or end coordinate within a CDS intron of an annotated transcript,
+  #   but not (respectively) a splice donor site or splice acceptor site within that same intron. Do we need some kind
+  #   of size cut-off here? I.e. for fuzzy edges that are misalignments rather than real retained introns. Should we clip these? 
   my $slice_offset = $host_gene->seq_region_start - 1; #print "OFFSET=$slice_offset\n";
   $min_overhang ||= 1;
+  my @comp_trs;
+  my $mane_select;
   foreach my $tr (@{$host_gene->get_all_Transcripts}){
     #Ignore lingering OTT transcripts
     next unless $tr->stable_id =~ /^ENS([A-Z]{3})?T000/;
@@ -238,7 +259,19 @@ sub is_retained_intron {
     if (scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')})){
       next unless ($tr->biotype eq "comp_pipe" or scalar(grep {$_->value eq "TAGENE_transcript"} @{$tr->get_all_Attributes('remark')}));
     }
-    
+    #Compare with MANE Select transcript first?...
+    if (scalar(grep {$_->value eq "MANE_select"} @{$tr->get_all_Attributes('remark')})){
+      $mane_select = $tr;
+    }
+    elsif ($tr->translate){
+      push(@comp_trs, $tr);
+    }
+  }
+  if ($mane_select){
+    unshift(@comp_trs, $mane_select);
+  }
+
+  foreach my $tr (@comp_trs){
     if ($tr->translate){
       #print "TR:  ".$tr->stable_id." ".$tr->biotype."\n"; 
       my $cds_start = $tr->coding_region_start + $slice_offset;
@@ -259,18 +292,29 @@ sub is_retained_intron {
             #print "EXON: ".$exon->seq_region_start."-".$exon->seq_region_end."\n";
             if ($exon->seq_region_start < $intron->seq_region_start and $exon->seq_region_end > $intron->seq_region_end){
               #print "FOUND\n";
-              return 1;
+              if ($stop_codon_coordinate){ #if CDS end coordinate, do not make retained_intron if CDS end is upstream of intron
+                if (($transcript->seq_region_strand == 1 and $stop_codon_coordinate > $intron->seq_region_start) or
+                    ($transcript->seq_region_strand == -1 and $stop_codon_coordinate < $intron->seq_region_end)
+                ){
+                  return 1;
+                }
+              }
+              else{
+                return 1;
+              }
             }
           }
           #Partial intron retention
           #  ref: #######-------#######------######
           #   tr:          #######---####
+          #a) partial intron retention of the start exon (forward strand)
           if ($transcript->seq_region_strand == 1 and 
               $transcript->start_Exon->seq_region_start >= $intron->seq_region_start and
               $transcript->start_Exon->seq_region_end > $intron->seq_region_end and
               ($transcript->start_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
                 return 1;
           }
+          #b) partial intron retention of the end exon (reverse strand)
           if ($transcript->seq_region_strand == -1 and 
               $transcript->end_Exon->seq_region_start >= $intron->seq_region_start and
               $transcript->end_Exon->seq_region_end > $intron->seq_region_end and
@@ -281,16 +325,22 @@ sub is_retained_intron {
                   return 1;
                 }
           }
+          #c) partial intron retention of the end exon (forward strand)
           if ($transcript->seq_region_strand == 1 and 
               $transcript->end_Exon->seq_region_start < $intron->seq_region_start and
               $transcript->end_Exon->seq_region_end <= $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
+                print "AAA - LAST INTRON\n";
+                if (LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500)){
+                  print "FOUND POLYASEQ\n";
+                }
                 #Check polyA site support
                 unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500)){
                   print "No polyA site support - will make a retained_intron\n";
                   return 1;
                 }
           }
+          #d) partial intron retention of the start exon (reverse strand)
           if ($transcript->seq_region_strand == -1 and 
               $transcript->start_Exon->seq_region_start < $intron->seq_region_start and
               $transcript->start_Exon->seq_region_end <= $intron->seq_region_end and
@@ -479,7 +529,7 @@ sub cds_fits {
   foreach my $exon (@{$acceptor_transcript->get_all_Exons}){
     print "EXON_START=".$exon->seq_region_start."\n";
     if ($exon->seq_region_start <= $cds_start and $exon->seq_region_end >= $cds_start){
-      $cds_start_present = 1;
+      $cds_start_present = 1; print "cds_start_present=1\n";
       last;
     }
   }
@@ -487,12 +537,14 @@ sub cds_fits {
   my $cds_end_present;
   foreach my $exon (@{$acceptor_transcript->get_all_Exons}){
     if ($exon->seq_region_start <= $cds_end and $exon->seq_region_end >= $cds_end){
-      $cds_end_present = 1;
+      $cds_end_present = 1; print "cds_end_present=1\n";
       last;
     }
   }
   #print "cds_start_present=$cds_start_present; cds_end_present=$cds_end_present\n";
   #CDS introns must coincide
+  print "acceptor_intron_chain($cds_start, $cds_end)=".intron_chain($acceptor_transcript, $cds_start, $cds_end)."\n";
+  print "donor_intron_chain($cds_start, $cds_end)=".intron_chain($donor_transcript, $cds_start, $cds_end)."\n";
   if ($cds_start_present and $cds_end_present and
       intron_chain($acceptor_transcript, $cds_start, $cds_end) eq intron_chain($donor_transcript, $cds_start, $cds_end)){
       print "cds_start, cds_end and intron chain match\n";
@@ -664,7 +716,7 @@ sub cds_exon_chain {
 =cut
 
 sub intron_chain {
-  my ($transcript, $from, $to) = shift;
+  my ($transcript, $from, $to) = @_;
   if (($from and !$to) or ($to and !$from)){
     die "Need both start and end coordinates or none!";
   }
@@ -840,7 +892,7 @@ sub start_codon_fits {
         #Find CDS end in genomic coordinates
         my $cds_length = length($1);
         my @coords2;
-        print "TR_CDS_START=$tr_cds_start; CDS_LENGTH=$cds_length\n";
+        print "TR_CDS_START=$tr_cds_start; CDS_LENGTH=".$cds_length."nt,".(($cds_length-3)/3)."aa\n";
         #if ($transcript->seq_region_strand == 1){
           @coords2 = $transcript->cdna2genomic($tr_cds_start + $cds_length - 1, $tr_cds_start + $cds_length - 1);
         #}

@@ -597,11 +597,15 @@ sub process_gene_2 {
           }
 
           print "TR1_START=".$tr->seq_region_start."; TR1_END=".$tr->seq_region_end."; EXONS=".join(":", map {$_->seq_region_start."-".$_->seq_region_end} @{$tr->get_all_Exons})."\n";
-          #Firstly, check for intron retention
-          #Else, if allowed, try to assign a CDS and change the biotype accordingly
-          if (LoutreWrite::CDSCreation::is_retained_intron($tr, $db_gene, 5)){
-            $tr->biotype("retained_intron");
+
+          #If gene is not coding, check for intron retention
+          if ($db_gene->biotype ne "protein_coding"){ #ANY OTHER GENE BIOTYPE? SHOULD I CHECK TRANSCRIPT BIOTYPES?
+            if (LoutreWrite::CDSCreation::is_retained_intron($tr, $db_gene, 5)){
+              $tr->biotype("retained_intron");
+            }
+            #else, the transcript will keep the processed_transcript biotype
           }
+          #Else, if allowed, try to assign a CDS and change the transcript biotype accordingly
           else{
             unless ($do_not_add_cds){
               assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
