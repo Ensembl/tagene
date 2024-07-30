@@ -99,6 +99,7 @@ sub default_options {
     tag => 'split',
     dep_job => '',
     output_dir => '',
+    filter_file => '',
     by_gene_id => 0,
     no_shuffle => 0,
     job_limit => 20,
@@ -465,7 +466,7 @@ sub pipeline_analyses {
         write => ($self->o('write') ? '-write' : ''),
       },
       -max_retry_count => 0,
-      -rc_name => 'default',
+      -rc_name => '5GB',
       -analysis_capacity => $self->o('job_limit'),
       -flow_into => {
         'MEMLIMIT' => ['load_gxf_in_loutre_high_mem'],
@@ -535,7 +536,7 @@ sub pipeline_analyses {
         write => ($self->o('write') ? '-write' : ''),
       },
       -max_retry_count => 0,
-      -rc_name => '10GB',
+      -rc_name => '20GB',
       -analysis_capacity => $self->o('job_limit'),
     },
 
@@ -664,9 +665,9 @@ sub resource_classes {
 
   return {
     'default' => {SLURM => '--time=1:00:00 --mem=1000', LSF => '-q short -M 1000 -R"select[mem>1000] rusage[mem=1000]"'},   
-    '5GB' => {SLURM => '--time=2:00:00 --mem=5000', LSF => '-q short -M 5000 -R"select[mem>5000] rusage[mem=5000]"'},
-    '10GB' => {SLURM => '--time=3:00:00 --mem=10000', LSF => '-q standard -M 10000 -R"select[mem>10000] rusage[mem=10000]"'},
-    '20GB' => {SLURM => '--time=6:00:00 --mem=20000', LSF => '-q standard -M 20000 -R"select[mem>20000] rusage[mem=20000]"'},
+    '5GB' => {SLURM => '--time=3:00:00 --mem=5000', LSF => '-q short -M 5000 -R"select[mem>5000] rusage[mem=5000]"'},
+    '10GB' => {SLURM => '--time=5:00:00 --mem=10000', LSF => '-q standard -M 10000 -R"select[mem>10000] rusage[mem=10000]"'},
+    '20GB' => {SLURM => '--time=8:00:00 --mem=20000', LSF => '-q standard -M 20000 -R"select[mem>20000] rusage[mem=20000]"'},
     '40GB' => {SLURM => '--time=12:00:00 --mem=40000', LSF => '-q short -M 40000 -R"select[mem>40000] rusage[mem=40000]"'},
   };
 }
