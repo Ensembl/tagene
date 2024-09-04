@@ -445,7 +445,7 @@ sub process_gene_2 {
               if (($merged_transcript->stable_id =~ /^ENS/ and $ts->stable_id eq $merged_transcript->stable_id)
                   or ($merged_transcript->get_all_Attributes('name')->[0] and $ts->get_all_Attributes('name')->[0] and $merged_transcript->get_all_Attributes('name')->[0]->value eq $ts->get_all_Attributes('name')->[0]->value)
                   or $ts == $merged_transcript){
-                print "FGHIJ S1=".$ts->stable_id." N1=".$ts->get_all_Attributes('name')->[0]->value." S2=".$merged_transcript->stable_id." N2=".$merged_transcript->get_all_Attributes('name')->[0]->value."\n";
+                print "FGHIJ S1=".$ts->stable_id." N1=".($ts->get_all_Attributes('name')->[0] ? $ts->get_all_Attributes('name')->[0]->value : "")." S2=".$merged_transcript->stable_id." N2=".($merged_transcript->get_all_Attributes('name')->[0] ? $merged_transcript->get_all_Attributes('name')->[0]->value : "")."\n";
                 print "TS=".$ts->seq_region_start."-".$ts->seq_region_end.":".$ts->seq_region_strand."  ".join(", ", map {$_->seq_region_start."-".$_->seq_region_end.":".$_->seq_region_strand} @{$ts->get_all_Exons})."\n";
                 print "MT=".$merged_transcript->seq_region_start."-".$merged_transcript->seq_region_end.":".$merged_transcript->seq_region_strand."  ".join(", ", map {$_->seq_region_start."-".$_->seq_region_end.":".$_->seq_region_strand} @{$merged_transcript->get_all_Exons})."\n";
                 # $ts and $merged_transcript point to the same object, so flushing exons in one does the same to the other
