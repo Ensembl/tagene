@@ -132,8 +132,8 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
                #$att->value eq "Assembled from RACEseq reads" or
                #$att->value =~ /^Assembled from LRGASP.+reads.+/ or
                #$att->value =~ /^Assembled from PacBio reads/
-               $att->value =~ /Assembled from (.+) reads/ or
-               $att->value eq "CLS3 project"
+               $att->value =~ /Assembled from (.+) reads/ #or
+#               $att->value eq "CLS3 project"
               ){
             $tagene_datasets++;
             my ($dataset) = $att->value =~ /Assembled from (.+) reads/;
@@ -229,16 +229,16 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
                         $transcript->seq_region_end,
                         $transcript->seq_region_strand,
                         $gene->stable_id, 
-                        ($gene->get_all_Attributes('name')->[0]->value || "NA"),
+                        ($gene->get_all_Attributes('name')->[0] ? $gene->get_all_Attributes('name')->[0]->value : "NA"),
                         $gene->biotype, 
                         $transcript->stable_id,
-                        ($transcript->get_all_Attributes('name')->[0]->value || "NA"),
+                        ($transcript->get_all_Attributes('name')->[0] ? $transcript->get_all_Attributes('name')->[0]->value : "NA"),
                         $transcript->biotype,
                         (previous_biotype($transcript) || "NA"),
                         ($extended_flag ? "extended" : "novel"),
                         join(", ", keys %tsources),
                         scalar(@{$transcript->get_all_Attributes('cds_end_NF')}) ? "cds_end_NF" : "NA",
-                        join(", ", map {$_->value} grep {$_->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_|PB|anchIC|anchUC)/} @{$transcript->get_all_Attributes('hidden_remark')}),
+                        join(", ", map {$_->value} grep {$_->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_|PB|anchIC|anchUC|.+)/} @{$transcript->get_all_Attributes('hidden_remark')}),
                         $is_unique_cds,
                         ($tn_length || "NA"),
                         scalar(@{$transcript->get_all_Exons}),
@@ -302,7 +302,7 @@ sub previous_biotype {
   if ($date){
     $sth = $otter_dba->dbc->prepare("select biotype from transcript join seq_region using (seq_region_id)
                                       where stable_id = ? and modified_date < ? and name = ? and seq_region_start < ? and seq_region_end > ?
-                                      order by modified_date desc limit 1");
+                                      order by transcript_id desc limit 1");
     $sth->execute($transcript->stable_id, $date, $transcript->slice->seq_region_name, $transcript->seq_region_end, $transcript->seq_region_start);
   }
   else{
