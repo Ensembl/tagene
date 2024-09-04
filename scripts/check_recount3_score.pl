@@ -4,6 +4,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::DB::HTS::Tabix;
 use List::Util qw(uniq);
 
@@ -14,6 +15,10 @@ my $cls_id_list;
 my $recount3_file;
 my $cutoff = 50;
 my $only_chr;
+my $ref_dbhost;
+my $ref_dbport;
+my $ref_dbuser;
+my $ref_dbname;
 my $outfile;
 
 &GetOptions(
@@ -22,8 +27,43 @@ my $outfile;
             'chr=s'      => \$only_chr,
             'recount3=s' => \$recount3_file,
             'cutoff=i'   => \$cutoff,
+            'refhost=s'  => \$ref_dbhost,
+            'refport=i'  => \$ref_dbport,
+            'refuser=s'  => \$ref_dbuser,
+            'refdbname=s' => \$ref_dbname,
             'out=s'      => \$outfile,
            );
+
+
+#Connect to database with reference annotation
+my %ref_introns;
+if ($ref_dbhost and $ref_dbport and $ref_dbuser and $ref_dbname){
+  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+            -host => $ref_dbhost,
+            -port => $ref_dbport,    
+            -user => $ref_dbuser,
+            -dbname => $ref_dbname,
+  );
+  my $sa = $db->get_SliceAdaptor();
+  foreach my $slice (@{$sa->fetch_all("toplevel")}){
+    next unless $slice->coord_system->is_default;
+    if ($only_chr){
+      next unless $slice->seq_region_name eq $only_chr;
+    }
+    foreach my $gene (@{$slice->get_all_Genes}){
+      unless ($gene->biotype eq "artifact" or !($gene->stable_id =~ /^ENS/) or scalar(grep {$_->value eq "not for VEGA"} @{$gene->get_all_Attributes})){
+        foreach my $transcript (@{$gene->get_all_Transcripts}){
+          unless ($transcript->biotype eq "artifact" or !($transcript->stable_id =~ /^ENS/) or scalar(grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes})){
+            foreach my $intron (@{$transcript->get_all_Introns}){
+              $ref_introns{$intron->seq_region_name.":".$intron->seq_region_start."-".$intron->seq_region_end} = 1;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 
 
 #Open Tabix for Recount3
@@ -79,6 +119,7 @@ while (<GTF>){
     }
   }
 }
+close (GTF);
 
 #Calculate intron coordinates for each transcript
 my %intron_coords_by_tid;
@@ -113,7 +154,7 @@ foreach my $tid (uniq @cls_ids){
       if ($iter){
         while (my $line = $iter->next){
           my @cols = split(/\t/, $line);
-          if ($cols[1]+1 == $intron_coords_by_tid{$tid}{'starts'}[$i] and $cols[2] == $intron_coords_by_tid{$tid}{'ends'}[$i]){
+          if ($cols[1]+1 == $intron_coords_by_tid{$tid}{'starts'}[$i] and $cols[2] == $intron_coords_by_tid{$tid}{'ends'}[$i] and $cols[5] eq $intron_coords_by_tid{$tid}{'strand'}){
             $score = $cols[4];
             last;
           }
@@ -121,7 +162,13 @@ foreach my $tid (uniq @cls_ids){
       }
       push(@scores, $score);
       if ($score < $cutoff){
-        $passed = 0;
+        if ($ref_introns{$coords}){ #ignore low score if intron was in the reference annotation
+          $passed = 1;
+          $scores[-1] .= "(a)";
+        }
+        else{ 
+          $passed = 0;
+        }
       }
     }
     print OUT join("\t", $tid, ($passed ? "yes" : "no"), scalar(@{$intron_coords_by_tid{$tid}{'starts'}}), join(",", @scores))."\n";
