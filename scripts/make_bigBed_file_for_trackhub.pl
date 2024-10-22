@@ -156,7 +156,7 @@ if ($path_to_ftp){
   if ($ftp_user){
     $become_user = "become $ftp_user";
   }
-  system("bsub -q datamover -I $become_user cp -p $cwd/$outfile.bb $path_to_ftp");
+  system("sbatch -p datamover -t 5 --mem=500 --wrap=\"$become_user cp $cwd/$outfile.bb $path_to_ftp\"");
 }
 
 
