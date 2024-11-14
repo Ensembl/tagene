@@ -256,6 +256,7 @@ sub is_retained_intron {
   $min_overhang ||= 1;
   my @comp_trs;
   my $mane_select;
+  #print "\nLOOKING AT INTRON RETENTION...\n";
   foreach my $tr (@{$host_gene->get_all_Transcripts}){
     #Ignore lingering OTT transcripts
     next unless $tr->stable_id =~ /^ENS([A-Z]{3})?T000/;
@@ -275,9 +276,29 @@ sub is_retained_intron {
     unshift(@comp_trs, $mane_select);
   }
 
+
+  #Firstly, find which of the input transcript's exons exist in annotated coding transcripts
+  #These must not be queried for intron retention
+  my %annotated_exons;
   foreach my $tr (@comp_trs){
     if ($tr->translate){
-      #print "TR:  ".$tr->stable_id." ".$tr->biotype."\n"; 
+      foreach my $exon1 (@{$tr->get_all_Exons}){
+        my $rank = 0; #not using the 'rank' API method because it relies on exon stable ids, which may not have been assigned yet
+        foreach my $exon2 (@{$transcript->get_all_Exons}){
+          $rank++;
+          if ($exon1->seq_region_start == $exon2->seq_region_start and $exon1->seq_region_end == $exon2->seq_region_end){
+            $annotated_exons{$rank}++;
+            #print "SEEN=".$rank."\n";
+          }
+        }
+      }
+    }
+  }
+
+  #Now loop through all the coding transcripts again and search for intron retention in the input transcript
+  foreach my $tr (@comp_trs){
+    if ($tr->translate){
+      #print "\nTR:  ".$tr->stable_id." ".$tr->biotype."\n"; 
       my $cds_start = $tr->coding_region_start + $slice_offset;
       my $cds_end = $tr->coding_region_end + $slice_offset;
       if ($cds_start > $cds_end){
@@ -292,8 +313,14 @@ sub is_retained_intron {
           #Full intron retention
           #  ref: #######-------#######------######
           #   tr:       #########
+          my $rank = 0;
           foreach my $exon (@{$transcript->get_all_Exons}){
             #print "EXON: ".$exon->seq_region_start."-".$exon->seq_region_end."\n";
+            $rank++;
+            if ($annotated_exons{$rank}){
+              #print "ANNOTATED\n";
+              next;
+            }
             if ($exon->seq_region_start < $intron->seq_region_start and $exon->seq_region_end > $intron->seq_region_end){
               #print "FOUND\n";
               if ($stop_codon_coordinate){ #if CDS end coordinate, do not make retained_intron if CDS end is upstream of intron
@@ -312,24 +339,34 @@ sub is_retained_intron {
           #  ref: #######-------#######------######
           #   tr:          #######---####
           #a) partial intron retention of the start exon (forward strand)
+#print "\nEntering partial intron retention\n";
+#print "START_EXON: ".$transcript->start_Exon->seq_region_start."-".$transcript->start_Exon->seq_region_end."\n";
+#print "END_EXON: ".$transcript->end_Exon->seq_region_start."-".$transcript->end_Exon->seq_region_end."\n";
+#print "INTRON: ".$intron->seq_region_start."-".$intron->seq_region_end."\n\n";
           if ($transcript->seq_region_strand == 1 and 
               $transcript->start_Exon->seq_region_start >= $intron->seq_region_start and
               $transcript->start_Exon->seq_region_end > $intron->seq_region_end and
               ($transcript->start_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
-                return 1;
+#print "-case 1\n";
+            unless ($annotated_exons{1}){
+              return 1;
+            }
           }
           #b) partial intron retention of the end exon (reverse strand)
           if ($transcript->seq_region_strand == -1 and 
               $transcript->end_Exon->seq_region_start >= $intron->seq_region_start and
               $transcript->end_Exon->seq_region_end > $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_start + $min_overhang) <= $intron->seq_region_end){
+#print "-case 2\n";
                 #Check polyA site support
                 unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or
                         LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500) or
                         LoutreWrite::AnnotUpdate::has_last_exon_polyA_site_support($transcript, $host_gene) 
                         ){
-                  print "No polyA site support - will make a retained_intron\n";
-                  return 1;
+                  unless ($annotated_exons{scalar(@{$transcript->get_all_Exons})}){
+                    print "No polyA site support - will make a retained_intron\n";
+                    return 1;
+                  }
                 }
           }
           #c) partial intron retention of the end exon (forward strand)
@@ -337,7 +374,8 @@ sub is_retained_intron {
               $transcript->end_Exon->seq_region_start < $intron->seq_region_start and
               $transcript->end_Exon->seq_region_end <= $intron->seq_region_end and
               ($transcript->end_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
-                print "AAA - LAST INTRON\n";
+#print "-case 3\n";
+                #print "AAA - LAST INTRON\n";
                 if (LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500)){
                   print "FOUND POLYASEQ\n";
                 }
@@ -346,8 +384,10 @@ sub is_retained_intron {
                         LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500) or
                         LoutreWrite::AnnotUpdate::has_last_exon_polyA_site_support($transcript, $host_gene)
                         ){
-                  print "No polyA site support - will make a retained_intron\n";
-                  return 1;
+                  unless (scalar(@{$transcript->get_all_Exons})){
+                    print "No polyA site support - will make a retained_intron\n";
+                    return 1;
+                  }
                 }
           }
           #d) partial intron retention of the start exon (reverse strand)
@@ -355,7 +395,10 @@ sub is_retained_intron {
               $transcript->start_Exon->seq_region_start < $intron->seq_region_start and
               $transcript->start_Exon->seq_region_end <= $intron->seq_region_end and
               ($transcript->start_Exon->seq_region_end - $min_overhang) >= $intron->seq_region_start){
-                return 1;
+#print "-case 4\n";
+            unless ($annotated_exons{1}){
+              return 1;
+            }
           }
         }
       }
