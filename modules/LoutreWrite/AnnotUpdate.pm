@@ -551,6 +551,13 @@ sub process_gene_2 {
                     assign_cds_to_transcripts($ts, $g, $slice_offset);
                   }
                 }
+
+                #If the (extended) transcript has an "NMD likely if extended" remark and its biotype is nonsense_mediated_decay,
+                #remove the remark
+                if ($ts->biotype eq "nonsense_mediated_decay" and grep {$_->value eq "NMD likely if extended"} @{$ts->get_all_Attributes("remark")}){
+                  my $attributes = $ts->{'attributes'};
+                  @{$attributes} = grep {$_->code ne "remark" and $_->value ne "NMD likely if extended"} @{$attributes};
+                }
                               
                 #Change authorship
                 $ts->transcript_author($merged_transcript->transcript_author);
