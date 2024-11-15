@@ -395,6 +395,20 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
                 next GENE;
               }
             }
+
+            #Ignore genes containing "non-ATG start" transcripts
+            foreach my $tr (@{$host_gene->get_all_Transcripts}){
+              next if $tr->biotype eq "artifact";
+              next if scalar grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')};
+              if (scalar grep {$_->value eq "non-ATG start"} @{$tr->get_all_Attributes("remark")}){
+                print "Gene ".$host_gene->stable_id." will be ignored as it has non-ATG start transcripts\n";
+                foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
+                  my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+                  print "TR2: $t_name: host gene has non-ATG start transcripts\n";
+                }
+                next GENE;
+              }
+            }
             
             #$new_gene_obj = LoutreWrite::Default->assign_cds_to_transcripts($new_gene_obj, $host_gene);
         }
