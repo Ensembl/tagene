@@ -156,9 +156,11 @@ sub check_max_overlapped_loci {
         }
       }
       if (scalar @overlapped_db_genes and scalar keys %genes_not_overlapping_splice_site == scalar @overlapped_db_genes){
-        my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
-        print "KILL_2b: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@overlapped_db_genes)." loci: $message\n";
-        $list{$t_name} = 1;
+        if (scalar @clusters > $max_ov_loci){
+          my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+          print "KILL_2b: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@overlapped_db_genes)." loci: $message\n";
+          $list{$t_name} = 1;
+        }
       }
 ###      
        
