@@ -541,14 +541,27 @@ sub process_gene_2 {
                 }
                                
     
-                #Firstly, check for intron retention
-                #Else, if allowed, try to assign a CDS and change the biotype accordingly
-                if (LoutreWrite::CDSCreation::is_retained_intron($ts, $g, 5)){
-                  $ts->biotype("retained_intron"); print "STRAND=".$ts->seq_region_strand."\n";
+                
+                #If the gene is coding, try to assign a CDS and change the biotype accordingly
+                #But firstly check that the TSS doesn't overlap a coding exon of the MANE Select transcript
+                #Do not try to add a CDS in this case
+                if ($g->biotype eq "protein_coding"){
+                  if (tss_overlaps_mane_cds($ts, $g)){
+                    print "Skipping CDS creation: $id TSS overlaps MANE Select CDS exon\n";
+                    if (LoutreWrite::CDSCreation::is_retained_intron($ts, $g, 5)){
+                      $ts->biotype("retained_intron");
+                    }
+                  }
+                  else{
+                    unless ($do_not_add_cds){
+                      assign_cds_to_transcripts($ts, $g, $slice_offset);
+                    }
+                  }
                 }
+                #If gene is not coding, check for intron retention
                 else{
-                  unless ($do_not_add_cds){
-                    assign_cds_to_transcripts($ts, $g, $slice_offset);
+                  if (LoutreWrite::CDSCreation::is_retained_intron($ts, $g, 5)){
+                    $ts->biotype("retained_intron");
                   }
                 }
 
@@ -629,10 +642,20 @@ sub process_gene_2 {
             }
             #else, the transcript will keep the processed_transcript biotype
           }
-          #Else, if allowed, try to assign a CDS and change the transcript biotype accordingly
+          #If gene is coding, if allowed, try to assign a CDS to the transcript and change the its biotype accordingly
           else{
-            unless ($do_not_add_cds){
-              assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
+            #But firstly check that the TSS doesn't overlap a coding exon of the MANE Select transcript
+            #Do not try to add a CDS in this case
+            if (tss_overlaps_mane_cds($tr, $db_gene)){
+              print "Skipping CDS creation: $id TSS overlaps MANE Select CDS exon\n";
+              if (LoutreWrite::CDSCreation::is_retained_intron($tr, $db_gene, 5)){
+                $tr->biotype("retained_intron");
+              }
+            }
+            else{
+              unless ($do_not_add_cds){
+                assign_cds_to_transcripts($tr, $db_gene, $slice_offset);
+              }
             }
           }
           $db_gene->add_Transcript($tr);
@@ -1642,6 +1665,45 @@ sub fetch_from_gene_by_transcript_name {
   foreach my $transcript (@{$gene->get_all_Transcripts}){
     if ($transcript->get_all_Attributes('name')->[0] and $transcript->get_all_Attributes('name')->[0]->value eq $tr_name){
       return $transcript;
+    }
+  }
+  return;
+}
+
+
+
+=head2 tss_overlaps_mane_cds
+
+ Arg[1]    : Bio::Vega::Transcript object
+ Arg[2]    : Bio::Vega::Gene object
+ Function  : Returns true if the transcript TSS overlaps a coding exon of the MANE Select transcript (if any) of the host gene,
+             unless the TSS overlaps with the MANE Select transcript CDS start
+ Returntype: none
+
+=cut
+
+sub tss_overlaps_mane_cds {
+  my ($transcript, $host_gene) = @_;
+  #print "CHECKING tss_overlaps_mane_cds\n";
+  my $canonical_tr;
+  foreach my $tr (@{$host_gene->get_all_Transcripts}){
+    if (scalar grep {$_->value eq "MANE_select"} @{$tr->get_all_Attributes("remark")}){
+      $canonical_tr = $tr; #print "Found MANE_select: ".$tr->stable_id."\n";
+      last;
+    }
+  }
+  my $tss = $transcript->seq_region_strand == 1 ? $transcript->start : $transcript->end;
+  if ($canonical_tr){
+    #print "CAN_START=".$canonical_tr->seq_region_start."\n";
+    foreach my $cds_exon (@{$canonical_tr->get_all_translateable_Exons}){
+      #print "CDS_EXON_START=".$cds_exon->start." TSS=$tss CDS_EXON_END=".$cds_exon->end."\n";
+      #print "CRS=".$canonical_tr->coding_region_start."  CRE=".$canonical_tr->coding_region_end."\n";
+      if ($cds_exon->start <= $tss and $cds_exon->end >= $tss){
+        unless (($transcript->seq_region_strand == 1 and $tss == $canonical_tr->coding_region_start) or
+                ($transcript->seq_region_strand == -1 and $tss == $canonical_tr->coding_region_end)){
+          return 1;
+        }
+      }
     }
   }
   return;
