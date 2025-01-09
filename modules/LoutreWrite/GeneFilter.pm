@@ -48,53 +48,88 @@ sub check_artifact_transcripts {
 
  Arg[1]    : list of Bio::Vega::Gene objects
  Arg[2]    : Integer
+ Arg[3]    : 1/0 (stringent check, just simple exonic overlap, no clusters taken into account)
  Function  : Check for transcripts overlapping a number of existing genes at the exon level that exceeds the number given in the second argument.
+             Only genes of certain biotypes (coding and lncRNA but not small RNAs or pseudogenes), and not tagged as readthrough, count towards that number.
  Returntype: Hashref - list of transcript names
 
 =cut
 
 sub check_max_overlapped_loci {
-  my ($self, $genes, $max_ov_loci) = @_;
+  my ($self, $genes, $max_ov_loci, $stringent_check) = @_;
   my %list;
   foreach my $gene (@$genes){
     foreach my $transcript (@{$gene->get_all_Transcripts}){
       my $message = "";
       #Fetch database genes overlapping our transcript
-#      my $tr_slice = $transcript->slice->adaptor->fetch_by_region("toplevel", $transcript->seq_region_name, $transcript->start, $transcript->end);
-#      my @db_genes = grep {$_->seq_region_strand == $gene->seq_region_strand} @{$tr_slice->get_all_Genes};
-       #my $overlapped_genes_count = 0;
       my @db_genes = @{get_valid_overlapping_genes($transcript)};
       my @overlapped_db_genes;
+      my @overlapped_select_db_genes;
       DBG:foreach my $db_gene (@db_genes){
-#       next unless $db_gene->source =~ /(ensembl|havana)/;
-#       next if $db_gene->biotype eq "artifact";
-#       next if scalar(grep {$_->value eq "not for VEGA"} @{$db_gene->get_all_Attributes('remark')}) > 0;
-        # next if $db_gene->biotype =~ /^(miRNA|misc_RNA|ribozyme|rRNA|rRNA_pseudogene|scaRNA|snoRNA|snRNA|sRNA|vault_rna)$/i;  #Ignore small RNA genes
-        # next if $db_gene->biotype =~ /ig_pseudogene|processed_pseudogene|pseudoexon|pseudogene|transcribed_.+_pseudogene|tr_pseudogene|unitary_pseudogene/; #Ignore pseudogenes
+        #Count only certain biotypes (coding and lncRNA broad biotypes)
         if ($db_gene->biotype =~ /antisense|bidirectional_promoter_lncrna|ig_gene|IG_V_gene|lincRNA|macro_lncrna|overlapping_ncrna|polymorphic_pseudogene|processed_transcript|protein_coding|sense_intronic|sense_overlapping|tec|tr_gene/i){
-#EXCLUDE READTHROUGH GENES? (DIFFERENT FILTER)
+          my $mane_select;
           foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
             next if $db_tr->biotype eq "artifact";
             next if scalar grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')};
+            #Do not count readthrough genes as this may affect transcripts belonging to the overlapping non-readthrough genes
+            #In any case, if the novel transcript is readthrough, it will be assigned to the readthrough gene later and subsequently rejected
             if (scalar grep {$_->value eq "readthrough"} @{$db_tr->get_all_Attributes("remark")}){
               next DBG;
             }
+            #Store the MANE Select transcript, to be used later
+            if (scalar grep {$_->value eq "MANE_select"} @{$db_tr->get_all_Attributes("remark")}){
+              $mane_select = $db_tr;
+            }
           }
-#         
-          foreach my $db_exon (@{$db_gene->get_all_Exons}){
-            foreach my $exon (@{$transcript->get_all_Exons}){
-              if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
-                push(@overlapped_db_genes, $db_gene);
-                #$overlapped_genes_count++; 
-                $message .= "OV: ".$db_gene->stable_id." ".$db_gene->biotype."  ";
-                next DBG;
+          #Find if there is exonic overlap with the MANE Select transcript
+          #If a gene has a MANE Select transcript, count it as an overlapped gene only if there is exonic overlap with that transcript
+          #NOTE: this could be extended to all canonical transcripts if this info was available in the havana database (or obtained from the core database)
+          if ($mane_select){
+            E:foreach my $db_exon (@{$mane_select->get_all_Exons}){
+              foreach my $exon (@{$transcript->get_all_Exons}){
+                if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
+                  push(@overlapped_select_db_genes, $db_gene);
+                  push(@overlapped_db_genes, $db_gene);
+                  $message .= "OVms: ".$db_gene->stable_id." ".$db_gene->biotype."  ";
+                  last E;
+                }
+              }
+            }
+          } 
+          #If there is no MANE Select, find if there is exonic overlap with any transcript
+          else{
+            E:foreach my $db_exon (@{$db_gene->get_all_Exons}){
+              foreach my $exon (@{$transcript->get_all_Exons}){
+                if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
+                  push(@overlapped_db_genes, $db_gene);
+                  $message .= "OV: ".$db_gene->stable_id." ".$db_gene->biotype."  ";
+                  last E;
+                }
               }
             }
           }
         }
       }
-      #Instead of counting overlapped genes, count clusters of overlapped genes
-#REFINE THE DEFINITION OF CLUSTERS: ONE GENE INCLUDED IN THE OTHER, OR SUBSTANTIAL OVERLAP, OR SHARED SPLICE SITES!
+      if ($stringent_check){
+        if (scalar @overlapped_db_genes > $max_ov_loci){
+          my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+          print "KILL_2: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@overlapped_db_genes)." loci: $message\n";
+          $list{$t_name} = 1;
+        }
+      }
+
+  #NOTE: we could stop here, or if the limit is exceeded we could check if the overlapped genes
+  #      are part of a single cluster in which the canonical transcripts overlap...
+  #If 'stringent_check' is not set, the code below will determine which novel transcripts are killed.
+  #If it is set, the code below will run anyway but it should be less stringent than the code above,
+  #so it won't change the outcome.
+          
+      #Instead of counting overlapped genes, count clusters of overlapped genes.
+      #This is fine for lncRNAs. For coding genes, the presence of readthrough transcripts that are not tagged as such
+      #can lead to two coding genes being included in the same cluster and to the insertion of novel readthrough transcripts, 
+      #which we don't want.
+      #REFINE THE DEFINITION OF CLUSTERS: ONE GENE INCLUDED IN THE OTHER, OR SUBSTANTIAL OVERLAP, OR SHARED SPLICE SITES!
       my @clusters;
       foreach my $db_gene (sort {$a->seq_region_start <=> $b->seq_region_start} @overlapped_db_genes){
         my $clustered = 0;
@@ -124,7 +159,7 @@ sub check_max_overlapped_loci {
             
       if (scalar @clusters > $max_ov_loci){
         my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
-        print "KILL_2: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@clusters)." loci: $message\n";
+        print "KILL_2a: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@clusters)." loci: $message\n";
         $list{$t_name} = 1;
       }
 
@@ -155,12 +190,14 @@ sub check_max_overlapped_loci {
           }
         }
       }
-      if (scalar @overlapped_db_genes and scalar keys %genes_not_overlapping_splice_site == scalar @overlapped_db_genes){
-        if (scalar @clusters > $max_ov_loci){
+      #if (scalar @overlapped_db_genes and scalar keys %genes_not_overlapping_splice_site == scalar @overlapped_db_genes){
+      #  if (scalar @clusters > $max_ov_loci){
+      if (scalar @overlapped_db_genes and scalar keys %genes_not_overlapping_splice_site > $max_ov_loci){ #TEST THIS
           my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
-          print "KILL_2b: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@overlapped_db_genes)." loci: $message\n";
+          print "KILL_2b: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@overlapped_db_genes)." loci: $message; ".
+                " it shares non-overlapping splice sites with ".join(", ", keys %genes_not_overlapping_splice_site)."\n";
           $list{$t_name} = 1;
-        }
+      #  }
       }
 ###      
        
@@ -609,24 +646,108 @@ sub assign_host_gene_multi {
     my @db_genes = @{get_valid_overlapping_genes($gene, 1)};
     #Add genes created for other transcripts in the same cluster
     push(@db_genes, @new_genes);
-
+    print "DB_GENES = ".join(",", map {$_->stable_id} @db_genes)."\n";
     my @filt_db_genes;
-    foreach my $db_gene (@db_genes){
+    DBG:foreach my $db_gene (@db_genes){
       if ($db_gene->seq_region_strand == $gene->seq_region_strand){
+        #Ignore readthrough genes as candidate host genes
+        foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
+          if (scalar grep {$_->value eq "readthrough"} @{$db_tr->get_all_Attributes("remark")}){
+            next DBG;
+          }
+        }
+        #Ignore genes with certain biotypes as candidate host genes
         unless ($ignored_biotypes{$db_gene->biotype}){
           push(@filt_db_genes, $db_gene);
         }
       }
     }
+    print "FILT_DB_GENES = ".join(",", map {$_->stable_id} @filt_db_genes)."\n";
     
     foreach my $transcript (@{$gene->get_all_Transcripts}){
       my $host_gene;
       my $tid = $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+
+      ###
+      #Test to manage cases involving overlapping genes, i.e. where a readthrough transcript from an adjacent gene
+      #may be chosen instead of the expected gene.
+      #Give priority to candidate host genes that have MANE Select transcripts with exonic overlap with the novel transcript.
+      #Would that be right?
+      #This is potentially dangerous, especially for lncRNA genes which don't have MANE Select transcripts
+      #and could be ignored if there is a small overlap with coding genes.
+      #It should only be applied if the top two candidates have a MANE Select.
+      #It should require at least a common splice site.
+      
+      #TO DO:
+      #1-Find extent of exonic overlap, number of shared splice sites, overlap with MANE_Select, with all the overlapping genes
+      #2-Filter overlapped genes: if all exon-overlapped genes have a MANE_Select, filter for those where the transcript exon-overlaps the MANE_Select
+      #3-Find the best candidate
+      ###
+
+      #Alternative - more conservative approach: if all the overlapping genes with exonic overlap have a MANE Select,
+      #filter for those genes whose MANE Select transcript is overlapped by the novel transcript at the exon level 
+
+      my @exon_overlapping_genes;
+      DBG:foreach my $db_gene (@filt_db_genes){
+        foreach my $db_transcript (@{$db_gene->get_all_Transcripts}){
+          foreach my $db_exon (@{$db_transcript->get_all_Exons}){
+            foreach my $exon (@{$transcript->get_all_Exons}){
+              if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
+                push(@exon_overlapping_genes, $db_gene);                 
+                next DBG;
+              }
+            }
+          } 
+        }
+      }
+      print "EXON_OVLP_GENES = ".join(",", map {$_->stable_id} @exon_overlapping_genes)."\n";
+      if (scalar @exon_overlapping_genes){
+        @filt_db_genes = @exon_overlapping_genes;
+      }
+      print "FILT_DB_GENES_2 = ".join(",", map {$_->stable_id} @filt_db_genes)."\n";
+      
+      my @db_genes_with_mane_select;
+      DBG:foreach my $db_gene (@filt_db_genes){
+        foreach my $db_transcript (@{$db_gene->get_all_Transcripts}){
+          if (scalar grep {$_->value eq "MANE_select"} @{$db_transcript->get_all_Attributes("remark")}){
+            push(@db_genes_with_mane_select, $db_gene);
+            next DBG;
+          }
+        }
+      }
+      print "GENES_WITH_SELECT = ".join(",", map {$_->stable_id} @db_genes_with_mane_select)."\n";
+      #if (scalar @filt_db_genes == scalar @db_genes_with_mane_select){
+      #Compare the numbers of unique stable ids as some genes may be stored twice in the arrays
+      #Check if all the genes overlapped at the exon level have a MANE Select transcript
+      #If so, reset the host gene candidate set to include only genes whose MANE Select transcripts are overlapped at the exon level
+      if (scalar uniq(map {$_->stable_id} @filt_db_genes) == scalar uniq(map {$_->stable_id} @db_genes_with_mane_select)){ 
+        my @mane_select_overlapping_genes;
+        DBG:foreach my $db_gene (@filt_db_genes){
+          foreach my $db_transcript (@{$db_gene->get_all_Transcripts}){
+            if (scalar grep {$_->value eq "MANE_select"} @{$db_transcript->get_all_Attributes("remark")}){
+              foreach my $db_exon (@{$db_transcript->get_all_Exons}){
+                foreach my $exon (@{$transcript->get_all_Exons}){
+                  if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
+                    push(@mane_select_overlapping_genes, $db_gene);                 
+                    next DBG;
+                  }
+                }
+              }
+            } 
+          }
+        }
+        if (scalar @mane_select_overlapping_genes){
+          @filt_db_genes = @mane_select_overlapping_genes;
+        }
+      }
+
+
       #Check intron match - find gene with the most matching introns
       my @candidates;
       my $max_n_introns = 0;
       foreach my $db_gene (@filt_db_genes){
-        #EXPERIMENTAL: exclude pseudogenes so that spliced transcripts are assigned to new (lncRNA) genes
+        #Exclude pseudogenes so that spliced transcripts are assigned to new (lncRNA) genes
+        #(although pseudogene biotypes may already be included in the set of ignored biotypes)
         if (scalar @{$transcript->get_all_Introns} > 1 and $db_gene->biotype =~ /pseudogene/){
           next;
         }               

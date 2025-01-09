@@ -212,7 +212,7 @@ unless ($no_artifact_check){
 
 #Remove transcripts overlapping more than the allowed number of existing loci at the exon level
 if ($max_overlapped_loci){
-  my $kill_list_2 = LoutreWrite::GeneFilter->check_max_overlapped_loci($gene_objects, $max_overlapped_loci);
+  my $kill_list_2 = LoutreWrite::GeneFilter->check_max_overlapped_loci($gene_objects, $max_overlapped_loci, 1);
   $gene_objects = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list_2);
   foreach my $tid (keys %{$kill_list_2}){
     print "TR2: $tid: max allowed number of overlapped loci exceeded\n";
