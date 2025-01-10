@@ -14,12 +14,9 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::DB::HTS;
-use Bio::DB::HTS::Tabix;
 use Net::FTP;
 use List::Util qw(min max uniq);
-use LWP::Simple;
 
 $|=1;
 
@@ -48,10 +45,42 @@ my $print_whole_alignment;
             'window=i'     => \$window_size,
             'maxerr=i'     => \$max_errors,
             'asreport=s'   => \$assembly_report_url,
-            'out=s'        => \$outfile,
-            'simple!'      => \$keep_it_simple, #stop after one read is valid
+            'outfile=s'    => \$outfile,
+            'simple!'      => \$keep_it_simple,
             'print_ali!'   => \$print_whole_alignment,
            );
+
+
+
+my $usage =  <<_USAGE_;
+
+This script looks for RNA-seq-based transcripts containing splice sites supported by misaligned reads.
+For each read supporting a spliced transcript, it searches a window of X nucleotides before the donor site
+and after the acceptor site for mismatches and indels, assigning a score based on the distance from these
+to the splice site. If the score is higher than a given threshold, the supporting read is considered invalid.
+If a transcript is left without any valid supporting read, it is tagged for filtering.
+
+perl check_splice_site_alignments.pl -gtf ANNOTATION_FILE -bamdir PATH_TO_BAM_DIR -fasta GENOME_FASTA_FILE -readsup READ_SUPPORT_FILE
+ -gtf            annotation file in GTF format - only 'exon' lines and 'transcript_id' attributes are essential
+ -bamdir         directory containing the BAM file(s)
+ -fasta          genome sequence file in Fasta format
+ -readsup        file with supporting reads for each transcript: tab-delimited file with columns 1) transcript name, 2) BAM file name (without .bam suffix) and 3) comma-separated list of read names
+ -outfile        output file
+ 
+  OPTIONAL PARAMETERS:
+  -readintnum    list of number of introns of supporting reads: tab-delimited file with columns 1) BAM file name (without .bam suffix), 2) read name, 3) number of introns. It can help speed up the analysis
+  -ids           only check the transcripts having the given IDs
+  -chr           only check the annotation in the given chromosome
+  -window        window size before donor splice site or after acceptor splice site (default = 10)
+  -maxerr        maximum allowed number of emisaligned nucleotides in the splice site window (default = 3)
+  -asreport      genome assembly report from NCBI - only needed if chromosome or scaffold names differ between GTF and BAM files, eg they are synonymns
+  -simple        stop checking a splice junction after finding a single valid supporting read
+  -print_ali     print the read-genome alignment in the output file
+
+_USAGE_
+
+die $usage unless ($gtf_file and $bam_dir and $genome_fasta and $outfile);
+
 
 
 #Connect to a remote or local directory and get a list of BAM files
