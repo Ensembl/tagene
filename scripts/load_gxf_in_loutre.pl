@@ -35,6 +35,7 @@ my $host_biotype;
 my $no_overlap_biotype;
 my $max_overlapped_loci;
 my $protected_loci_list;
+my $protected_region_list;
 my $filter_introns;
 my $platinum;
 my $only_chr;
@@ -59,6 +60,7 @@ my $registry_file;
             'no_overlap_biotype=s' => \$no_overlap_biotype,
             'max_ov_loc=i'      => \$max_overlapped_loci,
             'protected_loci=s'  => \$protected_loci_list,
+            'protected_regions=s' => \$protected_region_list,
             'filter_introns!'   => \$filter_introns,
             'platinum!'         => \$platinum,
             'readseqdir=s'      => \$READSEQDIR,
@@ -107,6 +109,7 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -no_overlap_biotype skip overlapped genes by biotype (comma-separated list) 
  -max_ov_loc     maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
  -protected_loci file with a list of annotated genes that must not be updated
+ -protected_regions file with a list of annotated regions that must not be updated 
  -filter_introns assess introns and ignore transcript if at least an intron does not pass the filters
  -platinum       add a 'platinum' hidden remark to all transcripts
  -chr            restrict to annotation on this chromosome
@@ -243,10 +246,36 @@ if ($protected_loci_list and -e $protected_loci_list){
   open (IN, $protected_loci_list) or die "Can't open file $protected_loci_list: $!";
   while (<IN>){
     chomp;
+    next if /^#/;
     $protected_loci{$_} = 1;
   }
   close (IN);
 }
+
+#Read protected region list
+my @protected_regions;
+if ($protected_region_list and -e $protected_region_list){
+  open (IN, $protected_region_list) or die "Can't open file $protected_region_list: $!";
+  while (<IN>){
+    chomp;
+    next if /^#/;
+    if ($_ =~ /(\w+):(\d+)-(\d+)/){
+      push(@protected_regions, {'chr' => $1, 'start' => $2, 'end' => $3});
+    }
+  }
+  close (IN);
+}
+
+#Store list of protected gene biotypes
+#Regardless of the biotypes in the allowed biotype list, genes with these biotypes should never be updated
+my @protected_biotypes = qw(polymorphic_pseudogene protein_coding_LoF
+                            ig_gene IG_C_gene IG_D_gene IG_J_gene IG_LV_gene IG_V_gene 
+                            ig_pseudogene IG_pseudogene IG_C_pseudogene IG_D_pseudogene IG_J_pseudogene IG_V_pseudogene
+                            tr_gene TR_C_gene TR_D_gene TR_J_gene TR_V_gene
+                            tr_pseudogene TR_J_pseudogene TR_V_pseudogene
+                          );
+
+
 
 #Assign host genes
 foreach my $go (@$gene_objects){
@@ -323,6 +352,19 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
 
     #GENE:foreach my $new_gene_obj (@$new_gene_objects){
         print "HOST: ".($new_gene_obj->stable_id || "NONE")."\n";
+
+        #Do not create or update genes in the protected regions
+        foreach my $region (@protected_regions){
+          print "REGION=".$region->{'chr'}."\n";
+          if ($new_gene_obj->seq_region_name eq $region->{'chr'} and $new_gene_obj->seq_region_start < $region->{'end'} and $new_gene_obj->seq_region_end > $region->{'start'}){
+            print "Gene ".$new_gene_obj->stable_id." will be ignored as it is in a protected region\n";
+            foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
+              my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+              print "TR2: $t_name: region is protected\n";
+            }
+            next GENE;
+          }
+        }
         
         if ($new_gene_obj->stable_id =~ /^ENS/){
             #Ignore genes in the protected loci list
@@ -342,15 +384,11 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
               print "Couldn't fetch host gene with stable_id ".$new_gene_obj->stable_id."\n";
               $wrong_host = 1;
             }
-            elsif ($host_biotype and !($allowed_biotypes{$host_gene->biotype})){
-                print "Gene ".$host_gene->stable_id." will be ignored as its biotype (".$host_gene->biotype.") is not allowed\n";
-                $wrong_host = 1;
+            elsif (($host_biotype and !($allowed_biotypes{$host_gene->biotype})) or scalar grep {$_ eq $host_gene->biotype} @protected_biotypes){
+              print "Gene ".$host_gene->stable_id." will be ignored as its biotype (".$host_gene->biotype.") is not allowed\n";
+              $wrong_host = 1;
             }
-            #Ignore if gene has an ASB_protein_coding remark
-            elsif ($host_biotype and !($host_biotype =~ /protein_coding/) and scalar(grep {$_->value eq "ASB_protein_coding"} @{$host_gene->get_all_Attributes('remark')})){
-                print "Gene ".$host_gene->stable_id." will be ignored as it has an ASB_protein_coding remark\n";
-                $wrong_host = 1;
-            }
+
             #Ignore genes having these locus-level attributes
             elsif (scalar(grep {$_->value eq "reference genome error"} @{$host_gene->get_all_Attributes('remark')})){
               print "Gene ".$host_gene->stable_id." will be ignored as it has a 'reference genome error' remark\n";
@@ -360,12 +398,16 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
               print "Gene ".$host_gene->stable_id." will be ignored as it has a Selenoprotein remark\n";
               $wrong_host = 1;
             }
+            elsif ($host_biotype and !($host_biotype =~ /protein_coding/) and scalar(grep {$_->value eq "ASB_protein_coding"} @{$host_gene->get_all_Attributes('remark')})){
+              print "Gene ".$host_gene->stable_id." will be ignored as it has an ASB_protein_coding remark\n";
+              $wrong_host = 1;
+            }
             
             #Double check that the gene does not have a coding transcript
             #There are a few cases in loutre_human
             else{
                 foreach my $tr (@{$host_gene->get_all_Transcripts}){
-                    next if scalar (grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')});
+                    next if scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')});
                     if ($tr->translate and $host_biotype and !($host_biotype =~ /protein_coding/)){
                         print "Gene ".$host_gene->stable_id." will be ignored as it has a coding transcript\n";
                         $wrong_host = 1;
