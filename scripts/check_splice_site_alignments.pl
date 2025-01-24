@@ -72,7 +72,7 @@ perl check_splice_site_alignments.pl -gtf ANNOTATION_FILE -bamdir PATH_TO_BAM_DI
   -ids           only check the transcripts having the given IDs
   -chr           only check the annotation in the given chromosome
   -window        window size before donor splice site or after acceptor splice site (default = 10)
-  -maxerr        maximum allowed number of emisaligned nucleotides in the splice site window (default = 3)
+  -maxerr        maximum allowed number of misaligned nucleotides in the splice site window (default = 3)
   -asreport      genome assembly report from NCBI - only needed if chromosome or scaffold names differ between GTF and BAM files, eg they are synonymns
   -simple        stop checking a splice junction after finding a single valid supporting read
   -print_ali     print the read-genome alignment in the output file
@@ -181,7 +181,7 @@ while (<GTF>){
         next;
       }
     }
-    if ($cols[8] =~ /transcript_id \"(\w+)\";/){
+    if ($cols[8] =~ /transcript_id \"(\S+)\";/){
       my $tid = $1;
       #Filter by ID list if any
       if ($id_list){
@@ -244,6 +244,8 @@ open (LOG, ">$outfile.log") or die "Can't open $outfile.log: $!";
 #foreach my $tid (keys %intron_coords_by_tid){
 foreach my $tid (uniq @tids){
   print LOG "\n##".$tid."\n";
+  my $timestamp = localtime(time);
+  print LOG $timestamp."\n";
   my $transcript_has_valid_support = 0;
   my @valid_reads;
   my @misaligned_reads;
@@ -323,7 +325,7 @@ foreach my $tid (uniq @tids){
         unless ($query[$i]){
           print LOG "MISSING SEQ AT $i\n";
         }
-        if ($ref[$i] =~ /[ATGC]/){
+        if ($ref[$i] =~ /[ATGCN]/){
           $gpos++;
           if ($query[$i] eq "-"){
             $diff{$gpos} = "D"; #deletion
