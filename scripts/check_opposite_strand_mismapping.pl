@@ -65,7 +65,12 @@ print "Reading input GTF...\n";
 my @tids;
 my %tr_coords;
 my %exon_coords;
-open (IN, "zcat $input_gtf | ") or die "Can't open input file $input_gtf: $!";
+if ($input_gtf =~ /\.gz$/){
+  open (IN, "zcat $input_gtf | ") or die "Can't open input file $input_gtf: $!";
+}
+else{
+  open (IN, "cat $input_gtf | ") or die "Can't open input file $input_gtf: $!";
+}
 while (<IN>){
   next if /^#/;
   chomp;
