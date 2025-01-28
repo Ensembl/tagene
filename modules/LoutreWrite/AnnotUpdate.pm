@@ -19,12 +19,11 @@ use LoutreWrite::Config;
 use LoutreWrite::GeneFilter qw(get_valid_overlapping_genes);
 use base 'Exporter';
 
-our @EXPORT = qw( $WRITE );
+our @EXPORT = qw( $WRITE @ALLOWED_TRANSCRIPT_BIOTYPES );
 our @EXPORT_OK = qw( exon_novelty intron_novelty can_be_merged merge_transcripts has_polyA_site_support has_polyAseq_support );
 our $WRITE = 0;
 our $CP_BIOTYPE = "comp_pipe";
-
-
+our @ALLOWED_TRANSCRIPT_BIOTYPES;
 
 
 
@@ -658,9 +657,16 @@ sub process_gene_2 {
               }
             }
           }
-          $db_gene->add_Transcript($tr);
-          print "TR: $id: Will add transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id."\n";
-          push (@log, "TR2: $id: Added transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id." (".$db_gene->biotype.")");
+          #Check if transcript biotype is allowed
+          if (@ALLOWED_TRANSCRIPT_BIOTYPES and !(grep {$_ eq $tr->biotype} @ALLOWED_TRANSCRIPT_BIOTYPES)){
+            print "TR: $id: Will reject transcript in host gene ".$db_gene->stable_id." as transcript biotype (".$tr->biotype.") not allowed\n";
+            push (@log, "TR2: $id: Rejected transcript in host gene ".$db_gene->stable_id." as transcript biotype (".$tr->biotype.") not allowed");
+          }
+          else{
+            $db_gene->add_Transcript($tr);
+            print "TR: $id: Will add transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id."\n";
+            push (@log, "TR2: $id: Added transcript $new_tr_name (".$tr->biotype.") to gene ".$db_gene->stable_id." (".$db_gene->biotype.")");
+          }
         }
         else{
           if ($outcome){

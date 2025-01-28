@@ -33,6 +33,7 @@ my $do_not_add_cds;
 my $no_intron_check;
 my $host_biotype;
 my $no_overlap_biotype;
+my $allowed_transcript_biotypes;
 my $max_overlapped_loci;
 my $protected_loci_list;
 my $protected_region_list;
@@ -58,6 +59,7 @@ my $registry_file;
             'no_intron_check!'  => \$no_intron_check,
             'host_biotype=s'    => \$host_biotype,
             'no_overlap_biotype=s' => \$no_overlap_biotype,
+            'tr_biotypes=s'     => \$allowed_transcript_biotypes,
             'max_ov_loc=i'      => \$max_overlapped_loci,
             'protected_loci=s'  => \$protected_loci_list,
             'protected_regions=s' => \$protected_region_list,
@@ -90,30 +92,31 @@ my $usage =  <<_USAGE_;
 This script stores the gene annotation from a gtf/gff3 file into an Otter (loutre) database.
 
 perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -dataset DATASET_NAME -author AUTHOR_NAME -remark REMARK_STRING [-comp_pipe] [-write]
- -file           annotation file in GTF or GFF3 format - it can only contain exon lines - it will ignore anything but gene, transcript and exon lines
- -dataset        dataset name (species) already known by the Otter system, ie. present in the species.dat file on the live server
- -source         tsv file with transcript id and transcript sources, ie. RNA-seq read names supporting the model or tissues where it was found
- -readseqdir     directory with supporting read sequences in Fasta format
- -author         author name in the corresponding loutre database
- -remark         annotation remark to be added to all transcripts, usually the ENA/GEO accession for the experiment that generated the models
- -comp_pipe      override the given biotypes and use "comp_pipe"
- -analysis       analysis logic name (default is "Otter")
- -tsource        transcript source (default is "havana")
- -assembly       assembly version of the annotation in the file, if not the default one
- -registry       registry file providing auxiliary database connection details
- -no_check       do no check for transcripts spanning a large number of genes
- -no_NFV         do not add the 'not for VEGA' attribute
- -no_CDS         do not try to add a CDS if the transcript falls in a coding gene
- -no_intron_check  allow transcripts with intron chains fully or partially identical to others in the database
- -host_biotype   restrict host genes by biotype (comma-separated list)
- -no_overlap_biotype skip overlapped genes by biotype (comma-separated list) 
- -max_ov_loc     maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
- -protected_loci file with a list of annotated genes that must not be updated
- -protected_regions file with a list of annotated regions that must not be updated 
- -filter_introns assess introns and ignore transcript if at least an intron does not pass the filters
- -platinum       add a 'platinum' hidden remark to all transcripts
- -chr            restrict to annotation on this chromosome
- -write          store the gene annotation in the loutre database
+ -file                 annotation file in GTF or GFF3 format - it can only contain exon lines - it will ignore anything but gene, transcript and exon lines
+ -dataset              dataset name (species) already known by the Otter system, ie. present in the species.dat file on the live server
+ -source               tsv file with transcript id and transcript sources, ie. RNA-seq read names supporting the model or tissues where it was found
+ -readseqdir           directory with supporting read sequences in Fasta format
+ -author               author name in the corresponding loutre database
+ -remark               annotation remark to be added to all transcripts, usually the ENA/GEO accession for the experiment that generated the models
+ -comp_pipe            override the given biotypes and use "comp_pipe"
+ -analysis             analysis logic name (default is "Otter")
+ -tsource              transcript source (default is "havana")
+ -assembly             assembly version of the annotation in the file, if not the default one
+ -registry             registry file providing auxiliary database connection details
+ -no_check             do no check for transcripts spanning a large number of genes
+ -no_NFV               do not add the 'not for VEGA' attribute
+ -no_CDS               do not try to add a CDS if the transcript falls in a coding gene
+ -no_intron_check      allow transcripts with intron chains fully or partially identical to others in the database
+ -host_biotype         only allow host genes with these biotypes (comma-separated list)
+ -no_overlap_biotype   skip overlapped genes by biotype (comma-separated list) 
+ -tr_biotypes          only allow novel transcripts with these biotypes (comma-separated list)
+ -max_ov_loc           maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
+ -protected_loci       file with a list of annotated genes that must not be updated
+ -protected_regions    file with a list of annotated regions that must not be updated 
+ -filter_introns       assess introns and ignore transcript if at least an intron does not pass the filters
+ -platinum             add a 'platinum' hidden remark to all transcripts
+ -chr                  restrict to annotation on this chromosome
+ -write                store the gene annotation in the loutre database
 
 
 _USAGE_
@@ -121,6 +124,10 @@ _USAGE_
 die $usage unless ($file and $dataset_name and $author_name);
 
 my $time0 = time();
+
+if ($allowed_transcript_biotypes){
+  @ALLOWED_TRANSCRIPT_BIOTYPES = split(/,/, $allowed_transcript_biotypes);
+}
 
 #Connect to loutre database
 #DataSet interacts directly with an otter database
