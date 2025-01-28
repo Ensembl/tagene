@@ -11,7 +11,7 @@ use List::Util qw(uniq);
 $|=1;
 
 my $gtf_file;
-my $cls_id_list;
+my $id_list;
 my $recount3_file;
 my $cutoff = 50;
 my $only_chr;
@@ -23,7 +23,7 @@ my $outfile;
 
 &GetOptions(
             'gtf=s'      => \$gtf_file,
-            'idlist=s'   => \$cls_id_list,
+            'idlist=s'   => \$id_list,
             'chr=s'      => \$only_chr,
             'recount3=s' => \$recount3_file,
             'cutoff=i'   => \$cutoff,
@@ -35,7 +35,7 @@ my $outfile;
            );
 
 
-#Connect to database with reference annotation
+#Get intron coordinates from the reference annotation
 my %ref_introns;
 if ($ref_dbhost and $ref_dbport and $ref_dbuser and $ref_dbname){
   my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -55,7 +55,9 @@ if ($ref_dbhost and $ref_dbport and $ref_dbuser and $ref_dbname){
         foreach my $transcript (@{$gene->get_all_Transcripts}){
           unless ($transcript->biotype eq "artifact" or !($transcript->stable_id =~ /^ENS/) or scalar(grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes})){
             foreach my $intron (@{$transcript->get_all_Introns}){
-              $ref_introns{$intron->seq_region_name.":".$intron->seq_region_start."-".$intron->seq_region_end} = 1;
+              my $coord = "chr".$intron->seq_region_name.":".$intron->seq_region_start."-".$intron->seq_region_end;
+              $coord .= ":".($intron->seq_region_strand == 1 ? "+" : "-");
+              $ref_introns{$coord} = 1;
             }
           }
         }
@@ -70,23 +72,28 @@ if ($ref_dbhost and $ref_dbport and $ref_dbuser and $ref_dbname){
 my $recount3_tabix = Bio::DB::HTS::Tabix->new( filename => $recount3_file );
 
 
-#Read list of CLS models
-my @cls_ids;
-my %id_list;
-if ($cls_id_list){
-  open (IN, $cls_id_list) or die "Can't open $cls_id_list: $!";
+#Read list of selected RNA-seq transcript ids, if any
+my @selected_ids;
+my %selected_id_list;
+if ($id_list){
+  open (IN, $id_list) or die "Can't open $id_list: $!";
   while (<IN>){
     chomp;
-    push(@cls_ids, $_);
-    $id_list{$_} = 1;
+    push(@selected_ids, $_);
+    $selected_id_list{$_} = 1;
   }
   close (IN);
 }
 
 
-#Read GTF file with CLS models
+#Read input GTF file
 my %exon_coords_by_tid;
-open (GTF, "zcat $gtf_file |") or die "Can't open $gtf_file: $!";
+if ($gtf_file =~ /\.gz$/){
+  open (GTF, "zcat $gtf_file |") or die "Can't open $gtf_file : $!";
+}
+else{
+  open (GTF, "cat $gtf_file |") or die "Can't open $gtf_file : $!";
+}
 while (<GTF>){
   next if /^#/;
   chomp;
@@ -98,14 +105,14 @@ while (<GTF>){
         next;
       }
     }
-    if ($cols[8] =~ /transcript_id \"(\w+)\";/){
+    if ($cols[8] =~ /transcript_id \"(\S+)\";/){
       my $tid = $1;
       #Filter by ID list if any
-      if ($cls_id_list){
-        next unless $id_list{$tid};
+      if ($id_list){
+        next unless $selected_id_list{$tid};
       }
       else{
-        push(@cls_ids, $tid);
+        push(@selected_ids, $tid);
       }
       #Store exon coordinates
       my ($chr, $start, $end, $strand) = @cols[0,3,4,6];
@@ -141,8 +148,8 @@ print OUT "#".join("\t", "transcript_ID",
                         "intron_scores",
                   )."\n";
                   
-#Loop through CLS transcripts
-foreach my $tid (uniq @cls_ids){
+#Loop through transcripts
+foreach my $tid (uniq @selected_ids){
   my $transcript_has_valid_support = 0;
   my $passed = 1;
   my @scores;
@@ -162,6 +169,7 @@ foreach my $tid (uniq @cls_ids){
       }
       push(@scores, $score);
       if ($score < $cutoff){
+        $coords = $coords.":".$intron_coords_by_tid{$tid}{'strand'};
         if ($ref_introns{$coords}){ #ignore low score if intron was in the reference annotation
           $passed = 1;
           $scores[-1] .= "(a)";
