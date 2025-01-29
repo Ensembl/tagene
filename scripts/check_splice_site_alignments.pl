@@ -376,10 +376,24 @@ foreach my $tid (uniq @tids){
               push(@{$read_introns{'ends'}}, $iend);
     
               #check that intron is present in transcript model
-              unless ($intron_coords_by_tid{$tid}{'strand'} eq "+" and scalar(grep {$_ == $istart} @{$intron_coords_by_tid{$tid}{'donors'}}) and scalar(grep {$_ == $iend} @{$intron_coords_by_tid{$tid}{'acceptors'}}) or
-                      $intron_coords_by_tid{$tid}{'strand'} eq "-" and scalar(grep {$_ == $istart} @{$intron_coords_by_tid{$tid}{'acceptors'}}) and scalar(grep {$_ == $iend} @{$intron_coords_by_tid{$tid}{'donors'}})
-              ){
-                print LOG "Can't find intron $istart-$iend ($read_name) in transcript $tid\n";
+              my $found_intron = 0;
+              for (my $i = 0; $i < @{$intron_coords_by_tid{$tid}{'donors'}}; $i++){
+                if (($intron_coords_by_tid{$tid}{'strand'} eq "+" and
+                      $intron_coords_by_tid{$tid}{'donors'}[$i] == $istart and
+                      $intron_coords_by_tid{$tid}{'acceptors'}[$i] == $iend)
+                      or
+                      ($intron_coords_by_tid{$tid}{'strand'} eq "-" and
+                      $intron_coords_by_tid{$tid}{'acceptors'}[$i] == $istart and
+                      $intron_coords_by_tid{$tid}{'donors'}[$i] == $iend)
+                ){
+                  $found_intron = 1;
+                  last;
+                }
+              }
+              unless ($found_intron){
+                print LOG "  => Can't find intron $istart-$iend ($read_name) in transcript $tid\n\n";
+                push(@misaligned_reads, $read_name);
+                next READ;
               }
     
               #count number of sequence differences in windows around splice sites   
@@ -389,7 +403,7 @@ foreach my $tid (uniq @tids){
               for (my $i = $istart-$window_size; $i < $istart; $i++){
                 print LOG $i." ".($diff{$i}||" ")."\n";
                 if ($diff{$i}){
-                  $n_diff_start++; #print LOG "AAA $i AAA\n";
+                  $n_diff_start++;
                   $closest_diff_start = $istart - $i;
                   $score_start += $window_size - ($istart - $i) + 1; #misalignment score, directly proportional to the distance to the splice site
                   if ($diff{$i} =~ /I/){
@@ -495,6 +509,14 @@ close (LOG);
 
 
 
-
+__END__
+              unless (($intron_coords_by_tid{$tid}{'strand'} eq "+" and
+                    scalar(grep {$_ == $istart} @{$intron_coords_by_tid{$tid}{'donors'}}) and
+                      scalar(grep {$_ == $iend} @{$intron_coords_by_tid{$tid}{'acceptors'}}))
+                      or
+                      ($intron_coords_by_tid{$tid}{'strand'} eq "-" and
+                      scalar(grep {$_ == $istart} @{$intron_coords_by_tid{$tid}{'acceptors'}}) and
+                      scalar(grep {$_ == $iend} @{$intron_coords_by_tid{$tid}{'donors'}}))
+              ){
 
 
