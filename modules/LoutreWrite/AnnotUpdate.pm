@@ -19,11 +19,12 @@ use LoutreWrite::Config;
 use LoutreWrite::GeneFilter qw(get_valid_overlapping_genes);
 use base 'Exporter';
 
-our @EXPORT = qw( $WRITE @ALLOWED_TRANSCRIPT_BIOTYPES );
+our @EXPORT = qw( $WRITE @ALLOWED_TRANSCRIPT_BIOTYPES $ONLY_COMPLETE_CDS );
 our @EXPORT_OK = qw( exon_novelty intron_novelty can_be_merged merge_transcripts has_polyA_site_support has_polyAseq_support );
 our $WRITE = 0;
 our $CP_BIOTYPE = "comp_pipe";
 our @ALLOWED_TRANSCRIPT_BIOTYPES;
+our $ONLY_COMPLETE_CDS = 0;
 
 
 
@@ -661,6 +662,10 @@ sub process_gene_2 {
           if (@ALLOWED_TRANSCRIPT_BIOTYPES and !(grep {$_ eq $tr->biotype} @ALLOWED_TRANSCRIPT_BIOTYPES)){
             print "TR: $id: Will reject transcript in host gene ".$db_gene->stable_id." as transcript biotype (".$tr->biotype.") not allowed\n";
             push (@log, "TR2: $id: Rejected transcript in host gene ".$db_gene->stable_id." as transcript biotype (".$tr->biotype.") not allowed");
+          }
+          elsif ($ONLY_COMPLETE_CDS and grep {$_->value == 1} @{$tr->get_all_Attributes("cds_end_NF")}){
+            print "TR: $id: Will reject transcript in host gene ".$db_gene->stable_id." as transcript has a CDS_end_NF remark\n";
+            push (@log, "TR2: $id: Rejected transcript in host gene ".$db_gene->stable_id." as transcript has a CDS_end_NF remark");
           }
           else{
             $db_gene->add_Transcript($tr);

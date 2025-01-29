@@ -60,6 +60,7 @@ my $registry_file;
             'host_biotype=s'    => \$host_biotype,
             'no_overlap_biotype=s' => \$no_overlap_biotype,
             'tr_biotypes=s'     => \$allowed_transcript_biotypes,
+            'complete_cds!'     => \$ONLY_COMPLETE_CDS,
             'max_ov_loc=i'      => \$max_overlapped_loci,
             'protected_loci=s'  => \$protected_loci_list,
             'protected_regions=s' => \$protected_region_list,
@@ -86,7 +87,6 @@ if ($file =~ /^(.+)\%I(.+)$/){
   $file = $1.$ENV{LSB_JOBINDEX}.$2;
 }
 
-
 my $usage =  <<_USAGE_;
 
 This script stores the gene annotation from a gtf/gff3 file into an Otter (loutre) database.
@@ -108,11 +108,12 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -no_CDS               do not try to add a CDS if the transcript falls in a coding gene
  -no_intron_check      allow transcripts with intron chains fully or partially identical to others in the database
  -host_biotype         only allow host genes with these biotypes (comma-separated list)
- -no_overlap_biotype   skip overlapped genes by biotype (comma-separated list) 
+ -no_overlap_biotype   skip overlapped genes by biotype (comma-separated list)
  -tr_biotypes          only allow novel transcripts with these biotypes (comma-separated list)
+ -complete_cds         do not create any incomplete CDS, i.e. a transcript with a 'cds_end_NF' attribute will not be stored
  -max_ov_loc           maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
  -protected_loci       file with a list of annotated genes that must not be updated
- -protected_regions    file with a list of annotated regions that must not be updated 
+ -protected_regions    file with a list of annotated regions that must not be updated
  -filter_introns       assess introns and ignore transcript if at least an intron does not pass the filters
  -platinum             add a 'platinum' hidden remark to all transcripts
  -chr                  restrict to annotation on this chromosome
