@@ -241,6 +241,7 @@ foreach my $tid (uniq @tids){
   my $read_count;
   if ($intron_coords_by_tid{$tid}{'donors'}){
     my $number_of_introns = scalar(@{$intron_coords_by_tid{$tid}{'donors'}});
+    print LOG "Number of introns  = $number_of_introns\n";
     #Loop through BAM files
     foreach my $file_name (keys %bam_hts){
       my ($sample_name) = $file_name =~ /^(.+)\.bam$/;
@@ -248,28 +249,26 @@ foreach my $tid (uniq @tids){
       #Extract all reads overlapping the transcript and filter for supporting reads
       #NOTE: another option is to find each supporting read by location and name (searching by name alone is very slow),
       #but this takes long if there is a large number of them
-      my $filter_code = 1;
-      if ($same_intron_count){
-        $filter_code = "my \$a_int = scalar(() = \$a->cigar_str =~ /\\dN\\d/g); return \$a_int == \$number_of_introns; 1";
-      }
-      my $iterator = $bam_hts{$file_name}->get_features_by_location(
+      my @reads = $bam_hts{$file_name}->get_features_by_location(
                                                       -seq_id => $ucsc_synonyms{$exon_coords_by_tid{$tid}{'chr'}} || $exon_coords_by_tid{$tid}{'chr'},
                                                       -start  => min(@{$exon_coords_by_tid{$tid}{'starts'}}),
                                                       -end    => max(@{$exon_coords_by_tid{$tid}{'ends'}}),
-                                                      -iterator => 1,
-                                                      -filter => sub {
-                                                                        my $a = shift;
-                                                                        $filter_code;
-                                                                      }
                                                     );
-      READ:while (my $read_ali = $iterator->next_seq){
+                                                    
+      print LOG "Number of reads = ".scalar(@reads)."\n";
+      READ:while (my $read_ali = shift @reads){  
         my $read_name = $read_ali->query->name;
         if (grep {$_ eq $read_name} @{$supporting_reads{$tid}{$sample_name}}){
+          my $n_read_introns = scalar(() = $read_ali->cigar_str =~ /\dN\d/g);
+          if ($same_intron_count){
+            next READ unless $n_read_introns == $number_of_introns;
+          }
           $read_count++;
           if ($max_reads_per_transcript and $read_count > $max_reads_per_transcript){
             last READ;
-          } 
-          print LOG "\n#".$read_name." ($sample_name)\n";
+          }
+          
+          print LOG "\n#".$read_name." ($sample_name), $n_read_introns introns\n";
           my $timestamp = localtime(time);
           print LOG $timestamp."\n";
           my $read_has_misaligned_splice_site = 0;
@@ -278,19 +277,13 @@ foreach my $tid (uniq @tids){
           #(when multiple reads/alignments under the same name are present in the BAM file)
           #$read_name =~ s/_\d{1,2}$//;
 
-
-          #unless ($read_ali){
-          #  print LOG "\nNo alignment for $read_name - $sample_name at ".($ucsc_synonyms{$exon_coords_by_tid{$tid}{'chr'}} || $exon_coords_by_tid{$tid}{'chr'}).":".min(@{$exon_coords_by_tid{$tid}{'starts'}})."-".max(@{$exon_coords_by_tid{$tid}{'ends'}})."\n\n";
-          #  next;
-          #}
           #Skip this read if it's unspliced (i.e. there is no intron in the CIGAR string)
-          unless ($read_ali->cigar_str =~ /\dN\d/){
+          unless ($n_read_introns){
             print LOG "\nUnspliced read: $read_name - $sample_name - CIGAR = ".$read_ali->cigar_str."\n\n";
             next;
           }
 
           #Skip this read if the number of introns doesn't match the number of transcript's introns
-          my $n_read_introns = scalar(() = $read_ali->cigar_str =~ /\dN\d/g);
           unless ($n_read_introns == @{$intron_coords_by_tid{$tid}{'donors'}}){
             print LOG "  => Different number of introns: READ = ".$n_read_introns." - TRANSCRIPT = ".scalar(@{$intron_coords_by_tid{$tid}{'donors'}})."\n\n";
             push(@misaligned_reads, $read_name);
@@ -419,8 +412,8 @@ foreach my $tid (uniq @tids){
               my $n_diff_end = 0;
               my $closest_diff_end = $window_size + 1; #default value for closest mismatch to acceptor splice site
               my $score_end = 0;
-              for (my $i = $iend+$window_size; $i > $iend; $i--){
-                print LOG $i." ".($diff{$i}||" ")."\n";
+              for (my $i = $iend+$window_size; $i >= $iend; $i--){
+ #               print LOG $i." ".($diff{$i}||" ")."\n";
                 if ($diff{$i}){
                   $n_diff_end++; #print LOG "BBB $i BBB\n";
                   $closest_diff_end = $i - $iend;
@@ -430,6 +423,7 @@ foreach my $tid (uniq @tids){
                     $score_end += scalar(() = $diff{$i} =~ /I/g) - 1; #increase misalignment score by adding insertion size
                   }
                 }
+                print LOG $i." ".($diff{$i}||" ")."$score_end\n";
               }
               if ($closest_diff_end > $window_size){
                 $closest_diff_end .= "+";
