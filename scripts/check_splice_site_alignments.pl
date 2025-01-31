@@ -415,6 +415,9 @@ foreach my $tid (uniq @tids){
               for (my $i = $iend+$window_size; $i >= $iend; $i--){
  #               print LOG $i." ".($diff{$i}||" ")."\n";
                 if ($diff{$i}){
+                  if ($i == $iend){
+                    next if $diff{$i} eq "D";
+                  }
                   $n_diff_end++; #print LOG "BBB $i BBB\n";
                   $closest_diff_end = $i - $iend;
                   $score_end += $window_size - ($i - $iend) + 1; #misalignment score, directly proportional to the distance to the splice site
