@@ -61,6 +61,7 @@ my $registry_file;
             'no_overlap_biotype=s' => \$no_overlap_biotype,
             'tr_biotypes=s'     => \$allowed_transcript_biotypes,
             'complete_cds!'     => \$ONLY_COMPLETE_CDS,
+            'no_novel_genes!'   => \$NO_NOVEL_GENES,
             'max_ov_loc=i'      => \$max_overlapped_loci,
             'protected_loci=s'  => \$protected_loci_list,
             'protected_regions=s' => \$protected_region_list,
@@ -111,6 +112,7 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -no_overlap_biotype   skip overlapped genes by biotype (comma-separated list)
  -tr_biotypes          only allow novel transcripts with these biotypes (comma-separated list)
  -complete_cds         do not create any incomplete CDS, i.e. a transcript with a 'cds_end_NF' attribute will not be stored
+ -no_novel_genes       do not create novel genes
  -max_ov_loc           maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
  -protected_loci       file with a list of annotated genes that must not be updated
  -protected_regions    file with a list of annotated regions that must not be updated

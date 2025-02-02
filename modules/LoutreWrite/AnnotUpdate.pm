@@ -19,12 +19,13 @@ use LoutreWrite::Config;
 use LoutreWrite::GeneFilter qw(get_valid_overlapping_genes);
 use base 'Exporter';
 
-our @EXPORT = qw( $WRITE @ALLOWED_TRANSCRIPT_BIOTYPES $ONLY_COMPLETE_CDS );
+our @EXPORT = qw( $WRITE @ALLOWED_TRANSCRIPT_BIOTYPES $ONLY_COMPLETE_CDS $NO_NOVEL_GENES );
 our @EXPORT_OK = qw( exon_novelty intron_novelty can_be_merged merge_transcripts has_polyA_site_support has_polyAseq_support );
 our $WRITE = 0;
 our $CP_BIOTYPE = "comp_pipe";
 our @ALLOWED_TRANSCRIPT_BIOTYPES;
 our $ONLY_COMPLETE_CDS = 0;
+our $NO_NOVEL_GENES = 0;
 
 
 
@@ -91,25 +92,34 @@ sub process_gene_2 {
   }
 
   if ($mode eq "add"){
-    #Create a new gene name
-    my $new_gene_name = $self->get_new_gene_name($region, $gene, $dataset_name, $dba) or return " ";
-    my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_gene_name);
-    $gene->add_Attributes($name_att);
-    foreach my $tr (@{$gene->get_all_Transcripts}){
-      #Create a new transcript name
-      my $new_tr_name = $self->get_new_transcript_name($gene, $dba);
-      my $tr_name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
-      $tr->add_Attributes($tr_name_att);
-      my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
-      if ($platinum){
-        $tr->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => 'Platinum set') );
+    if ($NO_NOVEL_GENES){
+      foreach my $tr (@{$gene->get_all_Transcripts}){
+        my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+        print "TR: $id: Will reject transcript in novel gene since the -no_novel_genes flag is set\n";
+        push (@log, "TR2: $id: Rejected transcript in novel gene since the -no_novel_genes flag is set");
       }
-      print "TR: $id: Will add transcript $new_tr_name to novel gene $new_gene_name\n";
-      push (@log, "TR2: $id: Added transcript $new_tr_name to novel gene $new_gene_name");
     }
-    $gene = $self->assign_biotypes($gene);
-    #Add new gene to region
-    $region->add_genes($gene);
+    else{
+      #Create a new gene name
+      my $new_gene_name = $self->get_new_gene_name($region, $gene, $dataset_name, $dba) or return " ";
+      my $name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_gene_name);
+      $gene->add_Attributes($name_att);
+      foreach my $tr (@{$gene->get_all_Transcripts}){
+        #Create a new transcript name
+        my $new_tr_name = $self->get_new_transcript_name($gene, $dba);
+        my $tr_name_att = Bio::EnsEMBL::Attribute->new(-code => 'name', -value => $new_tr_name);
+        $tr->add_Attributes($tr_name_att);
+        my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
+        if ($platinum){
+          $tr->add_Attributes( Bio::EnsEMBL::Attribute->new(-code => 'hidden_remark', -value => 'Platinum set') );
+        }
+        print "TR: $id: Will add transcript $new_tr_name to novel gene $new_gene_name\n";
+        push (@log, "TR2: $id: Added transcript $new_tr_name to novel gene $new_gene_name");
+      }
+      $gene = $self->assign_biotypes($gene);
+      #Add new gene to region
+      $region->add_genes($gene);
+    }
   }
 
   elsif ($mode eq "update"){
