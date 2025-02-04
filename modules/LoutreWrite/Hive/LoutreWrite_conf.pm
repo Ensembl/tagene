@@ -86,7 +86,11 @@ sub default_options {
     no_intron_check => 0,
     host_biotype => '',
     no_overlap_biotype => '',
+    tr_biotypes => '',
+    complete_cds => 0,
+    no_novel_genes => 0,
     protected_loci => '',
+    protected_regions => '',
     max_ov_loc => 0,
     filter_introns => 0,
     platinum => 0,
@@ -412,36 +416,30 @@ sub pipeline_analyses {
           .' -file #infile#'
           .' -dataset '.$self->o('dataset')
           .' -author '.$self->o('author')
-       #   .' -source '.$self->o('source')
           .' #source#'
           .' -remark "'.$self->o('remark').'"'
-       #   .' -readseqdir '.$self->o('read_seq_dir')
           .' #readseqdir#'
-       #   .' -comp_pipe '.$self->o('comp_pipe')
-       #   .' -analysis '.$self->o('analysis')
-       #   .' -tsource '.$self->o('tsource')
-       #   .' -assembly '.$self->o('assembly_version')
+          .' #comp_pipe#'
+          .' #analysis#'
+          .' #tsource#'
           .' #assembly#'
           .' #registry#'
-       #   .' -no_check '.$self->o('no_check')
           .' #no_artifact_check#'
-       #   .' -no_NFV '.$self->o('no_NFV')
           .' #no_nfv#'
-       #   .' -no_CDS '.$self->o('no_CDS')
           .' #no_cds#'
-       #   .' -no_intron_check '.$self->o('no_intron_check')
+          .' #no_intron_check#'
           .' -host_biotype '.$self->o('host_biotype')
           .' -no_overlap_biotype '.$self->o('no_overlap_biotype')
+          .' #tr_biotypes#'
+          .' #complete_cds#'
+          .' #no_novel_genes#'
           .' -max_ov_loc '.$self->o('max_ov_loc')
           .' #protected_loci#'
-      #    .' -filter_introns '.$self->o('filter_introns')
+          .' #protected_regions#'
           .' #filter_introns#'
-          #.' -platinum '.$self->o('platinum')
           .' #platinum#'
           .' #die_locked#'
-      #    .' -chr '.$self->o('chr')
           .' #chr#'
-          #.' -write '.$self->o('write')
           .' #write#'
           .' > #output_file#'
           .' 2> #output_file#.err',
@@ -450,16 +448,23 @@ sub pipeline_analyses {
         infile => catfile('#gxf_dir#', '#filename#'),
         log_dir => catdir($self->o('output_dir'), 'log'),
         output_file => catfile('#log_dir#', '#filename#.log'),
-        #log_dir_2 => join("", grep {$_ =~ /\//} splitpath('#output_file#')),
         source => ($self->o('source') ? '-source '.$self->o('source') : ''),
         readseqdir => ($self->o('read_seq_dir') ? '-readseqdir '.$self->o('read_seq_dir') : ''),
+        comp_pipe => ($self->o('comp_pipe') ? '-comp_pipe' : ''),
+        analysis => ($self->o('analysis') ? '-analysis '.$self->o('analysis') : ''),        
+        tsource => ($self->o('tsource') ? '-tsource '.$self->o('tsource') : ''), 
         assembly => ($self->o('assembly_version') ? '-assembly_version '.$self->o('assembly_version') : ''),
         registry => ($self->o('registry') ? '-registry '.$self->o('registry') : ''),
         chr => ($self->o('chr') ? ' -chr '.$self->o('chr') : ''),
         no_artifact_check => ($self->o('no_artifact_check') ? ' -no_check ' : ''),
+        no_intron_check => ($self->o('no_intron_check') ? '-no_intron_check ' : ''),
         no_nfv => ($self->o('no_NFV') ? '-no_NFV' : ''),
         no_cds => ($self->o('no_CDS') ? '-no_CDS' : ''),
+        tr_biotypes => ($self->o('tr_biotypes') ? '-tr_biotypes '.$self->o('tr_biotypes') : ''),
+        complete_cds => ($self->o('complete_cds') ? '-complete_cds' : ''),
+        no_novel_genes => ($self->o('no_novel_genes') ? '-no_novel_genes' : ''),
         protected_loci => ($self->o('protected_loci') ? '-protected_loci '.$self->o('protected_loci') : ''),
+        protected_regions => ($self->o('protected_regions') ? '-protected_regions '.$self->o('protected_regions') : ''),
         filter_introns => ($self->o('filter_introns') ? '-filter_introns' : ''),
         platinum => ($self->o('platinum') ? '-platinum' : ''),
         die_locked => ($self->o('die_locked') ? '-die_locked' : ''),
@@ -482,36 +487,30 @@ sub pipeline_analyses {
           .' -file #infile#'
           .' -dataset '.$self->o('dataset')
           .' -author '.$self->o('author')
-       #   .' -source '.$self->o('source')
           .' #source#'
           .' -remark "'.$self->o('remark').'"'
-       #   .' -readseqdir '.$self->o('read_seq_dir')
           .' #readseqdir#'
-       #   .' -comp_pipe '.$self->o('comp_pipe')
-       #   .' -analysis '.$self->o('analysis')
-       #   .' -tsource '.$self->o('tsource')
-       #   .' -assembly '.$self->o('assembly_version')
+          .' #comp_pipe#'
+          .' #analysis#'
+          .' #tsource#'
           .' #assembly#'
           .' #registry#'
-       #   .' -no_check '.$self->o('no_check')
           .' #no_artifact_check#'
-       #   .' -no_NFV '.$self->o('no_NFV')
           .' #no_nfv#'
-       #   .' -no_CDS '.$self->o('no_CDS')
           .' #no_cds#'
-       #   .' -no_intron_check '.$self->o('no_intron_check')
+          .' #no_intron_check#'
           .' -host_biotype '.$self->o('host_biotype')
           .' -no_overlap_biotype '.$self->o('no_overlap_biotype')
+          .' #tr_biotypes#'
+          .' #complete_cds#'
+          .' #no_novel_genes#'
           .' -max_ov_loc '.$self->o('max_ov_loc')
           .' #protected_loci#'
-      #    .' -filter_introns '.$self->o('filter_introns')
+          .' #protected_regions#'
           .' #filter_introns#'
-          #.' -platinum '.$self->o('platinum')
           .' #platinum#'
           .' #die_locked#'
-      #    .' -chr '.$self->o('chr')
           .' #chr#'
-          #.' -write '.$self->o('write')
           .' #write#'
           .' > #output_file#'
           .' 2> #output_file#.err',
@@ -520,16 +519,23 @@ sub pipeline_analyses {
         infile => catfile('#gxf_dir#', '#filename#'),
         log_dir => catdir($self->o('output_dir'), 'log'),
         output_file => catfile('#log_dir#', '#filename#.log'),
-        #log_dir_2 => join("", grep {$_ =~ /\//} splitpath('#output_file#')),
         source => ($self->o('source') ? '-source '.$self->o('source') : ''),
         readseqdir => ($self->o('read_seq_dir') ? '-readseqdir '.$self->o('read_seq_dir') : ''),
+        comp_pipe => ($self->o('comp_pipe') ? '-comp_pipe' : ''),
+        analysis => ($self->o('analysis') ? '-analysis '.$self->o('analysis') : ''),        
+        tsource => ($self->o('tsource') ? '-tsource '.$self->o('tsource') : ''), 
         assembly => ($self->o('assembly_version') ? '-assembly_version '.$self->o('assembly_version') : ''),
         registry => ($self->o('registry') ? '-registry '.$self->o('registry') : ''),
         chr => ($self->o('chr') ? ' -chr '.$self->o('chr') : ''),
         no_artifact_check => ($self->o('no_artifact_check') ? ' -no_check ' : ''),
+        no_intron_check => ($self->o('no_intron_check') ? '-no_intron_check ' : ''),
         no_nfv => ($self->o('no_NFV') ? '-no_NFV' : ''),
         no_cds => ($self->o('no_CDS') ? '-no_CDS' : ''),
+        tr_biotypes => ($self->o('tr_biotypes') ? '-tr_biotypes '.$self->o('tr_biotypes') : ''),
+        complete_cds => ($self->o('complete_cds') ? '-complete_cds' : ''),
+        no_novel_genes => ($self->o('no_novel_genes') ? '-no_novel_genes' : ''),
         protected_loci => ($self->o('protected_loci') ? '-protected_loci '.$self->o('protected_loci') : ''),
+        protected_regions => ($self->o('protected_regions') ? '-protected_regions '.$self->o('protected_regions') : ''),
         filter_introns => ($self->o('filter_introns') ? '-filter_introns' : ''),
         platinum => ($self->o('platinum') ? '-platinum' : ''),
         die_locked => ($self->o('die_locked') ? '-die_locked' : ''),
