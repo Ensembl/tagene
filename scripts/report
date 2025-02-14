@@ -1,55 +1,98 @@
 #!/usr/bin/env bash
 
 
+TMPFILE=tmp_log_lines
+
+#grep -P "^(LOOKING|TR2:|RESULT)" $@ > $TMPFILE
+find $@ -name "*.log" | xargs cat | grep -P "^(LOOKING|TR2:|RESULT)" > $TMPFILE
+
 
 echo -e "\nNumber of genes"
-grep -R ^LOOKING $@ | awk '{print $5}' | sort -u | wc -l
+grep ^LOOKING $TMPFILE | awk '{print $5}' | sort -u | wc -l
 
 echo -e "\nTranscripts ignored as gene didn't transform to default assembly"
-grep -R ^TR2 $@ | grep "did not transform" | awk '{print $3}' | sort -u | wc -l
+grep ^TR2 $TMPFILE | grep "did not transform" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts ignored as overlapping multiple loci"
-grep -R ^TR2 $@ | grep "max allowed number" | awk '{print $3}' | sort -u | wc -l
+grep ^TR2 $TMPFILE | grep "max allowed number" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as genomic region is protected"
+grep ^TR2 $TMPFILE | grep "region is protected" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as host gene not found by stable id"
+grep ^TR2 $TMPFILE | grep "host gene not found by stable_id" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as host gene has 'reference genome error' remark"
+grep ^TR2 $TMPFILE | grep "host gene has 'reference genome error' remark" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as host gene has Selenoprotein remark"
+grep ^TR2 $TMPFILE | grep "host gene has Selenoprotein remark" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as host gene has ASB_protein_coding remark and coding genes not allowed"
+grep ^TR2 $TMPFILE | grep "host gene has ASB_protein_coding remark and coding genes not allowed" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as host gene has coding transcript(s) and coding genes not allowed"
+grep ^TR2 $TMPFILE | grep "host gene has coding transcript(s) and coding genes not allowed" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as gene is novel and the -no_novel_genes flag is set"
+grep ^TR2 $TMPFILE | grep "Rejected transcript in novel gene since the -no_novel_genes flag is set" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as transcript biotype not allowed"
+grep ^TR2 $TMPFILE | grep -P "Rejected transcript.+as transcript biotype.+not allowed" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as CDS_end_NF remark and partial CDS is not allowed"
+grep ^TR2 $TMPFILE | grep -P "Rejected transcript.+as transcript has a CDS_end_NF remark" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as max allowed number of overlapped loci exceeded"
+grep ^TR2 $TMPFILE | grep "max allowed number of overlapped loci exceeded" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts ignored as overlapping locus with unallowed biotype"
-grep -R ^TR2 $@ | grep "overlapped locus with unallowed biotype" | awk '{print $3}' | sort -u | wc -l
+grep ^TR2 $TMPFILE | grep "overlapped locus with unallowed biotype" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts ignored as host gene biotype not allowed"
-grep -R ^TR2 $@ | grep "host gene biotype not allowed" | awk '{print $3}' | sort -u | wc -l
+grep ^TR2 $TMPFILE | grep "host gene biotype not allowed" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts ignored as host gene is protected"
-grep -R ^TR2 $@ | grep "host gene is protected" | awk '{print $3}' | sort -u | wc -l
+grep ^TR2 $TMPFILE | grep "host gene is protected" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as host gene is readthrough"
+grep ^TR2 $TMPFILE | grep "host gene is readthrough" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as host gene has non-ATG start transcripts"
+grep ^TR2 $TMPFILE | grep "host gene has non-ATG start transcripts" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts rejected as intron didn't pass the filter"
-grep -R ^TR2 $@ | grep "intron did not pass the filter" | awk '{print $3}' | sort -u | wc -l
+grep ^TR2 $TMPFILE | grep "intron did not pass the filter" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts rejected as intron chain exists in annotation"
-grep -R ^TR2 $@ | grep -P "Rejected.+as intron chain exists" | awk '{print $3}' | sort -u | wc -l
+grep ^TR2 $TMPFILE | grep -P "Rejected.+as intron chain exists" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts rejected as no exon novelty provided"
-grep -R ^TR2 $@ | grep -P "Rejected.+as no exon novelty" | awk '{print $3}' | sort -u | wc -l
+grep ^TR2 $TMPFILE | grep -P "Rejected.+as no exon novelty" | awk '{print $3}' | sort -u | wc -l
 
-echo -e "\nTranscripts rejected as as partially redundant with a coding transcript"
-grep -R ^TR2 $@ | grep -P "Rejected.+as partially redundant with a coding transcript" | awk '{print $3}' | sort -u | wc -l
+echo -e "\nTranscripts rejected as partially redundant with a coding transcript"
+grep ^TR2 $TMPFILE | grep -P "Rejected.+as partially redundant with a coding transcript" | awk '{print $3}' | sort -u | wc -l
 
-echo -e "\nTranscripts rejected as as partially redundant with a MANE transcript"
-grep -R ^TR2 $@ | grep -P "Rejected.+as partially redundant with a MANE transcript" | awk '{print $3}' | sort -u | wc -l
+echo -e "\nTranscripts rejected as partially redundant with a MANE transcript"
+grep ^TR2 $TMPFILE | grep -P "Rejected.+as partially redundant with a MANE transcript" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts skipped as clones could not be unlocked"
-grep -R ^TR2 $@ | grep "Transcript slice could not be unlocked" | awk '{print $3}' | sort -u | wc -l
+grep ^TR2 $TMPFILE | grep "Transcript slice could not be unlocked" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts could not be processed because of an error"
-grep -R ^TR2 $@ | grep "Transcript could not be processed because of an error" | awk '{print $3}' | sort -u | wc -l
+grep ^TR2 $TMPFILE | grep "Transcript could not be processed because of an error" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts added (novel)"
-grep -R ^TR2 $@ | grep "Added" | awk '{print $3}' | sort -u | wc -l
+grep ^TR2 $TMPFILE | grep "Added" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts extended"
-grep -R ^TR2 $@ | grep "Extended" | awk '{print $3}' | sort -u | wc -l
+grep ^TR2 $TMPFILE | grep "Extended" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nNovel genes"
-grep -R -P "RESULT: novel gene .+ was created" $@ | wc -l
+grep -P "RESULT: novel gene .+ was created" $TMPFILE | wc -l
 
 echo -e "\nModified genes"
-grep -R -P "RESULT: gene .+ was modified" $@ | sort -u | wc -l 
+grep -P "RESULT: gene .+ was modified" $TMPFILE | sort -u | wc -l 
+
+rm $TMPFILE
 
