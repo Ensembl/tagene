@@ -12,11 +12,13 @@ my $dataset_name;
 my $outfile;
 my $date;
 my $remark;
+my $only_chr;
 
 &GetOptions(
             'dataset=s'  => \$dataset_name,
             'date=s'     => \$date,
             'remark=s'   => \$remark,
+            'chr=s'      => \$only_chr,
             'out=s'      => \$outfile,
             );
 
@@ -33,6 +35,7 @@ print OUT join("\t", "chromosome",
                      "modified_date",
                      "new/modified",
                      "single_exon",
+                     "transcript_count",
                      "novel_transcripts",
                      "extended_transcripts",
                      "transcript_info",
@@ -77,12 +80,23 @@ my $multiple_tagene_ms_count = 0;
 foreach my $slice (@{$sa->fetch_all("toplevel")}){
   next unless $slice->coord_system->is_default;
   print $slice->seq_region_name."...";
+  if ($only_chr){
+    next unless $slice->seq_region_name eq $only_chr;
+  }
   foreach my $gene (@{$slice->get_all_Genes}){
     next unless $gene->source =~ /ensembl|havana/;
     my $gene_modif_date = Bio::EnsEMBL::Utils::ConversionSupport->date_format($gene->modified_date, "%y-%m-%d");
     if ($date){
       next unless $gene_modif_date ge $date;
     }
+    #Total transcript count
+    my $total_tr_count = 0;
+    foreach my $transcript (@{$gene->get_all_Transcripts}){
+      unless ($transcript->biotype eq "artifact" or grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes("remark")}){
+        $total_tr_count++;
+      }
+    }
+    
     #Get all gene's translations in order to report uniqueness of TAGENE CDS later
     my %tn_seqs;
     foreach my $transcript (@{$gene->get_all_Transcripts}){
@@ -91,6 +105,7 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
       }
     }
     my $added_c= 0; #Added by TAGENE pipeline
+    my %added_c_b; #Added, by biotype
     my $extended_c = 0; #Extended by TAGENE pipeline
     my $pre_c = 0; #Pre-existing transcript, not extended by TAGENE pipeline
     my $is_tagene_gene = 0; #Has a TAGENE transcript
@@ -132,11 +147,13 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
                #$att->value eq "Assembled from RACEseq reads" or
                #$att->value =~ /^Assembled from LRGASP.+reads.+/ or
                #$att->value =~ /^Assembled from PacBio reads/
-               $att->value =~ /Assembled from (.+) reads/ #or
-#               $att->value eq "CLS3 project"
+               ($att->value =~ /Assembled from (.+) reads/ or
+               $att->value eq "CLS3 project" or
+               $att->value =~ /^(DanaFarber|ENCODE|LRGASP)$/)
               ){
             $tagene_datasets++;
-            my ($dataset) = $att->value =~ /Assembled from (.+) reads/;
+            #my ($dataset) = $att->value =~ /Assembled from (.+) reads/;
+            my $dataset = $1;
             $tsources{$dataset}++;
             $report{'sources'}{$dataset}++;
           }
@@ -198,6 +215,8 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
         else{
           $added_c++;
           $report{$transcript->stable_id} = "novel";
+          #count by biotype
+          $added_c_b{$transcript->biotype}++;
         }
         $report{$transcript->stable_id} .= "-".$transcript->biotype;
       }
@@ -273,10 +292,12 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
                   $gene_modif_date,
                   join(", ", map {$report{$_}} grep {/ENS([A-Z]{3})?G/} keys %report),
                   ($is_single_exon_gene ? "yes" : "no"),
+                  $total_tr_count,
                   scalar(grep {/novel/} values(%report)),
                   scalar(grep {/extended/} values(%report)),
                   join(", ", map {$_.":".$report{$_}} grep {/ENS([A-Z]{3})?T/} keys %report),
-                  join(", ", keys %{$report{'sources'}})
+                  join(", ", keys %{$report{'sources'}}),
+                  join("\t", $added_c_b{"protein_coding"}||0, $added_c_b{"nonsense_mediated_decay"}||0)
                 )."\n";
     }
   }
