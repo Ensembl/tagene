@@ -586,20 +586,12 @@ sub cds_fits {
 
 sub has_complete_cds {
   my $transcript = shift;
-  if (!($transcript->translate)){
+  if ($transcript->translate and has_cds_start($transcript) and has_cds_end($transcript)){
+    return 1;
+  }
+  else{
     return 0;
   }
-  foreach my $attribute (@{$transcript->get_all_Attributes('cds_start_NF')}){
-    if ($attribute->value == 1){
-      return 0;
-    }
-  }
-  foreach my $attribute (@{$transcript->get_all_Attributes('cds_end_NF')}){
-    if ($attribute->value == 1){
-      return 0;
-    }
-  }
-  return 1;
 }
 
 
@@ -622,6 +614,11 @@ sub has_cds_start {
       return 0;
     }
   }
+  foreach my $attribute (@{$transcript->get_all_Attributes('mRNA_start_NF')}){
+    if ($attribute->value == 1){
+      return 0;
+    }
+  } 
   return 1;
 }
 
@@ -644,6 +641,11 @@ sub has_cds_end {
       return 0;
     }
   }
+  foreach my $attribute (@{$transcript->get_all_Attributes('mRNA_end_NF')}){
+    if ($attribute->value == 1){
+      return 0;
+    }
+  }  
   return 1;
 }
 
