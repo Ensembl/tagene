@@ -388,29 +388,29 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
             }
 
             #Check biotype of host gene
-            my $wrong_host;
+            my $wrong_host_reason;
             my $host_gene = $ga->fetch_by_stable_id($new_gene_obj->stable_id);
             if (!$host_gene){
               print "Couldn't fetch host gene with stable_id ".$new_gene_obj->stable_id."\n";
-              $wrong_host = 1;
+              $wrong_host_reason = "host gene not found by stable_id";
             }
             elsif (($host_biotype and !($allowed_biotypes{$host_gene->biotype})) or scalar grep {$_ eq $host_gene->biotype} @protected_biotypes){
               print "Gene ".$host_gene->stable_id." will be ignored as its biotype (".$host_gene->biotype.") is not allowed\n";
-              $wrong_host = 1;
+              $wrong_host_reason = "host gene biotype not allowed";
             }
 
             #Ignore genes having these locus-level attributes
             elsif (scalar(grep {$_->value eq "reference genome error"} @{$host_gene->get_all_Attributes('remark')})){
               print "Gene ".$host_gene->stable_id." will be ignored as it has a 'reference genome error' remark\n";
-              $wrong_host = 1;
+              $wrong_host_reason = "host gene has 'reference genome error' remark";
             }
-            elsif (scalar(grep {$_->value eq "Selenoprotein"} @{$host_gene->get_all_Attributes('remark')})){
+            elsif (scalar(grep {$_->value =~ /^(S|s)elenoprotein$/} @{$host_gene->get_all_Attributes('remark')})){
               print "Gene ".$host_gene->stable_id." will be ignored as it has a Selenoprotein remark\n";
-              $wrong_host = 1;
+              $wrong_host_reason = "host gene has Selenoprotein remark";
             }
             elsif ($host_biotype and !($host_biotype =~ /protein_coding/) and scalar(grep {$_->value eq "ASB_protein_coding"} @{$host_gene->get_all_Attributes('remark')})){
               print "Gene ".$host_gene->stable_id." will be ignored as it has an ASB_protein_coding remark\n";
-              $wrong_host = 1;
+              $wrong_host_reason = "host gene has ASB_protein_coding remark and coding genes not allowed";
             }
             
             #Double check that the gene does not have a coding transcript
@@ -420,15 +420,15 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
                     next if scalar(grep {$_->value eq "not for VEGA"} @{$tr->get_all_Attributes('remark')});
                     if ($tr->translate and $host_biotype and !($host_biotype =~ /protein_coding/)){
                         print "Gene ".$host_gene->stable_id." will be ignored as it has a coding transcript\n";
-                        $wrong_host = 1;
+                        $wrong_host_reason = "host gene has coding transcript(s) and coding genes not allowed";
                         last;
                     }
                 }
             }
-            if ($wrong_host){
+            if ($wrong_host_reason){
                 foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
                     my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
-                    print "TR2: $t_name: host gene biotype not allowed\n";
+                    print "TR2: $t_name: $wrong_host_reason\n";
                 }
                 next GENE;
             }
