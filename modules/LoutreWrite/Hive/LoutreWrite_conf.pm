@@ -565,7 +565,7 @@ sub pipeline_analyses {
       -flow_into => {
         1 => ['get_stats_from_db'],
       },
-      -rc_name => 'default',
+      -rc_name => '5GB',
     },
 
     {
@@ -584,7 +584,7 @@ sub pipeline_analyses {
       -flow_into => {
         1 => ['make_trackhub_annotation_file'],
       },
-      -rc_name => 'default',
+      -rc_name => '5GB',
     },  
 
     {
@@ -676,8 +676,8 @@ sub resource_classes {
   return {
     'default' => {SLURM => '--time=3:00:00 --mem=1000', LSF => '-q short -M 1000 -R"select[mem>1000] rusage[mem=1000]"'},   
     '5GB' => {SLURM => '--time=6:00:00 --mem=5000', LSF => '-q short -M 5000 -R"select[mem>5000] rusage[mem=5000]"'},
-    '10GB' => {SLURM => '--time=7:00:00 --mem=10000', LSF => '-q standard -M 10000 -R"select[mem>10000] rusage[mem=10000]"'},
-    '20GB' => {SLURM => '--time=8:00:00 --mem=20000', LSF => '-q standard -M 20000 -R"select[mem>20000] rusage[mem=20000]"'},
+    '10GB' => {SLURM => '--time=8:00:00 --mem=10000', LSF => '-q standard -M 10000 -R"select[mem>10000] rusage[mem=10000]"'},
+    '20GB' => {SLURM => '--time=10:00:00 --mem=20000', LSF => '-q standard -M 20000 -R"select[mem>20000] rusage[mem=20000]"'},
     '40GB' => {SLURM => '--time=12:00:00 --mem=40000', LSF => '-q short -M 40000 -R"select[mem>40000] rusage[mem=40000]"'},
   };
 }
