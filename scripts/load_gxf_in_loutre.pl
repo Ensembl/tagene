@@ -65,6 +65,7 @@ my $registry_file;
             'max_ov_loc=i'      => \$max_overlapped_loci,
             'protected_loci=s'  => \$protected_loci_list,
             'protected_regions=s' => \$protected_region_list,
+            'no_transcript_extensions' => \$NO_TRANSCRIPT_EXTENSIONS,
             'filter_introns!'   => \$filter_introns,
             'platinum!'         => \$platinum,
             'readseqdir=s'      => \$READSEQDIR,

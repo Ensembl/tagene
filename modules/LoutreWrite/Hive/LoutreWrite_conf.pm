@@ -92,6 +92,7 @@ sub default_options {
     protected_loci => '',
     protected_regions => '',
     max_ov_loc => 0,
+    no_transcript_extensions => 0,
     filter_introns => 0,
     platinum => 0,
     die_locked => 0,
@@ -436,6 +437,7 @@ sub pipeline_analyses {
           .' -max_ov_loc '.$self->o('max_ov_loc')
           .' #protected_loci#'
           .' #protected_regions#'
+          .' #no_transcript_extensions#'
           .' #filter_introns#'
           .' #platinum#'
           .' #die_locked#'
@@ -465,6 +467,7 @@ sub pipeline_analyses {
         no_novel_genes => ($self->o('no_novel_genes') ? '-no_novel_genes' : ''),
         protected_loci => ($self->o('protected_loci') ? '-protected_loci '.$self->o('protected_loci') : ''),
         protected_regions => ($self->o('protected_regions') ? '-protected_regions '.$self->o('protected_regions') : ''),
+        no_transcript_extensions => ($self->o('no_transcript_extensions') ? '-no_transcript_extensions' : ''),
         filter_introns => ($self->o('filter_introns') ? '-filter_introns' : ''),
         platinum => ($self->o('platinum') ? '-platinum' : ''),
         die_locked => ($self->o('die_locked') ? '-die_locked' : ''),
@@ -536,6 +539,7 @@ sub pipeline_analyses {
         no_novel_genes => ($self->o('no_novel_genes') ? '-no_novel_genes' : ''),
         protected_loci => ($self->o('protected_loci') ? '-protected_loci '.$self->o('protected_loci') : ''),
         protected_regions => ($self->o('protected_regions') ? '-protected_regions '.$self->o('protected_regions') : ''),
+        no_transcript_extensions => ($self->o('no_transcript_extensions') ? '-no_transcript_extensions' : ''),
         filter_introns => ($self->o('filter_introns') ? '-filter_introns' : ''),
         platinum => ($self->o('platinum') ? '-platinum' : ''),
         die_locked => ($self->o('die_locked') ? '-die_locked' : ''),

@@ -19,13 +19,14 @@ use LoutreWrite::Config;
 use LoutreWrite::GeneFilter qw(get_valid_overlapping_genes);
 use base 'Exporter';
 
-our @EXPORT = qw( $WRITE @ALLOWED_TRANSCRIPT_BIOTYPES $ONLY_COMPLETE_CDS $NO_NOVEL_GENES );
+our @EXPORT = qw( $WRITE @ALLOWED_TRANSCRIPT_BIOTYPES $ONLY_COMPLETE_CDS $NO_NOVEL_GENES $NO_TRANSCRIPT_EXTENSIONS );
 our @EXPORT_OK = qw( exon_novelty intron_novelty can_be_merged merge_transcripts has_polyA_site_support has_polyAseq_support );
 our $WRITE = 0;
 our $CP_BIOTYPE = "comp_pipe";
 our @ALLOWED_TRANSCRIPT_BIOTYPES;
 our $ONLY_COMPLETE_CDS = 0;
 our $NO_NOVEL_GENES = 0;
+our $NO_TRANSCRIPT_EXTENSIONS = 0;
 
 
 
@@ -407,6 +408,11 @@ sub process_gene_2 {
         #Take action
         #my $id = $tr->get_all_Attributes('hidden_remark')->[0]->value;
         if (scalar @merge_candidates > 0){
+          if ($NO_TRANSCRIPT_EXTENSIONS){
+            print "TR: $id: Will reject transcript in gene ".$gene->stable_id." since it would extend a transcript but the -no_transcript_extensions flag was set\n";
+            push (@log, "TR2: $id: Reject transcript in gene ".$gene->stable_id." since it would extend a transcript but the -no_transcript_extensions flag was set\n");
+            next;
+          } 
           my $sel_db_tr;
           if (scalar @merge_candidates > 1){
             $sel_db_tr = pick_db_tr(\@merge_candidates, $tr);
