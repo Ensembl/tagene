@@ -565,6 +565,7 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
                 else{
                     print "\nRESULT: gene ".$new_gene_obj->stable_id." not modified (WRITE = 0)\n";
                 }
+                die "Dying because an error prevented the annotation from being stored" if $die_if_locked_clone;
             }
             elsif ($msg =~ /lock failed/){
                 if ($WRITE){
