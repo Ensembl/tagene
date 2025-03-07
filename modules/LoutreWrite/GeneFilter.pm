@@ -65,17 +65,20 @@ sub check_max_overlapped_loci {
       my @db_genes = @{get_valid_overlapping_genes($transcript)};
       my @overlapped_db_genes;
       my @overlapped_select_db_genes;
+      my @overlapped_readthrough_db_genes;
       DBG:foreach my $db_gene (@db_genes){
         #Count only certain biotypes (coding and lncRNA broad biotypes)
         if ($db_gene->biotype =~ /antisense|bidirectional_promoter_lncrna|ig_gene|IG_V_gene|lincRNA|macro_lncrna|overlapping_ncrna|polymorphic_pseudogene|processed_transcript|protein_coding|sense_intronic|sense_overlapping|tec|tr_gene/i){
           my $mane_select;
+          my $is_readthrough;
           foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
             next if $db_tr->biotype eq "artifact";
             next if scalar grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')};
             #Do not count readthrough genes as this may affect transcripts belonging to the overlapping non-readthrough genes
             #In any case, if the novel transcript is readthrough, it will be assigned to the readthrough gene later and subsequently rejected
             if (scalar grep {$_->value eq "readthrough"} @{$db_tr->get_all_Attributes("remark")}){
-              next DBG;
+              $is_readthrough = 1;
+              #next DBG;
             }
             #Store the MANE Select transcript, to be used later
             if (scalar grep {$_->value eq "MANE_select"} @{$db_tr->get_all_Attributes("remark")}){
@@ -102,7 +105,12 @@ sub check_max_overlapped_loci {
             E:foreach my $db_exon (@{$db_gene->get_all_Exons}){
               foreach my $exon (@{$transcript->get_all_Exons}){
                 if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
-                  push(@overlapped_db_genes, $db_gene);
+                  if ($is_readthrough){
+                    push(@overlapped_readthrough_db_genes, $db_gene);
+                  }
+                  else{
+                    push(@overlapped_db_genes, $db_gene);
+                  }
                   $message .= "OV: ".$db_gene->stable_id." ".$db_gene->biotype."  ";
                   last E;
                 }
@@ -111,11 +119,27 @@ sub check_max_overlapped_loci {
           }
         }
       }
+   
       if ($stringent_check){
+        my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
         if (scalar @overlapped_db_genes > $max_ov_loci){
-          my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
           print "KILL_2: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@overlapped_db_genes)." loci: $message\n";
           $list{$t_name} = 1;
+        }
+        #If exonic overlap with readthrough gene, even if there is exonic overlap with only other transcript,
+        #calculate the ratio between the transcript span and both gene spans, or set a limit on how far upstream or downstream
+        #of the host gene the novel transcript can go. 
+        #This will be useful in case the readthrough gene overlaps only that gene (eg. STAG3L5P-PVRIG2P-PILRB and PILRB)
+        #Note: implemented below for the most common use case: max. one overlapping locus allowed, but it wouldn't work for other cases (TO DO)
+        else{
+          if ($max_ov_loci == 1 and scalar @overlapped_db_genes == 1 and scalar @overlapped_readthrough_db_genes > 0){
+            if ($transcript->seq_region_start < ($overlapped_db_genes[0]->seq_region_start - 3000) or
+                $transcript->seq_region_end > ($overlapped_db_genes[0]->seq_region_end + 3000)
+            ){
+              print "KILL_2: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps ".scalar(@overlapped_db_genes)." loci and ".scalar(@overlapped_readthrough_db_genes)." readthroughs: $message\n";
+              $list{$t_name} = 1;
+            }
+          }
         }
       }
 
