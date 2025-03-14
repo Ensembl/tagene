@@ -275,7 +275,7 @@ sub is_retained_intron {
   }
 
 
-  #Firstly, find which of the input transcript's exons exist in annotated coding transcripts
+  #Firstly, find which of the input transcript's exons exist in the CDS of annotated coding transcripts
   #These must not be queried for intron retention
   my %annotated_exons;
   foreach my $tr (@comp_trs){
@@ -284,7 +284,11 @@ sub is_retained_intron {
         my $rank = 0; #not using the 'rank' API method because it relies on exon stable ids, which may not have been assigned yet
         foreach my $exon2 (@{$transcript->get_all_Exons}){
           $rank++;
-          if ($exon1->seq_region_start == $exon2->seq_region_start and $exon1->seq_region_end == $exon2->seq_region_end){
+          my $cds_start = $tr->coding_region_start + $slice_offset;
+          my $cds_end = $tr->coding_region_end + $slice_offset;
+          if ($exon1->seq_region_start == $exon2->seq_region_start and $exon1->seq_region_end == $exon2->seq_region_end and
+              $cds_start < $exon1->seq_region_end and $cds_end > $exon1->seq_region_start
+          ){
             $annotated_exons{$rank}++;
             #print "SEEN=".$rank."\n";
           }
@@ -310,7 +314,7 @@ sub is_retained_intron {
           #print "CDS INTRON: ".$intron->seq_region_start."-".$intron->seq_region_end."\n";
           #Full intron retention
           #  ref: #######-------#######------######
-          #   tr:       #########
+          #   tr:     ############-----------######
           my $rank = 0;
           foreach my $exon (@{$transcript->get_all_Exons}){
             #print "EXON: ".$exon->seq_region_start."-".$exon->seq_region_end."\n";
@@ -321,14 +325,17 @@ sub is_retained_intron {
             }
             if ($exon->seq_region_start < $intron->seq_region_start and $exon->seq_region_end > $intron->seq_region_end){
               #print "FOUND\n";
-              if ($stop_codon_coordinate){ #if CDS end coordinate, do not make retained_intron if CDS end is upstream of intron
+              #If CDS end (stop codon) coordinate provided, call it intron retention if stop codon is not upstream of retained intron
+              if ($stop_codon_coordinate){ 
                 if (($transcript->seq_region_strand == 1 and $stop_codon_coordinate > $intron->seq_region_start) or
                     ($transcript->seq_region_strand == -1 and $stop_codon_coordinate < $intron->seq_region_end)
                 ){
+                  print "Full intron retention\n";
                   return 1;
                 }
               }
               else{
+                print "Full intron retention\n";
                 return 1;
               }
             }
