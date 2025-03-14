@@ -717,7 +717,7 @@ sub process_gene_2 {
     my $n = 0;
     while (($g_msg eq " " or $g_msg =~ /write failed/ or $g_msg =~ /lock failed/) and $n<5){
       $g_msg = write_gene_region($region_action, $region);
-      sleep(30);
+      sleep(60);
       $n++;
     }
     print $g_msg."\n";
