@@ -13,9 +13,6 @@ grep ^LOOKING $TMPFILE | awk '{print $5}' | sort -u | wc -l
 echo -e "\nTranscripts ignored as gene didn't transform to default assembly"
 grep ^TR2 $TMPFILE | grep "did not transform" | awk '{print $3}' | sort -u | wc -l
 
-echo -e "\nTranscripts ignored as overlapping multiple loci"
-grep ^TR2 $TMPFILE | grep "max allowed number" | awk '{print $3}' | sort -u | wc -l
-
 echo -e "\nTranscripts ignored as genomic region is protected"
 grep ^TR2 $TMPFILE | grep "region is protected" | awk '{print $3}' | sort -u | wc -l
 
@@ -36,6 +33,9 @@ grep ^TR2 $TMPFILE | grep "host gene has coding transcript(s) and coding genes n
 
 echo -e "\nTranscripts ignored as gene is novel and the -no_novel_genes flag is set"
 grep ^TR2 $TMPFILE | grep "Rejected transcript in novel gene since the -no_novel_genes flag is set" | awk '{print $3}' | sort -u | wc -l
+
+echo -e "\nTranscripts ignored as they would extend another transcript and the -no_transcript_extensions flag is set"
+grep ^TR2 $TMPFILE | grep -P "Reject transcript in gene .+ since it would extend a transcript but the -no_transcript_extensions flag was set" | awk '{print $3}' | sort -u | wc -l
 
 echo -e "\nTranscripts ignored as transcript biotype not allowed"
 grep ^TR2 $TMPFILE | grep -P "Rejected transcript.+as transcript biotype.+not allowed" | awk '{print $3}' | sort -u | wc -l
