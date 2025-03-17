@@ -137,6 +137,11 @@ if ($id_list){
 
 
 #Read GTF file
+use Memory::Usage;
+my $mu = Memory::Usage->new();
+$mu->record('before reading gtf file');
+my $timestamp = localtime(time);
+print "$timestamp Reading GTF file...\n";
 my %exon_coords_by_tid;
 if ($gtf_file =~ /\.gz$/){
   open (GTF, "zcat $gtf_file |") or die "Can't open $gtf_file: $!";
@@ -177,9 +182,11 @@ while (<GTF>){
   }
 }
 close (GTF);
-
+$mu->record('after reading gtf file');
 
 #Calculate intron coordinates for each transcript
+$timestamp = localtime(time);
+print "$timestamp Extracting intron coordinates...\n";
 my %intron_coords_by_tid;
 foreach my $tid (keys %exon_coords_by_tid){
   if (scalar @{$exon_coords_by_tid{$tid}{'starts'}} > 1){
@@ -199,9 +206,11 @@ foreach my $tid (keys %exon_coords_by_tid){
     }
   }
 }
-
+$mu->record('after extracting intron coordinates');
 
 #Read list of supporting reads
+$timestamp = localtime(time);
+print "$timestamp Reading list of supporting reads...\n";
 my %tids = map {$_=>1} @tids;
 my %supporting_reads;
 open (RSL, $read_support_list) or die "Can't open file $read_support_list: $!";
@@ -216,7 +225,8 @@ while (<RSL>){
   }
 }
 close (RSL);
-
+$mu->record('after reading supporting reads');
+$mu->dump();
 
 open (OUT, ">$outfile") or die "Can't open $outfile: $!";
 print OUT "#".join("\t", "transcript_ID",
@@ -231,6 +241,8 @@ open (LOG, ">$outfile.log") or die "Can't open $outfile.log: $!";
 
 
 #Loop through transcripts
+$timestamp = localtime(time);
+print "$timestamp Checking splice site alignments...";
 foreach my $tid (uniq @tids){
   print LOG "\n##".$tid."\n";
   my $timestamp = localtime(time);
@@ -245,7 +257,7 @@ foreach my $tid (uniq @tids){
     #Loop through BAM files
     foreach my $file_name (keys %bam_hts){
       my ($sample_name) = $file_name =~ /^(.+)\.bam$/;
-    
+      print LOG "Number of supporting reads = ".scalar(@{$supporting_reads{$tid}{$sample_name}})."\n";
       #Extract all reads overlapping the transcript and filter for supporting reads
       #NOTE: another option is to find each supporting read by location and name (searching by name alone is very slow),
       #but this takes long if there is a large number of them
@@ -255,7 +267,7 @@ foreach my $tid (uniq @tids){
                                                       -end    => max(@{$exon_coords_by_tid{$tid}{'ends'}}),
                                                     );
                                                     
-      print LOG "Number of reads = ".scalar(@reads)."\n";
+      print LOG "Number of overlapping reads = ".scalar(@reads)."\n";
       READ:while (my $read_ali = shift @reads){  
         my $read_name = $read_ali->query->name;
         if (grep {$_ eq $read_name} @{$supporting_reads{$tid}{$sample_name}}){
@@ -406,7 +418,7 @@ foreach my $tid (uniq @tids){
                 }
               }
               if ($closest_diff_start > $window_size){
-                $closest_diff_start .= "+";
+               # $closest_diff_start .= "+";
               }
               
               my $n_diff_end = 0;
@@ -429,10 +441,10 @@ foreach my $tid (uniq @tids){
                 print LOG $i." ".($diff{$i}||" ")."$score_end\n";
               }
               if ($closest_diff_end > $window_size){
-                $closest_diff_end .= "+";
+                #$closest_diff_end .= "+";
               }
               #unless ($n_diff_start <= $max_errors and $n_diff_end <= $max_errors){
-              if ($score_start > $window_size or $score_end > $window_size){
+              if ($score_start > $window_size or $score_end > $window_size or $closest_diff_start <= 2 or $closest_diff_end <= 2){
                 $intron_ok = 0;
                 $read_has_misaligned_splice_site = 1;
                 push(@misaligned_reads, $read_name);
@@ -504,7 +516,8 @@ foreach my $tid (uniq @tids){
 close (OUT);
 close (LOG);
 
-
+$mu->record('after finishing job');
+$mu->dump();
 
 __END__
               unless (($intron_coords_by_tid{$tid}{'strand'} eq "+" and
