@@ -29,7 +29,6 @@ sub get_db_adaptors_from_registry {
   unless ($DBA{'havana'}){
     $DBA{'havana'} = $DBA{'otter'};
   }
-  $DBA{'pipe'} = $registry->get_DBAdaptor('pipe_'.$SPECIES, 'core');
   $DBA{'core'} = $registry->get_DBAdaptor('core_'.$SPECIES, 'core');
   $DBA{'intron'} = $registry->get_DBAdaptor('intron_'.$SPECIES, 'core');
   $DBA{'polyAseq'} = $registry->get_DBAdaptor('polyAseq_'.$SPECIES, 'core');
@@ -41,7 +40,6 @@ sub get_db_adaptors{
   unless ($DBA{'havana'}){
     $DBA{'havana'} = $DBA{'otter'};
   }
-  $DBA{'pipe'} =  get_pipe_db_adaptor();
   $DBA{'core'} = get_core_db_adaptor();
   $DBA{'intron'} = get_intron_db_adaptor();
   $DBA{'polyAseq'} = get_polyAseq_db_adaptor();
@@ -70,28 +68,6 @@ sub get_havana_db_adaptor {
      -pass   => undef,
      -dbname => $dbname,
      -driver => 'mysql',
-  );
-  $db->dbc->reconnect_when_lost(1);
-  return $db;
-}
-
-
-#Connect to the Otter pipeline database
-sub get_pipe_db_adaptor {
-  my $host = 'mysql-ens-havana-prod-1';
-  my $port = 4581;
-  my $user = 'ensro';
-  my $dbname = "pipe_".$SPECIES;
-  if ($SPECIES eq "rat"){
-    $dbname = "pipe_rattus_norvegicus";
-  }
-  my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-    -host   => $host,
-    -port   => $port,
-    -user   => $user,
-    -pass   => undef,
-    -dbname => $dbname,
-    -driver => 'mysql',
   );
   $db->dbc->reconnect_when_lost(1);
   return $db;
