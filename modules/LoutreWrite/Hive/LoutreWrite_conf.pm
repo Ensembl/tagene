@@ -88,11 +88,13 @@ sub default_options {
     no_overlap_biotype => '',
     tr_biotypes => '',
     complete_cds => 0,
+    mane_select_start => 0,
+    mane_select_stop => 0,
     no_novel_genes => 0,
     protected_loci => '',
     protected_regions => '',
     max_ov_loc => 0,
-    no_transcript_extensions => 0,
+    no_extensions => 0,
     filter_introns => 0,
     platinum => 0,
     die_locked => 0,
@@ -432,12 +434,14 @@ sub pipeline_analyses {
           .' -host_biotype '.$self->o('host_biotype')
           .' -no_overlap_biotype '.$self->o('no_overlap_biotype')
           .' #tr_biotypes#'
+          .' #mane_select_start#'
+          .' #mane_select_stop#'
           .' #complete_cds#'
           .' #no_novel_genes#'
           .' -max_ov_loc '.$self->o('max_ov_loc')
           .' #protected_loci#'
           .' #protected_regions#'
-          .' #no_transcript_extensions#'
+          .' #no_extensions#'
           .' #filter_introns#'
           .' #platinum#'
           .' #die_locked#'
@@ -463,11 +467,13 @@ sub pipeline_analyses {
         no_nfv => ($self->o('no_NFV') ? '-no_NFV' : ''),
         no_cds => ($self->o('no_CDS') ? '-no_CDS' : ''),
         tr_biotypes => ($self->o('tr_biotypes') ? '-tr_biotypes '.$self->o('tr_biotypes') : ''),
+        mane_select_start => ($self->o('mane_select_start') ? ' -mane_select_start' : ''),
+        mane_select_stop => ($self->o('mane_select_stop') ? ' -mane_select_stop' : ''),
         complete_cds => ($self->o('complete_cds') ? '-complete_cds' : ''),
         no_novel_genes => ($self->o('no_novel_genes') ? '-no_novel_genes' : ''),
         protected_loci => ($self->o('protected_loci') ? '-protected_loci '.$self->o('protected_loci') : ''),
         protected_regions => ($self->o('protected_regions') ? '-protected_regions '.$self->o('protected_regions') : ''),
-        no_transcript_extensions => ($self->o('no_transcript_extensions') ? '-no_transcript_extensions' : ''),
+        no_extensions => ($self->o('no_extensions') ? '-no_extensions' : ''),
         filter_introns => ($self->o('filter_introns') ? '-filter_introns' : ''),
         platinum => ($self->o('platinum') ? '-platinum' : ''),
         die_locked => ($self->o('die_locked') ? '-die_locked' : ''),
@@ -505,11 +511,14 @@ sub pipeline_analyses {
           .' -host_biotype '.$self->o('host_biotype')
           .' -no_overlap_biotype '.$self->o('no_overlap_biotype')
           .' #tr_biotypes#'
+          .' #mane_select_start#'
+          .' #mane_select_stop#'
           .' #complete_cds#'
           .' #no_novel_genes#'
           .' -max_ov_loc '.$self->o('max_ov_loc')
           .' #protected_loci#'
           .' #protected_regions#'
+          .' #no_extensions#'
           .' #filter_introns#'
           .' #platinum#'
           .' #die_locked#'
@@ -535,11 +544,13 @@ sub pipeline_analyses {
         no_nfv => ($self->o('no_NFV') ? '-no_NFV' : ''),
         no_cds => ($self->o('no_CDS') ? '-no_CDS' : ''),
         tr_biotypes => ($self->o('tr_biotypes') ? '-tr_biotypes '.$self->o('tr_biotypes') : ''),
+        mane_select_start => ($self->o('mane_select_start') ? ' -mane_select_start' : ''),
+        mane_select_stop => ($self->o('mane_select_stop') ? ' -mane_select_stop' : ''),
         complete_cds => ($self->o('complete_cds') ? '-complete_cds' : ''),
         no_novel_genes => ($self->o('no_novel_genes') ? '-no_novel_genes' : ''),
         protected_loci => ($self->o('protected_loci') ? '-protected_loci '.$self->o('protected_loci') : ''),
         protected_regions => ($self->o('protected_regions') ? '-protected_regions '.$self->o('protected_regions') : ''),
-        no_transcript_extensions => ($self->o('no_transcript_extensions') ? '-no_transcript_extensions' : ''),
+        no_extensions => ($self->o('no_extensions') ? '-no_extensions' : ''),
         filter_introns => ($self->o('filter_introns') ? '-filter_introns' : ''),
         platinum => ($self->o('platinum') ? '-platinum' : ''),
         die_locked => ($self->o('die_locked') ? '-die_locked' : ''),

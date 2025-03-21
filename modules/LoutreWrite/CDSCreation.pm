@@ -4,9 +4,10 @@ package LoutreWrite::CDSCreation;
 use strict;
 use warnings;
 use base 'Exporter';
-our @EXPORT = qw( sort_by_categ get_host_gene_cds_set assign_cds_to_transcripts get_appris_tag get_ccds_tag cds_exon_chain start_codon_fits has_complete_cds get_host_gene_start_codon_set is_retained_intron %HOST_CDS_SET %HOST_START_CODON_SET %HOST_STOP_CODON_SET );
+our @EXPORT = qw( sort_by_categ get_host_gene_cds_set assign_cds_to_transcripts get_appris_tag get_ccds_tag cds_exon_chain start_codon_fits has_complete_cds get_host_gene_start_codon_set is_retained_intron 
+                  %HOST_CDS_SET %HOST_START_CODON_SET %HOST_STOP_CODON_SET %MANE_SELECT_START_CODON $ONLY_MANE_SELECT_START_CODON $ONLY_MANE_SELECT_STOP_CODON );
 use Bio::Vega::Translation;
-use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptUtils qw(calculate_exon_phases);
+use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptUtils qw( calculate_exon_phases );
 use Bio::EnsEMBL::Registry;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use LoutreWrite::AnnotUpdate qw( has_polyA_site_support has_polyAseq_support );
@@ -15,49 +16,40 @@ use LoutreWrite::Config;
 our %HOST_CDS_SET;
 our %HOST_START_CODON_SET;
 our %HOST_STOP_CODON_SET;
+our %MANE_SELECT_START_CODON;
+our %MANE_SELECT_STOP_CODON;
 our %CORE_TRANSCRIPTS;
-
-#my $registry = 'Bio::EnsEMBL::Registry';
-#$registry->load_registry_from_db(
-#    -host => 'ensembldb.ensembl.org',
-#    -user => 'anonymous'
-#);
-
-#my $core_slice_adaptor = $registry->get_adaptor( 'Human', 'Core', 'Slice' );
-#my $core_gene_adaptor = $registry->get_adaptor( 'Human', 'Core', 'Gene' );
+our $ONLY_MANE_SELECT_START_CODON;
+our $ONLY_MANE_SELECT_STOP_CODON;
 
 
-# my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-#     -host   => 'mysql-ens-havana-prod-1',
-#     -port   => '4581',
-#     -user   => 'ensro',
-#     -dbname => 'homo_sapiens_core_98_38_status',
-#     -driver => 'mysql'
-#   );
-# $db->dbc->disconnect_when_inactive(1);
-# my $core_slice_adaptor = $db->get_SliceAdaptor();
-# my $core_gene_adaptor = $db->get_GeneAdaptor();
-
-
+#Original CDS assignment strategy:
 #https://docs.google.com/document/d/17PIripFaSkGkHmZbwR1ZCRYQhyu5ov6dgBVNqVtDjt4/edit?ts=5b6b0748
 
+#Modified to prioritise MANE Select start and stop codons
+
 #Take annotated transcripts in host gene
-#Find all full-lenght CDSs and sort them by:
+
+#1 - Find the MANE Select transcript
+#Search for an ORF starting from the MANE Select start codon
+
+#2 - If not found, find all full-length CDSs and sort them by:
+# -MANE Select
 # -APPRIS level (principal 1 to 4)
 # -CCDS (5'-most ATG first)
 # -complete CDSs (5'-most ATG first)
-# -complete NMD CDSs (5'-most ATG first) - only use complete NMD CDSs that are not also found as non-NMD CDSs in loutre
-#Find all start codons and sort by 5'-most first
+# -complete NMD CDSs (5'-most ATG first) - only use complete NMD CDSs that are not also found as non-NMD CDSs
+#Find all start codons and sort them by 5'-most first
+#Search for each of these CDSs in the novel transcripts until one is found (including start codon, and stop codon if available) 
+#and copy the biotype ('known_CDS', 'novel_CDS', 'putative_CDS' or 'coding')
 
-#Search for each of these CDSs in comp_pipe models until one is found (including start codon, and stop codon if available) - copy biotype ('known_CDS', 'novel_CDS', 'putative_CDS' or 'coding')
-
-#If none is suitable for a comp_pipe model, try finding ORFs starting from known ATGs (CDS_end_NF allowed) sorted by:
+#3 - If none is suitable for a novel transcript, try finding ORFs starting from known ATGs (CDS_end_NF allowed) sorted by:
+# -MANE Select
 # -APPRIS level (principal 1 to 3)
 # -CCDS (5'-most ATG first)
 # -other CDSs (5'-most ATG first)
-
-#Search for ORFs starting from these start codons - if stop codon and not NMD, call it 'putative_CDS'
-# if no stop codon, add 'end not found' tag
+#Search for ORFs starting from these start codons: if stop codon and not NMD, call it 'putative_CDS';
+#if no stop codon, add 'CDS_end_NF' / 'mRNA_end_NF' attributes
 
 #Always check if NMD rules apply -
 #  -stop codon is found 50bps or more upstream of a splice donor site
@@ -65,15 +57,13 @@ our %CORE_TRANSCRIPTS;
 
 #Check for retained intron rules - no CDS will be assigned
 # -full intron retention: complete CDS intron(s)
-# -partial intron retention: model has a start or end coordinate within a CDS intron of a loutre model, but not (respectively) a splice donor site or splice acceptor site within that same intron
+# -partial intron retention: model has a start or end coordinate within a CDS intron of a loutre model, 
+#but not (respectively) a splice donor site or splice acceptor site within that same intron
 
 #Readthrough comp_pipe models do not get any CDS
 
-
 #NOTE: needs to deal with merged transcripts where the CDS must be modified, 
-# eg. if the pre-existing transcript was 'CDS end not found' and it has been extended.
-
-#Ensure MANE transcripts are not modified.
+# eg. if the pre-existing transcript was 'CDS_end_NF' and it has been extended.
 
 
 
@@ -99,6 +89,30 @@ sub assign_cds_to_transcripts {
     die "First parameter must be a Bio::Vega::Gene or Bio::Vega::Transcript object!";
   }
   #my $slice_offset = $host_gene->seq_region_start - 1;
+  #Get MANE Select start codon (CDS start coordinate)
+  my $mane_select_start_codon;
+  if ($MANE_SELECT_START_CODON{$host_gene->stable_id}){
+    $mane_select_start_codon = $MANE_SELECT_START_CODON{$host_gene->stable_id};
+  }
+  else{
+    $mane_select_start_codon = get_mane_select_start_codon($host_gene);
+    $MANE_SELECT_START_CODON{$host_gene->stable_id} = $mane_select_start_codon;
+  }
+  #Stop here if no MANE Select and $ONLY_MANE_SELECT_START_CODON flag is set
+#  if (!($mane_select_start_codon) and $ONLY_MANE_SELECT_START_CODON){
+#    print "No MANE Select start codon found and \$ONLY_MANE_SELECT_START_CODON flag is set - skipping CDS creation for gene ".$host_gene->stable_id."\n";
+#    return;
+#  }
+  #Get MANE Select stop codon (CDS end coordinate)
+  my $mane_select_stop_codon;
+  if ($MANE_SELECT_STOP_CODON{$host_gene->stable_id}){
+    $mane_select_stop_codon = $MANE_SELECT_STOP_CODON{$host_gene->stable_id};
+  }
+  else{
+    $mane_select_stop_codon = get_mane_select_stop_codon($host_gene);
+    $MANE_SELECT_STOP_CODON{$host_gene->stable_id} = $mane_select_stop_codon;
+  }
+  #Get all full-length CDSs in the host gene
   my $cds_set;
   if ($HOST_CDS_SET{$host_gene->stable_id}){
     $cds_set = $HOST_CDS_SET{$host_gene->stable_id};
@@ -108,6 +122,7 @@ sub assign_cds_to_transcripts {
     $cds_set = get_host_gene_cds_set($host_gene);
     $HOST_CDS_SET{$host_gene->stable_id} = $cds_set;
   }
+  #Get all annotated start codons in the host gene
   my $start_codon_set;
   if ($HOST_START_CODON_SET{$host_gene->stable_id}){
     $start_codon_set = $HOST_START_CODON_SET{$host_gene->stable_id};
@@ -117,6 +132,7 @@ sub assign_cds_to_transcripts {
     $start_codon_set = get_host_gene_start_codon_set($host_gene);
     $HOST_START_CODON_SET{$host_gene->stable_id} = $start_codon_set;
   }
+  #Get all annotated stop codons in the host gene
   my $stop_codon_set;
   if ($HOST_STOP_CODON_SET{$host_gene->stable_id}){
     $stop_codon_set = $HOST_STOP_CODON_SET{$host_gene->stable_id};
@@ -125,21 +141,90 @@ sub assign_cds_to_transcripts {
   else{
     $stop_codon_set = get_host_gene_stop_codon_set($host_gene);
     $HOST_STOP_CODON_SET{$host_gene->stable_id} = $stop_codon_set;
-  }  
-  
-        #print "HOST_CDS_SET=".scalar(keys %HOST_CDS_SET)."\n";
-        #print "HOST_START_CODON_SET=".scalar(keys %HOST_START_CODON_SET)."\n";
+  }
+
+
   print "HOST GENE START = ".$host_gene->seq_region_start." HOST GENE END = ".$host_gene->seq_region_end."\n";
   TR:foreach my $transcript (@novel_transcripts){
     my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
     print "\nFinding a CDS for transcript $t_name\n";
     print "TR_START=".$transcript->seq_region_start."; TR_END=".$transcript->seq_region_end."\n";
-    
+
+    #If the host gene has a MANE Select transcript, try to create a CDS using its start codon
+    if ($mane_select_start_codon){
+      print "\nChecking MANE Select start codon...\n";
+      #Start codon coordinates are relative to the region slice: convert to genomic
+      print "start_codon=".($mane_select_start_codon+$slice_offset)."; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
+      #Check if the CDS is compatible with the transcript's exon-intron chain (or at least the start codon and the CDS until the end of the novel transcript)
+      my ($cds_start, $cds_end, $fl_cds) = start_codon_fits($transcript, $mane_select_start_codon + $slice_offset);
+      if ($cds_start and $cds_end){
+        #Before annotating a CDS, check for intron retention
+        #Note that if the stop codon is upstream of the retained intron, the biotype must not be retained_intron (it will probably be NMD)
+        if (is_retained_intron($transcript, $host_gene, 5, $cds_end)){
+          print "Found retained_intron before stop codon at $cds_end\n";
+          $transcript->biotype("retained_intron");
+          next TR;
+        }
+
+        #If only the MANE Select start codon can be accepted, do not add the CDS if a different stop codon will be used
+        if ($ONLY_MANE_SELECT_STOP_CODON){
+          if ($cds_end != $mane_select_stop_codon){
+            print "CDS end doesn't match MANE Select stop codon and \$ONLY_MANE_SELECT_STOP_CODON flag is set - won't create CDS in transcript $t_name\n";
+            next TR;
+          }
+        }
+
+        #Annotate the CDS
+        if (create_cds($transcript, $cds_start, $cds_end)){
+          #If NMD rules are met, asign the nonsense_mediated_decay biotype
+          if (predicted_nmd_transcript($transcript, $cds_end)){
+            $transcript->biotype("nonsense_mediated_decay");
+          }
+          #If not, aim for protein_coding biotype                
+          else{
+            #Full-length CDS?
+            if ($fl_cds){
+              #PolyA support or know stop codon are required for protein_coding biotype if full-length CDS
+              #Otherwise, no CDS will be made and the biotype will be processed_transcript
+              unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or
+                      LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500) or
+                      LoutreWrite::AnnotUpdate::has_last_exon_polyA_site_support($transcript, $host_gene) or
+                      is_known_stop_codon($cds_end, $slice_offset, $host_gene)){
+                print "Stop codon at $cds_end has no polyA site support nor has been annotated before\n";
+                next TR;
+              }
+              #Assign biotype and status
+              $transcript->biotype("protein_coding");
+              $transcript->status("PUTATIVE");
+            }
+            else{
+              #Assign biotype and status
+              $transcript->biotype("protein_coding");
+              $transcript->status("PUTATIVE");
+              #Add end_NF attributes if 3'-incomplete CDS
+              add_end_NF_attributes($transcript, $slice_offset);          
+            }
+          }
+          print "MANE Select ".($mane_select_start_codon + $slice_offset)." start codon matches ".$transcript->stable_id." (".$transcript->biotype."-".$transcript->status.")\n";
+          next TR;
+        }
+      }
+    }
+    #Stop here if only the MANE Select start codon can be accepted
+    if ($ONLY_MANE_SELECT_START_CODON){
+      print "CDS start doesn't match MANE Select start codon and \$ONLY_MANE_SELECT_START_CODON flag is set - won't create CDS in transcript $t_name\n";
+      if (is_retained_intron($transcript, $host_gene, 5)){
+        $transcript->biotype("retained_intron");
+        print "Found retained_intron\n";
+      }
+      next TR;
+    }
+
+    #Try to find a suitable CDS among the host gene CDSs
     print "\nAvailable CDSs:\n";
     foreach my $unique_cds_tr (@$cds_set){
       print "CDS_START=".$unique_cds_tr->coding_region_start."; CDS_END=".$unique_cds_tr->coding_region_end."\n";
     }
-    #Try to find a suitable CDS from the host gene
     foreach my $unique_cds_tr (@$cds_set){
       if (cds_fits($transcript, $unique_cds_tr, $slice_offset)){
         print "CDS FITS: CDS_START=".$unique_cds_tr->coding_region_start."; CDS_END=".$unique_cds_tr->coding_region_end."\n";
@@ -168,6 +253,7 @@ sub assign_cds_to_transcripts {
         next TR;
       }
     }
+
     #Otherwise, try to create a novel CDS using a known start codon from the host gene    
     print "\nChecking start codons...\n";
     foreach my $unique_start_codon (@$start_codon_set){
@@ -899,6 +985,33 @@ sub sort_by_categ_2 {
 
 
 
+=head2 get_mane_select_start_codon
+
+ Arg[1]    : Bio::Vega::Gene object
+ Function  : returns the CDS start position of the MANE Select transcript in the host gene
+ Returntype: integer
+
+=cut
+
+sub get_mane_select_start_codon {
+  my $gene = shift;
+  my $cds_start;
+  foreach my $transcript (@{$gene->get_all_Transcripts}){
+    #Ignore lingering OTT transcripts
+    next unless $transcript->stable_id =~ /^ENS([A-Z]{3})?T000/;
+    #Ignore "not for VEGA" transcripts
+    if (scalar(grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')})){
+      next;
+    }
+    if (scalar(grep {$_->value eq "MANE_select"} @{$transcript->get_all_Attributes('remark')})){
+      $cds_start = $transcript->seq_region_strand == 1 ? $transcript->coding_region_start : $transcript->coding_region_end;
+      return $cds_start;
+    }
+  }
+  return;
+}
+
+
 =head2 start_codon_fits
 
  Arg[1]    : Bio::Vega::Transcript object
@@ -1093,6 +1206,35 @@ sub get_host_gene_stop_codon_set {
   }
   return \@stop_codon_set;
 }
+
+
+
+=head2 get_mane_select_stop_codon
+
+ Arg[1]    : Bio::Vega::Gene object
+ Function  : returns the CDS end position of the MANE Select transcript in the host gene
+ Returntype: integer
+
+=cut
+
+sub get_mane_select_stop_codon {
+  my $gene = shift;
+  my $cds_end;
+  foreach my $transcript (@{$gene->get_all_Transcripts}){
+    #Ignore lingering OTT transcripts
+    next unless $transcript->stable_id =~ /^ENS([A-Z]{3})?T000/;
+    #Ignore "not for VEGA" transcripts
+    if (scalar(grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes('remark')})){
+      next;
+    }
+    if (scalar(grep {$_->value eq "MANE_select"} @{$transcript->get_all_Attributes('remark')})){
+      $cds_end = $transcript->seq_region_strand == 1 ? $transcript->coding_region_end : $transcript->coding_region_start;
+      return $cds_end;
+    }
+  }
+  return;
+}
+
 
 
 =head2 is_known_stop_codon

@@ -13,11 +13,11 @@ use LoutreWrite::Config;
 use LoutreWrite::InputParsing;
 use LoutreWrite::GeneFilter;
 use LoutreWrite::AnnotUpdate;
+use LoutreWrite::CDSCreation;
 use LoutreWrite::IntronFilter;
 $| = 1;
 
-our %HOST_CDS_SET;
-our %HOST_START_CODON_SET;
+
 my $file;
 my $source_info;
 my $dataset_name;
@@ -44,35 +44,37 @@ my $die_if_locked_clone;
 my $registry_file;
 
 &GetOptions(
-            'file=s'            => \$file,
-            'dataset=s'         => \$dataset_name,
-            'author=s'          => \$author_name,
-            'source=s'          => \$source_info, #file with otter columns and read names supporting each transcript model
-            'remark=s'          => \$remark, #remark to be added to every transcript model
-            'comp_pipe!'        => \$use_comp_pipe_biotype,
-            'analysis=s'        => \$analysis_name,
-            'tsource=s'         => \$tsource,
-            'assembly=s'        => \$assembly_version,
-            'no_check!'         => \$no_artifact_check,
-            'no_NFV!'           => \$no_NFV,
-            'no_CDS!'           => \$do_not_add_cds,
-            'no_intron_check!'  => \$no_intron_check,
-            'host_biotype=s'    => \$host_biotype,
-            'no_overlap_biotype=s' => \$no_overlap_biotype,
-            'tr_biotypes=s'     => \$allowed_transcript_biotypes,
-            'complete_cds!'     => \$ONLY_COMPLETE_CDS,
-            'no_novel_genes!'   => \$NO_NOVEL_GENES,
-            'max_ov_loc=i'      => \$max_overlapped_loci,
-            'protected_loci=s'  => \$protected_loci_list,
-            'protected_regions=s' => \$protected_region_list,
-            'no_transcript_extensions' => \$NO_TRANSCRIPT_EXTENSIONS,
-            'filter_introns!'   => \$filter_introns,
-            'platinum!'         => \$platinum,
-            'readseqdir=s'      => \$READSEQDIR,
-            'chr=s'             => \$only_chr,
-            'die_locked!'       => \$die_if_locked_clone,
-            'registry=s'        => \$registry_file,
-            'write!'            => \$WRITE,
+            'file=s'                    => \$file,
+            'dataset=s'                 => \$dataset_name,
+            'author=s'                  => \$author_name,
+            'source=s'                  => \$source_info, #file with otter columns and read names supporting each transcript model
+            'remark=s'                  => \$remark, #remark to be added to every transcript model
+            'comp_pipe!'                => \$use_comp_pipe_biotype,
+            'analysis=s'                => \$analysis_name,
+            'tsource=s'                 => \$tsource,
+            'assembly=s'                => \$assembly_version,
+            'no_check!'                 => \$no_artifact_check,
+            'no_NFV!'                   => \$no_NFV,
+            'no_CDS!'                   => \$do_not_add_cds,
+            'no_intron_check!'          => \$no_intron_check,
+            'host_biotype=s'            => \$host_biotype,
+            'no_overlap_biotype=s'      => \$no_overlap_biotype,
+            'tr_biotypes=s'             => \$allowed_transcript_biotypes,
+            'mane_select_start!'        => \$ONLY_MANE_SELECT_START_CODON,
+            'mane_select_stop!'         => \$ONLY_MANE_SELECT_STOP_CODON,
+            'complete_cds!'             => \$ONLY_COMPLETE_CDS,
+            'no_novel_genes!'           => \$NO_NOVEL_GENES,
+            'max_ov_loc=i'              => \$max_overlapped_loci,
+            'protected_loci=s'          => \$protected_loci_list,
+            'protected_regions=s'       => \$protected_region_list,
+            'no_extensions!'            => \$NO_TRANSCRIPT_EXTENSIONS,
+            'filter_introns!'           => \$filter_introns,
+            'platinum!'                 => \$platinum,
+            'readseqdir=s'              => \$READSEQDIR,
+            'chr=s'                     => \$only_chr,
+            'die_locked!'               => \$die_if_locked_clone,
+            'registry=s'                => \$registry_file,
+            'write!'                    => \$WRITE,
             );
 
 #die unless $dataset_name && $dataset_name =~ /test/;
@@ -95,8 +97,8 @@ This script stores the gene annotation from a gtf/gff3 file into an Otter (loutr
 
 perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -dataset DATASET_NAME -author AUTHOR_NAME -remark REMARK_STRING [-comp_pipe] [-write]
  -file                 annotation file in GTF or GFF3 format - it can only contain exon lines - it will ignore anything but gene, transcript and exon lines
- -dataset              dataset name (species) already known by the Otter system, ie. present in the species.dat file on the live server
- -source               tsv file with transcript id and transcript sources, ie. RNA-seq read names supporting the model or tissues where it was found
+ -dataset              dataset name (species) already known by the Otter system, i.e. present in the species.dat file on the live server
+ -source               tsv file with transcript id and transcript sources, i.e. RNA-seq read names supporting the model or tissues where it was found
  -readseqdir           directory with supporting read sequences in Fasta format
  -author               author name in the corresponding loutre database
  -remark               annotation remark to be added to all transcripts, usually the ENA/GEO accession for the experiment that generated the models
@@ -112,14 +114,19 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -host_biotype         only allow host genes with these biotypes (comma-separated list)
  -no_overlap_biotype   skip overlapped genes by biotype (comma-separated list)
  -tr_biotypes          only allow novel transcripts with these biotypes (comma-separated list)
+ -mane_select_start    only create a CDS if it uses the MANE Select start codon
+ -mane_select_stop     only create a CDS if it uses the MANE Select stop codon
  -complete_cds         do not create any incomplete CDS, i.e. a transcript with a 'cds_end_NF' attribute will not be stored
  -no_novel_genes       do not create novel genes
  -max_ov_loc           maximum number of existing loci that a novel transcript can overlap at the exon level (ignore the transcript if exceeded)
  -protected_loci       file with a list of annotated genes that must not be updated
  -protected_regions    file with a list of annotated regions that must not be updated
+ -no_extensions        do not add transcripts that extend existing transcripts
  -filter_introns       assess introns and ignore transcript if at least an intron does not pass the filters
  -platinum             add a 'platinum' hidden remark to all transcripts
  -chr                  restrict to annotation on this chromosome
+ -die_locked           kill the job if the annotation can't be saved because the clones are locked
+ -registry             Ensembl registry file providing database connections
  -write                store the gene annotation in the loutre database
 
 
@@ -533,8 +540,7 @@ print "Testing exonerate support for intron at ".$intron->seq_region_start."-".$
             my $novel_gene = $new_gene_obj->stable_id ? 0 : 1;
             print "\nMODE: $mode\n";
             my ($msg, $log) = LoutreWrite::AnnotUpdate->process_gene_2($new_gene_obj, $mode, "aggr", $dataset_name, $otter_dba, $no_intron_check, $use_comp_pipe_biotype, $no_NFV, $do_not_add_cds, $platinum);
-        #print "HOST_CDS_SET_B=".scalar(keys %HOST_CDS_SET)."\n";
-        #print "HOST_START_CODON_SET_B=".scalar(keys %HOST_START_CODON_SET)."\n";
+
             if ($msg =~ /lock ok,write ok,unlock ok(,(.+))?/){
                 if ($2){
                     if ($novel_gene){
