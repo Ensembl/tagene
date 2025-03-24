@@ -106,7 +106,7 @@ sub default_options {
     tag => 'split',
     dep_job => '',
     output_dir => '',
-    filter_file => '',
+    filter_file => 'all_failed_non_redundant.txt',
     by_gene_id => 0,
     no_shuffle => 0,
     job_limit => 20,
