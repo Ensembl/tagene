@@ -38,6 +38,9 @@ my $outfile;
             'out=s'      => \$outfile,
            );
 
+if ($only_chr){
+  $only_chr =~ s/^chr//;
+}
 
 my ($sa, $ta);
 if ($dataset_name){
@@ -76,13 +79,13 @@ while (<IN>){
   chomp;
   my @cols = split(/\t/);
   if ($cols[2] eq "exon"){
+    my $chr = $cols[0];
+    $chr =~ s/^chr//;
     if ($only_chr){
-      unless ($cols[0] eq $only_chr or "chr".$cols[0] eq $only_chr or $cols[0] eq "chr".$only_chr){
-        next;
-      }
+      next unless $chr eq $only_chr;
     }
     my @atts = split(/; /, $cols[8]);
-    my ($chr, $start, $end, $strand) = @cols[0,3,4,6];
+    my ($start, $end, $strand) = @cols[3,4,6];
     my $transcript_id;
     foreach my $att (@atts){
       my ($field, $value) = split(/\s/, $att);
@@ -241,7 +244,7 @@ foreach my $transcript_id (@tids){
       print OUT join("\t", $transcript_id,
                           $tr_coords{$transcript_id}{'chr'}.":".$tr_coords{$transcript_id}{'start'}."-".$tr_coords{$transcript_id}{'end'}.":".$tr_coords{$transcript_id}{'strand'},
                           $gene->stable_id,
-                          "chr".$gene->seq_region_name.":".$gene->seq_region_start."-".$gene->seq_region_end.":".($gene->seq_region_strand == 1 ? "+" : "-"),
+                          $gene->seq_region_name.":".$gene->seq_region_start."-".$gene->seq_region_end.":".($gene->seq_region_strand == 1 ? "+" : "-"),
                     )."\n";
       last;
     }

@@ -257,6 +257,7 @@ foreach my $tid (uniq @tids){
     #Loop through BAM files
     foreach my $file_name (keys %bam_hts){
       my ($sample_name) = $file_name =~ /^(.+)\.bam$/;
+      next unless $supporting_reads{$tid}{$sample_name};
       print LOG "Number of supporting reads = ".scalar(@{$supporting_reads{$tid}{$sample_name}})."\n";
       #Extract all reads overlapping the transcript and filter for supporting reads
       #NOTE: another option is to find each supporting read by location and name (searching by name alone is very slow),

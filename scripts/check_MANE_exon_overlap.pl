@@ -31,6 +31,9 @@ my $outfile;
             'out=s'      => \$outfile,
            );
 
+if ($only_chr){
+  $only_chr =~ s/^chr//;
+}
 
 #Read list of selected RNA-seq transcript ids, if any
 my @selected_ids;
@@ -90,10 +93,10 @@ while (<GTF>){
   #Read exon lines (do not assume that there are transcript lines)
   my @cols = split("\t");
   if ($cols[2] eq "exon"){
+    my $chr = $cols[0];
+    $chr =~ s/^chr//;
     if ($only_chr){
-      unless ($cols[0] eq $only_chr or "chr".$cols[0] eq $only_chr or $cols[0] eq "chr".$only_chr){
-        next;
-      }
+      next unless $chr eq $only_chr;
     }
     if ($cols[8] =~ /transcript_id \"(\S+)\";/){
       my $tid = $1;
@@ -105,7 +108,7 @@ while (<GTF>){
         push(@selected_ids, $tid);
       }
       #Store exon coordinates
-      my ($chr, $start, $end, $strand) = @cols[0,3,4,6];
+      my ($start, $end, $strand) = @cols[3,4,6];
       $exon_coords_by_tid{$tid}{'chr'} = $chr;
       $exon_coords_by_tid{$tid}{'strand'} = $strand;
       push(@{$exon_coords_by_tid{$tid}{'starts'}}, $start);

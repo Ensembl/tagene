@@ -34,6 +34,9 @@ my $outfile;
             'out=s'      => \$outfile,
            );
 
+if ($only_chr){
+  $only_chr =~ s/^chr//;
+}
 
 #Get intron coordinates from the reference annotation
 my %ref_introns;
@@ -55,7 +58,7 @@ if ($ref_dbhost and $ref_dbport and $ref_dbuser and $ref_dbname){
         foreach my $transcript (@{$gene->get_all_Transcripts}){
           unless ($transcript->biotype eq "artifact" or !($transcript->stable_id =~ /^ENS/) or scalar(grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes})){
             foreach my $intron (@{$transcript->get_all_Introns}){
-              my $coord = "chr".$intron->seq_region_name.":".$intron->seq_region_start."-".$intron->seq_region_end;
+              my $coord = $intron->seq_region_name.":".$intron->seq_region_start."-".$intron->seq_region_end;
               $coord .= ":".($intron->seq_region_strand == 1 ? "+" : "-");
               $ref_introns{$coord} = 1;
             }
@@ -100,10 +103,10 @@ while (<GTF>){
   #Read exon lines (do not assume that there are transcript lines)
   my @cols = split("\t");
   if ($cols[2] eq "exon"){
+    my $chr = $cols[0];
+    $chr =~ s/^chr//;
     if ($only_chr){
-      unless ($cols[0] eq $only_chr or "chr".$cols[0] eq $only_chr or $cols[0] eq "chr".$only_chr){
-        next;
-      }
+      next unless $chr eq $only_chr;
     }
     if ($cols[8] =~ /transcript_id \"(\S+)\";/){
       my $tid = $1;
@@ -115,8 +118,8 @@ while (<GTF>){
         push(@selected_ids, $tid);
       }
       #Store exon coordinates
-      my ($chr, $start, $end, $strand) = @cols[0,3,4,6];
-      $exon_coords_by_tid{$tid}{'chr'} = "chr".$chr;
+      my ($start, $end, $strand) = @cols[3,4,6];
+      $exon_coords_by_tid{$tid}{'chr'} = $chr;
       $exon_coords_by_tid{$tid}{'strand'} = $strand;
       push(@{$exon_coords_by_tid{$tid}{'starts'}}, $start);
       push(@{$exon_coords_by_tid{$tid}{'ends'}}, $end);  
