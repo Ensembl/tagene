@@ -209,15 +209,23 @@ sub assign_cds_to_transcripts {
           next TR;
         }
       }
-    }
-    #Stop here if only the MANE Select start codon can be accepted
-    if ($ONLY_MANE_SELECT_START_CODON){
-      print "CDS start doesn't match MANE Select start codon and \$ONLY_MANE_SELECT_START_CODON flag is set - won't create CDS in transcript $t_name\n";
-      if (is_retained_intron($transcript, $host_gene, 5)){
-        $transcript->biotype("retained_intron");
-        print "Found retained_intron\n";
+      else{
+        if ($ONLY_MANE_SELECT_START_CODON){
+          print "CDS start doesn't match MANE Select start codon and \$ONLY_MANE_SELECT_START_CODON flag is set - won't create CDS in transcript $t_name\n";
+          next TR;
+        }
       }
-      next TR;
+    }
+    else{
+      #Stop here if only the MANE Select start codon can be accepted
+      if ($ONLY_MANE_SELECT_START_CODON){
+        print "No MANE Select transcript found and \$ONLY_MANE_SELECT_START_CODON flag is set - won't create CDS in transcript $t_name\n";
+        if (is_retained_intron($transcript, $host_gene, 5)){
+          $transcript->biotype("retained_intron");
+          print "Found retained_intron\n";
+        }
+        next TR;
+      }
     }
 
     #Try to find a suitable CDS among the host gene CDSs
