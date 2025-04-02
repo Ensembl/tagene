@@ -71,6 +71,7 @@ our $ONLY_MANE_SELECT_STOP_CODON;
 
  Arg[1]    : Bio::Vega::Gene or Bio::Vega::Transcript object
  Arg[2]    : Bio::Vega::Gene object
+ Arg[3]    : integer (slice offset)
  Function  : assign a CDS to every transcript in the first gene, based on the CDSs and start codons in the second gene
  Returntype: none
 
@@ -160,7 +161,7 @@ sub assign_cds_to_transcripts {
       if ($cds_start and $cds_end){
         #Before annotating a CDS, check for intron retention
         #Note that if the stop codon is upstream of the retained intron, the biotype must not be retained_intron (it will probably be NMD)
-        if (is_retained_intron($transcript, $host_gene, 5, $cds_end)){
+        if (is_retained_intron($transcript, $host_gene, 5, $cds_end, $slice_offset)){
           print "Found retained_intron before stop codon at $cds_end\n";
           $transcript->biotype("retained_intron");
           next TR;
@@ -220,7 +221,7 @@ sub assign_cds_to_transcripts {
       #Stop here if only the MANE Select start codon can be accepted
       if ($ONLY_MANE_SELECT_START_CODON){
         print "No MANE Select transcript found and \$ONLY_MANE_SELECT_START_CODON flag is set - won't create CDS in transcript $t_name\n";
-        if (is_retained_intron($transcript, $host_gene, 5)){
+        if (is_retained_intron($transcript, $host_gene, 5, undef, $slice_offset)){
           $transcript->biotype("retained_intron");
           print "Found retained_intron\n";
         }
@@ -272,7 +273,7 @@ sub assign_cds_to_transcripts {
       if ($cds_start and $cds_end){
         #Before annotating a CDS, check for intron retention
         #Note that if the stop codon is upstream of the retained intron, the biotype must not be retained_intron (it will probably be NMD)
-        if (is_retained_intron($transcript, $host_gene, 5, $cds_end)){
+        if (is_retained_intron($transcript, $host_gene, 5, $cds_end, $slice_offset)){
           print "Found retained_intron before stop codon at $cds_end\n";
           $transcript->biotype("retained_intron");
           next TR;
@@ -317,7 +318,7 @@ sub assign_cds_to_transcripts {
     print "No match for transcript ".$transcript->stable_id."\t".$transcript->biotype."\n";
     #Non-coding transcript: check for intron retention 
     print "\nChecking for intron retention...\n";
-    if (is_retained_intron($transcript, $host_gene, 5)){
+    if (is_retained_intron($transcript, $host_gene, 5, undef, $slice_offset)){
       $transcript->biotype("retained_intron");
       print "Found retained_intron\n";
     }
@@ -331,20 +332,24 @@ sub assign_cds_to_transcripts {
  Arg[1]    : Bio::Vega::Transcript object
  Arg[2]    : Bio::Vega::Gene object
  Arg[3]    : integer (minimum overhang in partial intron retention)
+ Arg[4]    : integer (CDS end genomic coordinate)
+ Arg[5]    : integer (slice offset)
  Function  : finds whether the novel transcript is a retained_intron model in the host gene
  Returntype: boolean
 
 =cut
 
 sub is_retained_intron {
-  my ($transcript, $host_gene, $min_overhang, $stop_codon_coordinate) = @_;
+  my ($transcript, $host_gene, $min_overhang, $stop_codon_coordinate, $slice_offset) = @_;
   #i) Full intron retention: the model fully transcribes the sequence between the splice donor site and
   #   acceptor site of adjacent coding exons (i.e. a ‘CDS intron’) of an annotated transcript. This could include scenarios
   #   where the TAGENE model retains multiple CDS introns of the same transcript. 
   #ii) Partial intron retention: the model has a start or end coordinate within a CDS intron of an annotated transcript,
   #   but not (respectively) a splice donor site or splice acceptor site within that same intron. Do we need some kind
-  #   of size cut-off here? I.e. for fuzzy edges that are misalignments rather than real retained introns. Should we clip these? 
-  my $slice_offset = $host_gene->seq_region_start - 1; #print "OFFSET=$slice_offset\n";
+  #   of size cut-off here? I.e. for fuzzy edges that are misalignments rather than real retained introns. Should we clip these?
+  unless ($slice_offset){
+    $slice_offset = $host_gene->seq_region_start - 1;
+  }
   $min_overhang ||= 1;
   my @comp_trs;
   my $mane_select;
@@ -384,7 +389,7 @@ sub is_retained_intron {
               $cds_start < $exon1->seq_region_end and $cds_end > $exon1->seq_region_start
           ){
             $annotated_exons{$rank}++;
-            #print "SEEN=".$rank."\n";
+            #print "SEEN_EXON=".$rank." in ".$tr->stable_id."\n";
           }
         }
       }
@@ -418,9 +423,10 @@ sub is_retained_intron {
               next;
             }
             if ($exon->seq_region_start < $intron->seq_region_start and $exon->seq_region_end > $intron->seq_region_end){
-              #print "FOUND\n";
+              #print "FOUND ".$exon->seq_region_start."-".$exon->seq_region_end."\n";
               #If CDS end (stop codon) coordinate provided, call it intron retention if stop codon is not upstream of retained intron
-              if ($stop_codon_coordinate){ 
+              if ($stop_codon_coordinate){
+                #print "Checking stop coordinate\n";
                 if (($transcript->seq_region_strand == 1 and $stop_codon_coordinate > $intron->seq_region_start) or
                     ($transcript->seq_region_strand == -1 and $stop_codon_coordinate < $intron->seq_region_end)
                 ){
