@@ -6,9 +6,15 @@ use warnings;
 use Getopt::Long;
 use Bio::Otter::Server::Config;
 use Bio::EnsEMBL::Utils::ConversionSupport;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 $| = 1;
 
+
 my $dataset_name;
+my $host;
+my $port;
+my $user;
+my $dbname;
 my $outfile;
 my $date;
 my $remark;
@@ -16,16 +22,20 @@ my $only_chr;
 
 &GetOptions(
             'dataset=s'  => \$dataset_name,
+            'host=s'     => \$host,
+            'port=i'     => \$port,
+            'user=s'     => \$user,
+            'dbname=s'   => \$dbname,
             'date=s'     => \$date,
             'remark=s'   => \$remark,
             'chr=s'      => \$only_chr,
             'out=s'      => \$outfile,
             );
 
-open (OUT, ">$outfile") or die "Can't open $outfile:$!";
-open (EXT, ">$outfile.tsv") or die "Can't open $outfile.tsv:$!";
+open (G, ">$outfile.gene.txt") or die "Can't open $outfile.gene.txt:$!";
+open (T, ">$outfile.transcript.txt") or die "Can't open $outfile.transcript.txt:$!";
 
-print OUT join("\t", "chromosome",
+print G join("\t", "chromosome",
                      "start",
                      "end",
                      "strand",
@@ -40,9 +50,13 @@ print OUT join("\t", "chromosome",
                      "extended_transcripts",
                      "transcript_info",
                      "data_source",
+                     "novel_exonic_seq",
+                     "novel_cds_seq",
+                     "novel_splice_sites",
+                     "novel_junctions",     
               )."\n";
 
-print EXT join("\t", "chromosome",
+print T join("\t", "chromosome",
                      "start",
                      "end",
                      "strand",
@@ -55,20 +69,36 @@ print EXT join("\t", "chromosome",
                      "previous_transcript_biotype",
                      "novel/extended",
                      "data_source",
-                     "CDS_end_not_found?",
                      "model_name",
-                     "unique_CDS?",
+                     "exon_count",
+                     "novel_CDS",
+                     "CDS_end_not_found",
+                     "SQANTI3_cat",
+                     "novel_exonic_seq",
+                     "novel_cds_seq",
+                     "novel_splice_sites",
+                     "novel_junctions",
                      "translation_length",
-                     "exon_count"
+                     #"translation_seq",
               )."\n";
 
-#Connect to loutre database
-#DataSet interacts directly with an otter database
-my $dataset = Bio::Otter::Server::Config->SpeciesDat->dataset($dataset_name);
-my $otter_dba = $dataset->otter_dba or die "can't get db adaptor\n";
-$otter_dba->dbc->reconnect_when_lost(1);
+#Connect to the havana database
+my $otter_dba;
+if ($dataset_name){
+  #DataSet interacts directly with an otter database
+  my $dataset = Bio::Otter::Server::Config->SpeciesDat->dataset($dataset_name);
+  $otter_dba = $dataset->otter_dba or die "can't get db adaptor\n";
+  $otter_dba->dbc->reconnect_when_lost(1);
+}
+else{
+  $otter_dba = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+    -host => $host,
+    -port => $port,    
+    -user => $user,
+    -dbname => $dbname,
+  );
+}
 my $sa = $otter_dba->get_SliceAdaptor();
-
 
 my $new_gene_count = 0;
 my $new_se_gene_count = 0;
@@ -97,13 +127,8 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
       }
     }
     
-    #Get all gene's translations in order to report uniqueness of TAGENE CDS later
-    my %tn_seqs;
-    foreach my $transcript (@{$gene->get_all_Transcripts}){
-      if ($transcript->translate){
-        $tn_seqs{$transcript->stable_id} = $transcript->translation->seq;
-      }
-    }
+
+
     my $added_c= 0; #Added by TAGENE pipeline
     my %added_c_b; #Added, by biotype
     my $extended_c = 0; #Extended by TAGENE pipeline
@@ -111,28 +136,109 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
     my $is_tagene_gene = 0; #Has a TAGENE transcript
     my $is_single_exon_gene = 0;
     my %report;
+    my @novel_transcripts;
+    my @current_transcripts;
     foreach my $transcript (@{$gene->get_all_Transcripts}){
       my $is_tagene = 0;
-      my $tagene_datasets = 0;
-      my $tagene_models = 0;
-      my $extended_flag = 0;
-      my %tsources;
       if (scalar(@{$gene->get_all_Transcripts}) == 1 and scalar(@{$transcript->get_all_Exons}) == 1){
         $is_single_exon_gene = 1;
       }
       #Was the transcript created or extended by the TAGENE pipeline?
-      if (scalar grep {$_->value eq "TAGENE_transcript"} @{$transcript->get_all_Attributes('remark')} and $transcript->transcript_author->name eq "tagene"){
+      if (scalar grep {$_->value eq "TAGENE_transcript"} @{$transcript->get_all_Attributes('remark')}){
         $is_tagene = 1;
+        #Check modification date if provided
+        if ($date and Bio::EnsEMBL::Utils::ConversionSupport->date_format($transcript->modified_date, "%y-%m-%d") lt $date){
+          $is_tagene = 0;
+        }
+        #Check TAGENE run remark if provided
+        if ($remark and scalar(grep {$_->value eq $remark} @{$transcript->get_all_Attributes('remark')}) == 0){
+          $is_tagene = 0;
+        }
       }
-      #Check modification date if provided
-      if ($date and Bio::EnsEMBL::Utils::ConversionSupport->date_format($transcript->modified_date, "%y-%m-%d") lt $date){
-        $is_tagene = 0;
+      if ($is_tagene){
+        push(@novel_transcripts, $transcript);
       }
-      #Check TAGENE run remark if provided
-      if ($remark and scalar(grep {$_->value eq $remark} @{$transcript->get_all_Attributes('remark')}) == 0){
-        $is_tagene = 0;
+      else{
+        unless (scalar grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes("remark")} or $transcript->biotype eq "artifact"){
+          push(@current_transcripts, $transcript);
+        }
       }
-      
+    }
+
+    #Get data from current annotation for comparison with novel transcripts
+    #Exon coverage
+    my %current_exonic_sequence;
+    foreach my $current_tr (@current_transcripts){
+      foreach my $exon (@{$current_tr->get_all_Exons}){
+        for (my $pos = $exon->seq_region_start; $pos <= $exon->seq_region_end; $pos++){
+          $current_exonic_sequence{$pos} = 1;
+        }
+      }
+    }
+    #CDS coverage
+    my %current_cds_sequence;
+    foreach my $current_tr (@current_transcripts){
+      foreach my $cds (@{$current_tr->get_all_CDS}){
+        for (my $pos = $cds->seq_region_start; $pos <= $cds->seq_region_end; $pos++){
+          $current_cds_sequence{$pos} = 1;
+        }
+      }
+    }
+    #Intron chain
+    my %current_intron_chains;
+    foreach my $current_tr (@current_transcripts){
+      my $intron_chain = join(":", map {$_->seq_region_start."-".$_->seq_region_end} @{$current_tr->get_all_Introns});
+      $current_intron_chains{$intron_chain} = 1;
+    }    
+    #CDS exon chain
+    my %current_cds_exon_chains;
+    foreach my $current_tr (@current_transcripts){
+      if ($current_tr->translate){
+        my $cds_chain = join(":", map {$_->seq_region_start."-".$_->seq_region_end} @{$current_tr->get_all_CDS});
+        $current_cds_exon_chains{$cds_chain} = 1;
+      }
+    }
+    #Translations
+    my %current_translation_seqs;
+    foreach my $transcript (@current_transcripts){
+      if ($transcript->translate){
+        $current_translation_seqs{$transcript->translation->seq} = 1;
+      }
+    }  
+    #Splice junctions
+    my %known_junctions;
+    foreach my $current_tr (@current_transcripts){
+      foreach my $intron (@{$current_tr->get_all_Introns}){
+        $known_junctions{$intron->seq_region_start."-".$intron->seq_region_end} = 1;
+      }
+    }
+    #Splice sites
+    my %known_donor_splice_sites;
+    my %known_acceptor_splice_sites;
+    foreach my $current_tr (@current_transcripts){
+      foreach my $intron (@{$current_tr->get_all_Introns}){
+        $known_donor_splice_sites{$intron->seq_region_start} = 1; #no need to check strand
+        $known_acceptor_splice_sites{$intron->seq_region_end} = 1;
+      }
+    }  
+
+
+
+    ####
+    my $novel_exon_coverage = 0;
+    my %novel_exon_coverage;
+    my $novel_cds_coverage = 0;
+    my %novel_cds_coverage;
+    my %novel_splice_sites;
+    my %novel_splice_junctions;
+
+
+    foreach my $transcript (@novel_transcripts){
+      my $tagene_datasets = 0;
+      my $tagene_models = 0;
+      my $extended_flag = 0;
+      my %tsources;
+      my $is_tagene = 1;
       if ($is_tagene){
         foreach my $att (@{$transcript->get_all_Attributes}){
           #Increase the count of different long read models that made up the transcript
@@ -208,7 +314,7 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
           #print "MULTI: ".$transcript->stable_id."\n";
         }
         #Extended existing one? - look at evidence list
-        if (scalar @{$transcript->evidence_list} or $extended_flag == 1){
+        if ($extended_flag == 1){
           $extended_c++;
           $report{$transcript->stable_id} = "extended";
         }
@@ -227,22 +333,70 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
       if ($is_tagene){
         my $tn_length;
         my $is_unique_cds = "NA";
+        my $tn_seq;
         if ($transcript->translation){
           $tn_length = $transcript->translation->length;
-          my $tnseq = $transcript->translation->seq;
-          $is_unique_cds = "yes";
-          foreach my $tid (grep {$_ ne $transcript->stable_id} keys %tn_seqs){
-            if ($tn_seqs{$tid} eq $tnseq){
-              $is_unique_cds = "no";
-              last;
-            }
-            elsif ($tn_seqs{$tid} =~ /$tnseq/){
-              $is_unique_cds = "partial";
+          $tn_seq = $transcript->translation->seq;
+        }
+
+        my $cds_str = join(":", map {$_->seq_region_start."-".$_->seq_region_end} @{$transcript->get_all_CDS});
+
+        #Novel exon coverage
+        my $t_novel_exon_coverage = 0;
+        foreach my $exon (@{$transcript->get_all_Exons}){
+          for (my $pos = $exon->seq_region_start; $pos <= $exon->seq_region_end; $pos++){
+            unless ($current_exonic_sequence{$pos}){
+              $t_novel_exon_coverage++;
+              $novel_exon_coverage{$pos} = 1;
             }
           }
         }
+
+        #Novel CDS coverage
+        my $t_novel_cds_coverage = 0;
+        foreach my $cds (@{$transcript->get_all_CDS}){
+          for (my $pos = $cds->seq_region_start; $pos <= $cds->seq_region_end; $pos++){
+            unless ($current_cds_sequence{$pos}){
+              $t_novel_cds_coverage++;
+              $novel_cds_coverage{$pos} = 1;
+            }
+          }
+        }
+
+        #Novel CDS (exon chain)
+        my $is_novel_cds = 0;
+        if ($transcript->translate){
+          my $cds_chain = join(":", map {$_->seq_region_start."-".$_->seq_region_end} @{$transcript->get_all_CDS});
+          unless ($current_cds_exon_chains{$cds_chain}){
+            $is_novel_cds = 1;
+          }
+        }
+
+        #Novel splice sites
+        my $t_novel_splice_sites = 0;
+        foreach my $intron (@{$transcript->get_all_Introns}){
+          unless ($known_donor_splice_sites{$intron->seq_region_start}){
+            $t_novel_splice_sites++;
+            $novel_splice_sites{$intron->seq_region_start} = 1;
+          }
+          unless ($known_acceptor_splice_sites{$intron->seq_region_end}){
+            $t_novel_splice_sites++;
+            $novel_splice_sites{$intron->seq_region_end} = 1;
+          }
+        }
+ 
+        #Novel splice junctions
+        my $t_novel_splice_junctions = 0;
+        foreach my $intron (@{$transcript->get_all_Introns}){
+          unless ($known_junctions{$intron->seq_region_start."-".$intron->seq_region_end}){
+            $t_novel_splice_junctions++;
+            $novel_splice_junctions{$intron->seq_region_start."-".$intron->seq_region_end} = 1;
+          }
+        }
+      
+
         
-        print EXT join("\t",
+        print T join("\t",
                         $transcript->seq_region_name,
                         $transcript->seq_region_start,
                         $transcript->seq_region_end,
@@ -256,17 +410,23 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
                         (previous_biotype($transcript) || "NA"),
                         ($extended_flag ? "extended" : "novel"),
                         join(", ", keys %tsources),
-                        scalar(@{$transcript->get_all_Attributes('cds_end_NF')}) ? "cds_end_NF" : "NA",
                         join(", ", map {$_->value} grep {$_->value =~ /^ID:.+(align|compmerge|NAM_TM|TM_|PB|anchIC|anchUC|.+)/} @{$transcript->get_all_Attributes('hidden_remark')}),
-                        $is_unique_cds,
-                        ($tn_length || "NA"),
                         scalar(@{$transcript->get_all_Exons}),
+                        $is_novel_cds ? "yes" : "no",
+                        scalar(@{$transcript->get_all_Attributes('cds_end_NF')}) ? "cds_end_NF" : "NA",
+                        sqanti3_category($transcript, \@current_transcripts),
+                        $t_novel_exon_coverage,
+                        $t_novel_cds_coverage,
+                        $t_novel_splice_sites,
+                        $t_novel_splice_junctions,
+                        ($tn_length || "NA"),
+                       # ($tn_seq || "NA"),
                       )."\n";
       
       }
     }
     if ($is_tagene_gene){
-      if ($added_c > 0 and $extended_c == 0 and $pre_c == 0){
+      if (scalar @current_transcripts == 0){
         $new_gene_count++;
         $report{$gene->stable_id} = "new";
         if ($is_single_exon_gene){
@@ -281,7 +441,7 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
     $added_tr_count += $added_c;
     $extended_tr_count += $extended_c;
     if (scalar keys %report){
-      print OUT join("\t",
+      print G join("\t",
                   $gene->seq_region_name,
                   $gene->seq_region_start,
                   $gene->seq_region_end,
@@ -297,13 +457,17 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
                   scalar(grep {/extended/} values(%report)),
                   join(", ", map {$_.":".$report{$_}} grep {/ENS([A-Z]{3})?T/} keys %report),
                   join(", ", keys %{$report{'sources'}}),
-                  join("\t", $added_c_b{"protein_coding"}||0, $added_c_b{"nonsense_mediated_decay"}||0)
+                  scalar keys %novel_exon_coverage,
+                  scalar keys %novel_cds_coverage,
+                  scalar keys %novel_splice_sites,
+                  scalar keys %novel_splice_junctions,
+                  join("\t", $added_c_b{"protein_coding"}||0, $added_c_b{"nonsense_mediated_decay"}||0),
                 )."\n";
     }
   }
 }
 
-print OUT "\nNew genes: $new_gene_count\n".
+print G "\nNew genes: $new_gene_count\n".
           "New single exon genes: $new_se_gene_count\n".
           "Modified genes: $modified_gene_count\n".
           "Novel transcripts: $added_tr_count\n".
@@ -311,8 +475,8 @@ print OUT "\nNew genes: $new_gene_count\n".
           "Transcripts with >1 TAGENE datasets: $multiple_tagene_ds_count\n".
           "Transcripts with >1 TAGENE models: $multiple_tagene_ms_count\n";
 
-close (OUT);
-close (EXT);
+close (G);
+close (T);
 
 ######
 
@@ -339,6 +503,130 @@ sub previous_biotype {
 }
 
 
+sub sqanti3_category {
+  my ($transcript, $current_transcripts) = @_;
+  my $category;
+  my $subcategory;
+  my %known_intron_chains;
+  my %known_junctions;
+  my %known_donor_splice_sites;
+  my %known_acceptor_splice_sites;
 
+  foreach my $current_tr (@$current_transcripts){
+    my $c_introns = $current_tr->get_all_Introns;
+    my $c_intron_chain = join(":", map {$_->seq_region_start."-".$_->seq_region_end} @{$c_introns});
+    $known_intron_chains{$c_intron_chain} = 1;
+    foreach my $intron (@$c_introns){
+      $known_junctions{$intron->seq_region_start."-".$intron->seq_region_end} = 1;
+      $known_donor_splice_sites{$intron->seq_region_start} = 1;
+      $known_acceptor_splice_sites{$intron->seq_region_end} = 1;
+    }
+  }
 
+  #Multi-exon transcripts
+  if (scalar @{$transcript->get_all_Exons} > 1){
+    my $introns = $transcript->get_all_Introns;
+    my $intron_chain = join(":", map {$_->seq_region_start."-".$_->seq_region_end} @$introns);
+    my %junctions;
+    my %donor_splice_sites;
+    my %acceptor_splice_sites;
+    foreach my $intron (@$introns){
+      $junctions{$intron->seq_region_start."-".$intron->seq_region_end} = 1;
+      $donor_splice_sites{$intron->seq_region_start} = 1;
+      $acceptor_splice_sites{$intron->seq_region_end} = 1;
+    }
+
+    if ($known_intron_chains{$intron_chain}){
+      $category = "FSM";
+    }
+    else{
+      foreach my $ic (keys %known_intron_chains){
+        if ($known_intron_chains{$ic} =~ /$intron_chain/){
+          $category = "ISM";
+          if ($known_intron_chains{$ic} =~ /^$intron_chain/){
+            $subcategory = "5' fragment";
+          }
+          elsif ($known_intron_chains{$ic} =~ /$intron_chain$/){
+            $subcategory = "3' fragment";
+          }
+          else{
+            $subcategory = "internal fragment";
+          }
+        }
+        # ...ISM intron retention
+      }
+      unless ($category){
+        foreach my $ss (keys %donor_splice_sites){
+          unless ($known_donor_splice_sites{$ss}){
+            $category = "NNC";
+          }
+        }
+        foreach my $ss (keys %acceptor_splice_sites){
+          unless ($known_acceptor_splice_sites{$ss}){
+            $category = "NNC";
+          }
+        }
+      }
+      unless ($category){
+        foreach my $sj (keys %junctions){
+          unless ($known_junctions{$sj}){
+            $category = "NIC";
+            $subcategory = "combination of known splice sites"
+          }
+        }
+      }
+      unless ($category){
+        $category = "NIC";
+        $subcategory = "combination of known SJs"       
+      }
+      #...NIC intron retention
+    }
+  }
+  #Single-exon transcripts
+  else{
+    if ($known_acceptor_splice_sites{$transcript->seq_region_start-1} and $known_donor_splice_sites{$transcript->seq_region_end+1}){
+      foreach my $ic (keys %known_intron_chains){
+        my ($start, $end) = split($ic, "-");
+        if ($start > $transcript->seq_region_start and $end < $transcript->seq_region_end){
+          $category = "NIC";
+          $subcategory = "mono-exon by intron retention";
+        }
+      }
+    }
+    else{
+      foreach my $current_tr (@$current_transcripts){
+        foreach my $exon (@{$transcript->get_all_Exons}){
+          if ($exon->seq_region_start == $current_tr->seq_region_end and $exon->seq_region_end == $current_tr->seq_region_start){
+            $category = "ISM";
+            $subcategory = "mono-exon";
+          }
+        }
+      }
+    }
+    unless ($category){
+      CT:foreach my $current_tr (@$current_transcripts){
+        foreach my $exon (@{$transcript->get_all_Exons}){
+          if ($exon->seq_region_start < $current_tr->seq_region_end and $exon->seq_region_end > $current_tr->seq_region_start){
+            $category = "Genic genomic";
+            last CT;
+          }
+        }
+      }
+    }
+    unless ($category){
+      CT:foreach my $current_tr (@$current_transcripts){
+        foreach my $intron (@{$transcript->get_all_Introns}){
+          if ($intron->seq_region_start <= $current_tr->seq_region_start and $intron->seq_region_end >= $current_tr->seq_region_end){
+            $category = "Genic intron";
+            last CT;
+          }
+        }
+      }
+    }
+  }
+  if ($subcategory){
+    $category .= " - ".$subcategory;
+  }
+  return $category;
+}
 
