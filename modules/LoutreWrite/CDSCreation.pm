@@ -157,7 +157,7 @@ sub assign_cds_to_transcripts {
       #Start codon coordinates are relative to the region slice: convert to genomic
       print "start_codon=".($mane_select_start_codon+$slice_offset)."; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
       #Check if the CDS is compatible with the transcript's exon-intron chain (or at least the start codon and the CDS until the end of the novel transcript)
-      my ($cds_start, $cds_end, $fl_cds) = start_codon_fits($transcript, $mane_select_start_codon + $slice_offset);
+      my ($cds_start, $cds_end, $full_length_cds) = start_codon_fits($transcript, $mane_select_start_codon + $slice_offset);
       if ($cds_start and $cds_end){
         #Before annotating a CDS, check for intron retention
         #Note that if the stop codon is upstream of the retained intron, the biotype must not be retained_intron (it will probably be NMD)
@@ -184,7 +184,7 @@ sub assign_cds_to_transcripts {
           #If not, aim for protein_coding biotype                
           else{
             #Full-length CDS?
-            if ($fl_cds){
+            if ($full_length_cds){
               #PolyA support or know stop codon are required for protein_coding biotype if full-length CDS
               #Otherwise, no CDS will be made and the biotype will be processed_transcript
               unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or
@@ -269,7 +269,7 @@ sub assign_cds_to_transcripts {
       #Start codon coordinates are relative to the region slice: convert to genomic
       print "start_codon=".($unique_start_codon+$slice_offset)."; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
       #Check if the CDS is compatible with the transcript's exon-intron chain (or at least the start codon and the CDS until the end of the novel transcript)
-      my ($cds_start, $cds_end, $fl_cds) = start_codon_fits($transcript, $unique_start_codon + $slice_offset);
+      my ($cds_start, $cds_end, $full_length_cds) = start_codon_fits($transcript, $unique_start_codon + $slice_offset);
       if ($cds_start and $cds_end){
         #Before annotating a CDS, check for intron retention
         #Note that if the stop codon is upstream of the retained intron, the biotype must not be retained_intron (it will probably be NMD)
@@ -288,7 +288,7 @@ sub assign_cds_to_transcripts {
           #If not, aim for protein_coding biotype                
           else{
             #Full-length CDS?
-            if ($fl_cds){
+            if ($full_length_cds){
               #PolyA support or know stop codon are required for protein_coding biotype if full-length CDS
               #Otherwise, no CDS will be made and the biotype will be processed_transcript
               unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or
@@ -1030,7 +1030,8 @@ sub get_mane_select_start_codon {
 
  Arg[1]    : Bio::Vega::Transcript object
  Arg[2]    : integer (genomic position)
- Function  : returns true if a CDS beginning from the given genomic position can be built for the transcript
+ Function  : returns the start and end coordinates of a CDS beginning from the given genomic position, provided that this location is exonic to the transcript, 
+             and an a third value (1/0) indicating whether the CDS is full-length, i.e. it ends with a canonical stop codon
  Returntype: array of integers corresponding to the CDS start and end genomic coordinates
 
 =cut
@@ -1287,7 +1288,7 @@ sub add_end_NF_attributes {
   if (($transcript->seq_region_strand == 1 and $transcript->coding_region_end+$slice_offset == $transcript->seq_region_end) or
     ($transcript->seq_region_strand == -1 and $transcript->coding_region_start+$slice_offset == $transcript->seq_region_start)
   ){
-    unless ($transcript->seq->seq =~ /(TGA|TAG|TAA)$/){
+    unless ($transcript->seq->seq =~ /^ATG([ATGC]{3})*?(TGA|TAA|TAG)$/){
       $transcript->add_Attributes(
         new Bio::EnsEMBL::Attribute(-code => 'cds_end_NF', -value => 1), 
         new Bio::EnsEMBL::Attribute(-code => 'mRNA_end_NF', -value => 1)
