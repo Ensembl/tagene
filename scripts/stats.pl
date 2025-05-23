@@ -53,7 +53,9 @@ print G join("\t", "chromosome",
                      "novel_exonic_seq",
                      "novel_cds_seq",
                      "novel_splice_sites",
-                     "novel_junctions",     
+                     "novel_junctions",
+                     "novel_protein_coding_transcripts",
+                     "novel_NMD_transcripts",
               )."\n";
 
 print T join("\t", "chromosome",
@@ -255,7 +257,7 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
                #$att->value =~ /^Assembled from PacBio reads/
                ($att->value =~ /Assembled from (.+) reads/ or
                $att->value eq "CLS3 project" or
-               $att->value =~ /^(DanaFarber|ENCODE|LRGASP)$/)
+               $att->value =~ /^(DanaFarber|ENCODE_tissue|LRGASP)$/)
               ){
             $tagene_datasets++;
             #my ($dataset) = $att->value =~ /Assembled from (.+) reads/;
