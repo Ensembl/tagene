@@ -21,7 +21,7 @@ our %MANE_SELECT_STOP_CODON;
 our %CORE_TRANSCRIPTS;
 our $ONLY_MANE_SELECT_START_CODON;
 our $ONLY_MANE_SELECT_STOP_CODON;
-
+my $MINIMUM_TRANSLATION_LENGTH = 10;
 
 #Original CDS assignment strategy:
 #https://docs.google.com/document/d/17PIripFaSkGkHmZbwR1ZCRYQhyu5ov6dgBVNqVtDjt4/edit?ts=5b6b0748
@@ -154,10 +154,11 @@ sub assign_cds_to_transcripts {
     #If the host gene has a MANE Select transcript, try to create a CDS using its start codon
     if ($mane_select_start_codon){
       print "\nChecking MANE Select start codon...\n";
-      #Start codon coordinates are relative to the region slice: convert to genomic
-      print "start_codon=".($mane_select_start_codon+$slice_offset)."; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
+      #Start codon coordinates are relative to the region slice: convert to genomic coordinates
+      $mane_select_start_codon = $mane_select_start_codon + $slice_offset;
+      print "start_codon=".$mane_select_start_codon."; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
       #Check if the CDS is compatible with the transcript's exon-intron chain (or at least the start codon and the CDS until the end of the novel transcript)
-      my ($cds_start, $cds_end, $full_length_cds) = start_codon_fits($transcript, $mane_select_start_codon + $slice_offset);
+      my ($cds_start, $cds_end, $full_length_cds, $translation_length) = start_codon_fits($transcript, $mane_select_start_codon);
       if ($cds_start and $cds_end){
         #Before annotating a CDS, check for intron retention
         #Note that if the stop codon is upstream of the retained intron, the biotype must not be retained_intron (it will probably be NMD)
@@ -175,6 +176,12 @@ sub assign_cds_to_transcripts {
           }
         }
 
+        #If a minimum translation length is required, do not add a CDS if the translation is shorter
+        if ($MINIMUM_TRANSLATION_LENGTH and $translation_length < $MINIMUM_TRANSLATION_LENGTH){
+          print "Translation of $translation_length aa is shorter than minimum length ($MINIMUM_TRANSLATION_LENGTH aa)\n";
+          next TR;
+        }
+	
         #Annotate the CDS
         if (create_cds($transcript, $cds_start, $cds_end)){
           #If NMD rules are met, asign the nonsense_mediated_decay biotype
@@ -206,7 +213,7 @@ sub assign_cds_to_transcripts {
               add_end_NF_attributes($transcript, $slice_offset);          
             }
           }
-          print "MANE Select ".($mane_select_start_codon + $slice_offset)." start codon matches ".$transcript->stable_id." (".$transcript->biotype."-".$transcript->status.")\n";
+          print "MANE Select ".$mane_select_start_codon." start codon matches ".$transcript->stable_id." (".$transcript->biotype."-".$transcript->status.")\n";
           next TR;
         }
       }
@@ -269,13 +276,18 @@ sub assign_cds_to_transcripts {
       #Start codon coordinates are relative to the region slice: convert to genomic
       print "start_codon=".($unique_start_codon+$slice_offset)."; transcript=".$transcript->seq_region_start."-".$transcript->seq_region_end."\n";
       #Check if the CDS is compatible with the transcript's exon-intron chain (or at least the start codon and the CDS until the end of the novel transcript)
-      my ($cds_start, $cds_end, $full_length_cds) = start_codon_fits($transcript, $unique_start_codon + $slice_offset);
+      my ($cds_start, $cds_end, $full_length_cds, $translation_length) = start_codon_fits($transcript, $unique_start_codon + $slice_offset);
       if ($cds_start and $cds_end){
         #Before annotating a CDS, check for intron retention
         #Note that if the stop codon is upstream of the retained intron, the biotype must not be retained_intron (it will probably be NMD)
         if (is_retained_intron($transcript, $host_gene, 5, $cds_end, $slice_offset)){
           print "Found retained_intron before stop codon at $cds_end\n";
           $transcript->biotype("retained_intron");
+          next TR;
+        }
+        #Do not add a CDS that is smaller than threshold
+        if ($MINIMUM_TRANSLATION_LENGTH and $translation_length < $MINIMUM_TRANSLATION_LENGTH){
+          print "Translation length ($translation_length aa) is smaller than minimum ($MINIMUM_TRANSLATION_LENGTH aa)\n";
           next TR;
         }
 
@@ -1031,7 +1043,8 @@ sub get_mane_select_start_codon {
  Arg[1]    : Bio::Vega::Transcript object
  Arg[2]    : integer (genomic position)
  Function  : returns the start and end coordinates of a CDS beginning from the given genomic position, provided that this location is exonic to the transcript, 
-             and an a third value (1/0) indicating whether the CDS is full-length, i.e. it ends with a canonical stop codon
+             a boolean value (1/0) indicating whether the CDS is full-length, i.e. it ends with a canonical stop codon,
+             and the length of the translation in amino acids
  Returntype: array of integers corresponding to the CDS start and end genomic coordinates
 
 =cut
@@ -1043,40 +1056,35 @@ sub start_codon_fits {
   foreach my $exon (@{$transcript->get_all_Exons}){
     if ($exon->seq_region_start <= $cds_start and $exon->seq_region_end >= $cds_start){
       print "cds_start $cds_start in exon ".$exon->seq_region_start."-".$exon->seq_region_end."\n";
-      #Find start position in transcript coordinates
-      my @coords = $transcript->genomic2cdna($cds_start, $cds_start, $transcript->seq_region_strand);
-      my $tr_cds_start = $coords[0]->start;
-      #Search for a putative ORF in the transcript subsequence 
-      #starting from the provided CDS start
+      #Find CDS start location in transcript coordinates
+      my @tr_cds_start_coords = $transcript->genomic2cdna($cds_start, $cds_start, $transcript->seq_region_strand);
+      my $tr_cds_start = $tr_cds_start_coords[0]->start;
+      #Search for a putative ORF in the transcript subsequence starting from the provided CDS start
       my $subseq = substr($transcript->seq->seq, $tr_cds_start-1);
-      #print $transcript->stable_id."\t".$subseq."\n";
       #Does it contain a complete ORF?
       if ($subseq =~ /^(ATG([ATGC]{3})*?(TGA|TAA|TAG))/){
         print "*".$1."*".length($1)."\n";
-        #Find CDS end in genomic coordinates
+        #Find CDS end location in genomic coordinates
         my $cds_length = length($1);
-        my @coords2;
-        print "TR_CDS_START=$tr_cds_start; CDS_LENGTH=".$cds_length."nt,".(($cds_length-3)/3)."aa\n";
-        #if ($transcript->seq_region_strand == 1){
-          @coords2 = $transcript->cdna2genomic($tr_cds_start + $cds_length - 1, $tr_cds_start + $cds_length - 1);
-        #}
-        #else{
-        #  @coords2 = $transcript->cdna2genomic($tr_cds_start - $cds_length + 1, $tr_cds_start - $cds_length + 1);
-        #}
-        my $cds_end = $coords2[0]->start;
+        my $translation_length = ($cds_length-3)/3;
+        print "TR_CDS_START=$tr_cds_start; CDS_LENGTH=".$cds_length."nt,".$translation_length."aa\n";
+        #Find CDS end location in genomic coordinates
+        my @cds_end_coords = $transcript->cdna2genomic($tr_cds_start + $cds_length - 1, $tr_cds_start + $cds_length - 1);
+        my $cds_end = $cds_end_coords[0]->start;
         print "CDS_END=$cds_end\n";
         #Avoid making an NMD transcript with a CDS smaller than 35 aa
-        unless (predicted_nmd_transcript($transcript, $cds_end) and ($cds_length-3)/3  <= 35){
-          print $transcript->stable_id.": complete CDS of $cds_length bp $3\n";
-          return ($cds_start, $cds_end, 1);
+        unless (predicted_nmd_transcript($transcript, $cds_end) and $translation_length < 35){
+          print $transcript->stable_id.": complete CDS of $cds_length bp including $3 stop codon\n";
+          return ($cds_start, $cds_end, 1, $translation_length);
         }
       }
-      #Or an open-ended ORF?
+      #Else, look for an open-ended ORF
       elsif ($subseq =~ /^(ATG([ATGC]+))$/){
         my $cds_length = length($1);
-        print $transcript->stable_id.": end-NF-CDS of $cds_length bp\n";
+        my $translation_length = int($cds_length/3);
+        print $transcript->stable_id.": 3'-incomplete CDS of $cds_length bp\n";
         my $cds_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
-        return ($cds_start, $cds_end, 0);
+        return ($cds_start, $cds_end, 0, $translation_length);
       }
     }
   }
@@ -1143,10 +1151,10 @@ sub predicted_nmd_transcript {
 sub create_cds {
   my ($transcript, $cds_start, $cds_end) = @_;
   unless ($transcript and $cds_start and $cds_end){
-    print "Not enough info for create_cds\n"; 
-    return undef;
+    print "Not enough information to create a CDS\n"; 
+    return;
   }
-print "create_cds => CDS_START: $cds_start ; CDS_END: $cds_end\n";
+  print "create_cds => CDS_START: $cds_start ; CDS_END: $cds_end\n";
 
   my $start_exon;
   my $end_exon;
@@ -1177,8 +1185,9 @@ print "create_cds => CDS_START: $cds_start ; CDS_END: $cds_end\n";
                                                 -SEQ_START  => $seq_start,
                                                 -SEQ_END    => $seq_end
                                                );
-  $transcript->translation($translation);
 
+  #Add translation to transcript
+  $transcript->translation($translation);
 
   #Assign phase and end_phase values to CDS exons
   #Assume start phase equals 0 in all cases
