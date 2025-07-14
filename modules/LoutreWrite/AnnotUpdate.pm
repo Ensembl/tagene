@@ -1278,6 +1278,7 @@ sub is_retained_intron {
                 #Check polyA site support
             unless (has_polyA_site_support($transcript, 500) or
                     has_polyAseq_support($transcript, 500) or
+                    has_polyAdb_support($transcript, 500) or
                     has_last_exon_polyA_site_support($transcript, $host_gene)){
               print "No polyA site support - will make a retained_intron\n";
               return 1;
@@ -1290,6 +1291,7 @@ sub is_retained_intron {
             #Check polyA site support
             unless (has_polyA_site_support($transcript, 500) or
                     has_polyAseq_support($transcript, 500) or
+                    has_polyAdb_support($transcript, 500) or
                     has_last_exon_polyA_site_support($transcript, $host_gene)){
               print "No polyA site support - will make a retained_intron\n";
               return 1;
@@ -1310,7 +1312,6 @@ sub is_retained_intron {
 
 
 
-
 =head2 has_polyA_site_support
 
  Arg[1]    : Bio::Vega::Transcript object
@@ -1326,6 +1327,28 @@ sub has_polyA_site_support {
   my $sa = $DBA{'havana'}->get_SliceAdaptor();
   my $ext_slice = $sa->fetch_by_region("toplevel", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
   if (scalar grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures('polya_site')}){
+    return 1;
+  }
+  return 0;
+}
+
+
+
+=head2 has_polyA_db_support
+
+ Arg[1]    : Bio::Vega::Transcript object
+ Arg[2]    : integer (distance threshold)
+ Function  : Returns true if there is a predicted polyA site within the distance to the transcript 3' end indicated by the second argument
+ Returntype: none
+
+=cut
+
+sub has_polyA_db_support {
+  my ($transcript, $threshold) = @_;
+  my $transcript_end = $transcript->seq_region_strand == 1 ? $transcript->seq_region_end : $transcript->seq_region_start;
+  my $sa = $DBA{'polyAdb'}->get_SliceAdaptor();
+  my $ext_slice = $sa->fetch_by_region("toplevel", $transcript->slice->seq_region_name, $transcript_end - $threshold, $transcript_end + $threshold);
+  if (scalar grep {$_->seq_region_strand==$transcript->seq_region_strand} @{$ext_slice->get_all_SimpleFeatures()}){
     return 1;
   }
   return 0;

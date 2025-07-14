@@ -32,6 +32,7 @@ sub get_db_adaptors_from_registry {
   $DBA{'core'} = $registry->get_DBAdaptor('core_'.$SPECIES, 'core');
   $DBA{'intron'} = $registry->get_DBAdaptor('intron_'.$SPECIES, 'core');
   $DBA{'polyAseq'} = $registry->get_DBAdaptor('polyAseq_'.$SPECIES, 'core');
+  $DBA{'polyAdb'} = $registry->get_DBAdaptor('polyAdb_'.$SPECIES, 'core');  
 }
   
 
