@@ -66,7 +66,20 @@ foreach my $slice (@{$sa->fetch_all("toplevel")}){
     unless ($gene->biotype eq "artifact" or !($gene->stable_id =~ /^ENS/) or scalar(grep {$_->value eq "not for VEGA"} @{$gene->get_all_Attributes})){
       foreach my $transcript (@{$gene->get_all_Transcripts}){
         unless ($transcript->biotype eq "artifact" or !($transcript->stable_id =~ /^ENS/) or scalar(grep {$_->value eq "not for VEGA"} @{$transcript->get_all_Attributes})){
-          if (scalar(grep {$_->value eq "MANE_select"} @{$transcript->get_all_Attributes("remark")})){
+          my $is_reference = 0;
+          if ($dbname =~ /homo_sapiens/ or $dbname =~ /human/){
+            if (scalar(grep {$_->value eq "MANE_select"} @{$transcript->get_all_Attributes("remark")}) or
+                scalar(@{$transcript->get_all_Attributes("MANE_Select")})
+            ){
+              $is_reference = 1;
+            }
+          }
+          else{
+            if ($transcript->is_canonical){
+              $is_reference = 1;
+            }
+          }
+          if ($is_reference){
             foreach my $exon (@{$transcript->get_all_Exons}){
               my $strand = $exon->seq_region_strand == 1 ? "+" : "-";
               $ref_exons{$exon->seq_region_name}{$strand}{$exon->seq_region_start."-".$exon->seq_region_end} = 1;
