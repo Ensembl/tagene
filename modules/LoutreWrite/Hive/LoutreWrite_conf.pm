@@ -79,10 +79,8 @@ sub default_options {
     analysis => '',
     tsource => '',
     assembly_version => '',
-    no_check => 0,
     no_NFV => 0,
     no_CDS => 0,
-    no_artifact_check => 0,
     no_intron_check => 0,
     host_biotype => '',
     no_overlap_biotype => '',
@@ -427,7 +425,6 @@ sub pipeline_analyses {
           .' #tsource#'
           .' #assembly#'
           .' #registry#'
-          .' #no_artifact_check#'
           .' #no_nfv#'
           .' #no_cds#'
           .' #no_intron_check#'
@@ -462,7 +459,6 @@ sub pipeline_analyses {
         assembly => ($self->o('assembly_version') ? '-assembly_version '.$self->o('assembly_version') : ''),
         registry => ($self->o('registry') ? '-registry '.$self->o('registry') : ''),
         chr => ($self->o('chr') ? ' -chr '.$self->o('chr') : ''),
-        no_artifact_check => ($self->o('no_artifact_check') ? ' -no_check ' : ''),
         no_intron_check => ($self->o('no_intron_check') ? '-no_intron_check ' : ''),
         no_nfv => ($self->o('no_NFV') ? '-no_NFV' : ''),
         no_cds => ($self->o('no_CDS') ? '-no_CDS' : ''),
@@ -504,7 +500,6 @@ sub pipeline_analyses {
           .' #tsource#'
           .' #assembly#'
           .' #registry#'
-          .' #no_artifact_check#'
           .' #no_nfv#'
           .' #no_cds#'
           .' #no_intron_check#'
@@ -539,7 +534,6 @@ sub pipeline_analyses {
         assembly => ($self->o('assembly_version') ? '-assembly_version '.$self->o('assembly_version') : ''),
         registry => ($self->o('registry') ? '-registry '.$self->o('registry') : ''),
         chr => ($self->o('chr') ? ' -chr '.$self->o('chr') : ''),
-        no_artifact_check => ($self->o('no_artifact_check') ? ' -no_check ' : ''),
         no_intron_check => ($self->o('no_intron_check') ? '-no_intron_check ' : ''),
         no_nfv => ($self->o('no_NFV') ? '-no_NFV' : ''),
         no_cds => ($self->o('no_CDS') ? '-no_CDS' : ''),

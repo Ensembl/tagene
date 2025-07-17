@@ -24,7 +24,6 @@ my $dataset_name;
 my $author_name;
 my $remark;
 my $use_comp_pipe_biotype;
-my $no_artifact_check;
 my $analysis_name;
 my $tsource;
 my $assembly_version;
@@ -53,7 +52,6 @@ my $registry_file;
             'analysis=s'                => \$analysis_name,
             'tsource=s'                 => \$tsource,
             'assembly=s'                => \$assembly_version,
-            'no_check!'                 => \$no_artifact_check,
             'no_NFV!'                   => \$no_NFV,
             'no_CDS!'                   => \$do_not_add_cds,
             'no_intron_check!'          => \$no_intron_check,
@@ -107,7 +105,6 @@ perl load_gxf_in_loutre.pl -file ANNOTATION_FILE -source SOURCE_INFO_FILE -datas
  -tsource              transcript source (default is "havana")
  -assembly             assembly version of the annotation in the file, if not the default one
  -registry             registry file providing auxiliary database connection details
- -no_check             do no check for transcripts spanning a large number of genes
  -no_NFV               do not add the 'not for VEGA' attribute
  -no_CDS               do not try to add a CDS if the transcript falls in a coding gene
  -no_intron_check      allow transcripts with intron chains fully or partially identical to others in the database
@@ -222,21 +219,13 @@ if ($assembly_version){
 }
 print "Number of genes (initial) = ".scalar(@$gene_objects)."\n";
 
-#Long artifact transcripts, spanning multiple real loci, make long artificial genes
-unless ($no_artifact_check){
-  #Generate a kill list of "artifact" transcripts (those with long introns spanning multiple genes, likely caused by misalignments)
-  my $kill_list = LoutreWrite::GeneFilter->check_artifact_transcripts($gene_objects);
-
-  #Remove artifacts and split genes left with genomic gaps
-  $gene_objects = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list);
-}
 
 #Remove transcripts overlapping more than the allowed number of existing loci at the exon level
 if ($max_overlapped_loci){
-  #my $kill_list_2 = LoutreWrite::GeneFilter->check_max_overlapped_loci($gene_objects, $max_overlapped_loci, 1);
-  my $kill_list_2 = LoutreWrite::GeneFilter->check_multiple_gene_overlap($gene_objects);
-  $gene_objects = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list_2);
-  foreach my $tid (keys %{$kill_list_2}){
+  #my $kill_list = LoutreWrite::GeneFilter->check_max_overlapped_loci($gene_objects, $max_overlapped_loci, 1);
+  my $kill_list = LoutreWrite::GeneFilter->check_multiple_gene_overlap($gene_objects);
+  $gene_objects = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list);
+  foreach my $tid (keys %{$kill_list}){
     print "TR2: $tid: max allowed number of overlapped loci exceeded\n";
   }
 }
@@ -245,16 +234,15 @@ print "Number of genes (after max overlapping loci) =".scalar(@$gene_objects)."\
 #Remove transcripts that overlap a gene having an unallowed biotype
 if ($no_overlap_biotype){
   my %excluded_biotypes = map {$_=>1} split(/,/, $no_overlap_biotype);
-  my $kill_list_3 = LoutreWrite::GeneFilter->check_overlapped_gene_biotypes($gene_objects, \%excluded_biotypes);
-  $gene_objects = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list_3);
-  foreach my $tid (keys %{$kill_list_3}){
+  my $kill_list_2 = LoutreWrite::GeneFilter->check_overlapped_gene_biotypes($gene_objects, \%excluded_biotypes);
+  $gene_objects = LoutreWrite::GeneFilter->recluster_transcripts($gene_objects, $kill_list_2);
+  foreach my $tid (keys %{$kill_list_2}){
     print "TR2: $tid: overlapped locus with unallowed biotype\n";
   }
 }
 print "Number of genes (after unallowed biotype overlap) =".scalar(@$gene_objects)."\n";
 
 #Add source info
-#my $gene_objects_3;
 if ($source_info){
   $gene_objects = LoutreWrite::InputParsing->add_sources($gene_objects, $source_info);
 }

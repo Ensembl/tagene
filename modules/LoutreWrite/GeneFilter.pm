@@ -11,39 +11,6 @@ use List::MoreUtils qw(uniq);
 
 
 
-
-=head2 check_artifact_transcripts
-
- Arg[1]    : list of Bio::Vega::Gene objects
- Function  : Check for transcripts unusually long and spanning several loci - probably alignment artifacts (NOT THOROUGHLY CHECKED YET)
- Returntype: Hashref - list of transcript names
-
-=cut
-
-sub check_artifact_transcripts {
-  my ($self, $genes) = @_;
-  my %list;
-  my $min_num_genes = 4;
-
-  foreach my $gene (@$genes){
-    foreach my $transcript (@{$gene->get_all_Transcripts}){
-      #Fetch database genes overlapping our transcript
-#      my $tr_slice = $transcript->slice->adaptor->fetch_by_region("toplevel", $transcript->seq_region_name, $transcript->start, $transcript->end);
-#      my @db_genes = grep {$_->seq_region_strand == $gene->seq_region_strand} @{$tr_slice->get_all_Genes};
-      my @db_genes = @{get_valid_overlapping_genes($transcript)};
-      if (scalar @db_genes > $min_num_genes){
-        my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
-        print "KILL: ".$t_name."  ".$transcript->start."-".$transcript->end."\n";
-        $list{$t_name} = 1;
-      }
-    }
-  }
-
-  return \%list;
-}
-
-
-
 =head2 check_max_overlapped_loci
 
  Arg[1]    : list of Bio::Vega::Gene objects
