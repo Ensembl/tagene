@@ -458,13 +458,33 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
                 next GENE;
               }
             }
-            
+
             #$new_gene_obj = LoutreWrite::Default->assign_cds_to_transcripts($new_gene_obj, $host_gene);
         }
- 
-        
-        #Predict intron outcome
-        #Only if novel intron?
+
+      #Ignore novel transcripts with large genome span in comparison with host gene
+      my $max_span_ratio = 20;
+      my $host_gene = $ga->fetch_by_stable_id($new_gene_obj->stable_id);
+      TR:foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
+        my $tr_span = $transcript->seq_region_end - $transcript->seq_region_start + 1;
+        my $span_ratio = $tr_span/$host_gene->length;
+        if ($span_ratio > $max_span_ratio){
+          my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+          print "TR2: $t_name: transcript span is ".sprintf("%.1f", $span_ratio)." times larger than host gene span \n";
+          if (scalar(@{$new_gene_obj->get_all_Transcripts}) > 1){
+            my $array = $new_gene_obj->{_transcript_array};
+            @$array = grep { $_->get_all_Attributes('hidden_remark')->[0]->value ne $t_name } @$array;
+            $ga->update_coords($new_gene_obj);
+            next TR;
+          }
+          else{
+            next GENE;
+          }
+        }
+      }
+
+      #Predict intron outcome
+      #Only if novel intron?
       if ($filter_introns){
         my %PASSED_INTRONS;
         TR:foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
