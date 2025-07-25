@@ -456,6 +456,9 @@ sub check_overlapped_gene_biotypes {
                 my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
                 print "KILL_2: ".$t_name."  ".$transcript->start."-".$transcript->end." overlaps gene ".$db_gene->stable_id." - ".$db_gene->biotype."\n";
                 $list{$t_name} = 1;
+                last DBG;
+              }
+              else{
                 next DBG;
               }
             }
