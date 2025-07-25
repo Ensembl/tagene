@@ -10,7 +10,7 @@ use Bio::Vega::Translation;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptUtils qw( calculate_exon_phases );
 use Bio::EnsEMBL::Registry;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use LoutreWrite::AnnotUpdate qw( has_polyA_site_support has_polyAseq_support );
+use LoutreWrite::AnnotUpdate qw( has_polyA_site_support has_polyAseq_support has_polyA_db_support );
 use LoutreWrite::Config;
 
 our %HOST_CDS_SET;
@@ -196,6 +196,7 @@ sub assign_cds_to_transcripts {
               #Otherwise, no CDS will be made and the biotype will be processed_transcript
               unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or
                       LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500) or
+                      LoutreWrite::AnnotUpdate::has_polyA_db_support($transcript, 500) or
                       LoutreWrite::AnnotUpdate::has_last_exon_polyA_site_support($transcript, $host_gene) or
                       is_known_stop_codon($cds_end, $slice_offset, $host_gene)){
                 print "Stop codon at $cds_end has no polyA site support nor has been annotated before\n";
@@ -305,6 +306,7 @@ sub assign_cds_to_transcripts {
               #Otherwise, no CDS will be made and the biotype will be processed_transcript
               unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or
                       LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500) or
+                      LoutreWrite::AnnotUpdate::has_polyA_db_support($transcript, 500) or
                       LoutreWrite::AnnotUpdate::has_last_exon_polyA_site_support($transcript, $host_gene) or
                       is_known_stop_codon($cds_end, $slice_offset, $host_gene)){
                 print "Stop codon at $cds_end has no polyA site support nor has been annotated before\n";
@@ -473,6 +475,7 @@ sub is_retained_intron {
             #Check polyA site support
             unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or
                     LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500) or
+                    LoutreWrite::AnnotUpdate::has_polyA_db_support($transcript, 500) or
                     LoutreWrite::AnnotUpdate::has_last_exon_polyA_site_support($transcript, $host_gene)){
               unless ($annotated_exons{scalar(@{$transcript->get_all_Exons})}){
                 print "Partial intron retention of the end exon without polyA site support\n";
@@ -488,6 +491,7 @@ sub is_retained_intron {
             #Check polyA site support
             unless (LoutreWrite::AnnotUpdate::has_polyA_site_support($transcript, 500) or
                     LoutreWrite::AnnotUpdate::has_polyAseq_support($transcript, 500) or
+                    LoutreWrite::AnnotUpdate::has_polyA_db_support($transcript, 500) or
                     LoutreWrite::AnnotUpdate::has_last_exon_polyA_site_support($transcript, $host_gene)){
               unless ($annotated_exons{scalar(@{$transcript->get_all_Exons})}){
                 print "Partial intron retention of the end exon without polyA site support\n";

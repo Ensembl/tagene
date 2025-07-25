@@ -20,7 +20,7 @@ use LoutreWrite::GeneFilter qw(get_valid_overlapping_genes);
 use base 'Exporter';
 
 our @EXPORT = qw( $WRITE @ALLOWED_TRANSCRIPT_BIOTYPES $ONLY_COMPLETE_CDS $NO_NOVEL_GENES $NO_TRANSCRIPT_EXTENSIONS );
-our @EXPORT_OK = qw( exon_novelty intron_novelty can_be_merged merge_transcripts has_polyA_site_support has_polyAseq_support );
+our @EXPORT_OK = qw( exon_novelty intron_novelty can_be_merged merge_transcripts has_polyA_site_support has_polyAseq_support has_polyA_db_support );
 our $WRITE = 0;
 our $CP_BIOTYPE = "comp_pipe";
 our @ALLOWED_TRANSCRIPT_BIOTYPES;
@@ -1278,7 +1278,7 @@ sub is_retained_intron {
                 #Check polyA site support
             unless (has_polyA_site_support($transcript, 500) or
                     has_polyAseq_support($transcript, 500) or
-                    has_polyAdb_support($transcript, 500) or
+                    has_polyA_db_support($transcript, 500) or
                     has_last_exon_polyA_site_support($transcript, $host_gene)){
               print "No polyA site support - will make a retained_intron\n";
               return 1;
@@ -1291,7 +1291,7 @@ sub is_retained_intron {
             #Check polyA site support
             unless (has_polyA_site_support($transcript, 500) or
                     has_polyAseq_support($transcript, 500) or
-                    has_polyAdb_support($transcript, 500) or
+                    has_polyA_db_support($transcript, 500) or
                     has_last_exon_polyA_site_support($transcript, $host_gene)){
               print "No polyA site support - will make a retained_intron\n";
               return 1;
