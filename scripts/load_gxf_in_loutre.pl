@@ -462,26 +462,126 @@ GENE:foreach my $new_gene_obj (@$gene_objects){
             #$new_gene_obj = LoutreWrite::Default->assign_cds_to_transcripts($new_gene_obj, $host_gene);
         }
 
-      #Ignore novel transcripts with large genome span in comparison with host gene
+      #Reject novel transcripts with large genome span in comparison with host gene
       my $max_span_ratio = 20;
       my $host_gene = $ga->fetch_by_stable_id($new_gene_obj->stable_id);
-      TR:foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
-        my $tr_span = $transcript->seq_region_end - $transcript->seq_region_start + 1;
-        my $span_ratio = $tr_span/$host_gene->length;
-        if ($span_ratio > $max_span_ratio){
-          my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
-          print "TR2: $t_name: transcript span is ".sprintf("%.1f", $span_ratio)." times larger than host gene span \n";
-          if (scalar(@{$new_gene_obj->get_all_Transcripts}) > 1){
-            my $array = $new_gene_obj->{_transcript_array};
-            @$array = grep { $_->get_all_Attributes('hidden_remark')->[0]->value ne $t_name } @$array;
-            $ga->update_coords($new_gene_obj);
-            next TR;
-          }
-          else{
-            next GENE;
+      if ($host_gene){
+        TR:foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
+          my $tr_span = $transcript->seq_region_end - $transcript->seq_region_start + 1;
+          my $span_ratio = $tr_span/$host_gene->length;
+          if ($span_ratio > $max_span_ratio){
+            my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+            print "TR2: $t_name: transcript span is ".sprintf("%.1f", $span_ratio)." times larger than host gene span \n";
+            if (scalar(@{$new_gene_obj->get_all_Transcripts}) > 1){
+              my $array = $new_gene_obj->{_transcript_array};
+              @$array = grep { $_->get_all_Attributes('hidden_remark')->[0]->value ne $t_name } @$array;
+              $ga->update_coords($new_gene_obj);
+              next TR;
+            }
+            else{
+              next GENE;
+            }
           }
         }
       }
+
+      #Reject novel transcripts that overlap other genes not overlapped by the host gene
+      #or share splice sites with other genes beyond the boundaries of the host gene
+      if ($host_gene){
+        TR:foreach my $transcript (@{$new_gene_obj->get_all_Transcripts}){
+          my @db_genes = @{LoutreWrite::GeneFilter::get_valid_overlapping_genes($transcript)};
+          #Find which genes overlap with the input transcript at the exon level beyond the host gene boundaries
+          my @overlapped_db_genes;
+          DBG:foreach my $db_gene (@db_genes){
+            next if $db_gene->stable_id eq $host_gene->stable_id;
+            #Consider only certain biotypes (coding and lncRNA broad biotypes)
+            if ($db_gene->biotype =~ /antisense|bidirectional_promoter_lncrna|ig_gene|IG_V_gene|lincRNA|macro_lncrna|overlapping_ncrna|polymorphic_pseudogene|processed_transcript|protein_coding|sense_intronic|sense_overlapping|tec|tr_gene/i){
+              foreach my $db_tr (@{$db_gene->get_all_Transcripts}){
+              next if $db_tr->biotype eq "artifact";
+                next if scalar grep {$_->value eq "not for VEGA"} @{$db_tr->get_all_Attributes('remark')};
+                foreach my $db_exon (@{$db_tr->get_all_Exons}){
+                  foreach my $exon (@{$transcript->get_all_Exons}){
+                    #Only check overlap with exons that go beyond the host gene's limits
+                    if ($exon->seq_region_start < $host_gene->seq_region_start or $exon->seq_region_end > $host_gene->seq_region_end){
+                      if ($db_exon->seq_region_start <= $exon->seq_region_end and $db_exon->seq_region_end >= $exon->seq_region_start){
+                        push(@overlapped_db_genes, $db_gene);
+                        next DBG;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          my $shared_external_splice_site = 0;
+          INT:foreach my $intron (@{$transcript->get_all_Introns}){
+            if ($intron->seq_region_start < $host_gene->seq_region_start or $intron->seq_region_end > $host_gene->seq_region_end){
+              foreach my $ov_gene (@overlapped_db_genes){
+                foreach my $ov_tr (@{$ov_gene->get_all_Transcripts}){
+                  next if $ov_tr->biotype eq "artifact";
+                  next if scalar grep {$_->value eq "not for VEGA"} @{$ov_tr->get_all_Attributes('remark')};
+                  foreach my $ov_intron (@{$ov_tr->get_all_Introns}){
+                    if (($ov_intron->seq_region_start == $intron->seq_region_start and $intron->seq_region_start < $host_gene->seq_region_start) or
+                        ($ov_intron->seq_region_end == $intron->seq_region_end and $intron->seq_region_end > $host_gene->seq_region_end)){
+                      $shared_external_splice_site = 1;
+                      last INT;
+                    }
+                  }
+                }
+              }
+            }
+          }
+          if ($shared_external_splice_site){
+            my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+            print "TR2: $t_name: shares splice site with other gene beyond the host gene boundaries\n";
+            if (scalar(@{$new_gene_obj->get_all_Transcripts}) > 1){
+              my $array = $new_gene_obj->{_transcript_array};
+              @$array = grep { $_->get_all_Attributes('hidden_remark')->[0]->value ne $t_name } @$array;
+              $ga->update_coords($new_gene_obj);
+              next TR;
+            }
+            else{
+              next GENE;
+            }
+          }
+        }
+      }
+        #Now, confirm that the genes overlapped by the novel transcript don't overlap the host gene
+        #foreach my $ov_gene (@overlapped_db_genes){
+          #my $overlap = 0;
+          #OVTR:foreach my $ov_tr (@{$ov_gene->get_all_Transcripts}){
+            #next if $ov_tr->biotype eq "artifact";
+            #next if scalar grep {$_->value eq "not for VEGA"} @{$ov_tr->get_all_Attributes('remark')};
+            #foreach my $h_tr (@{$host_gene->get_all_Transcripts}){
+              #next if $h_tr->biotype eq "artifact";
+              #next if scalar grep {$_->value eq "not for VEGA"} @{$h_tr->get_all_Attributes('remark')};
+              #E:foreach my $ov_exon (@{$ov_tr->get_all_Exons}){
+                #foreach my $h_exon (@{$h_tr->get_all_Exons}){
+                  #if ($ov_exon->seq_region_start <= $h_exon->seq_region_end and $ov_exon->seq_region_end >= $h_exon->seq_region_start){
+                    #$overlap = 1;
+                    #last OVTR;
+                  #}
+                #}
+              #}
+            #}
+          #}
+          #unless ($overlap){
+            #my $t_name = $transcript->stable_id || $transcript->get_all_Attributes('hidden_remark')->[0]->value;
+            #print "TR2: $t_name: overlaps exons from other gene that don't overlap the host gene\n";
+            #if (scalar(@{$new_gene_obj->get_all_Transcripts}) > 1){
+              #my $array = $new_gene_obj->{_transcript_array};
+              #@$array = grep { $_->get_all_Attributes('hidden_remark')->[0]->value ne $t_name } @$array;
+              #$ga->update_coords($new_gene_obj);
+              #next TR;
+            #}
+            #else{
+              #next GENE;
+            #}
+          #}
+        #}
+      #}
+
+
 
       #Predict intron outcome
       #Only if novel intron?
