@@ -154,8 +154,9 @@ print OUT "#".join("\t", "transcript_ID",
 #Loop through transcripts
 foreach my $tid (uniq @selected_ids){
   my $transcript_has_valid_support = 0;
-  my $passed = 1;
+  my $passed = 0;
   my @scores;
+  my $failed_splice_sites = 0;
   if ($intron_coords_by_tid{$tid}{'starts'}){
     for (my $i=0; $i < scalar(@{$intron_coords_by_tid{$tid}{'starts'}}); $i++){
       my $score = 0;
@@ -174,13 +175,15 @@ foreach my $tid (uniq @selected_ids){
       if ($score < $cutoff){
         $coords = $coords.":".$intron_coords_by_tid{$tid}{'strand'};
         if ($ref_introns{$coords}){ #ignore low score if intron was in the reference annotation
-          $passed = 1;
           $scores[-1] .= "(a)";
         }
         else{ 
-          $passed = 0;
+          $failed_splice_sites++;
         }
       }
+    }
+    if ($failed_splice_sites == 0){
+      $passed = 1;
     }
     print OUT join("\t", $tid, ($passed ? "yes" : "no"), scalar(@{$intron_coords_by_tid{$tid}{'starts'}}), join(",", @scores))."\n";
   }

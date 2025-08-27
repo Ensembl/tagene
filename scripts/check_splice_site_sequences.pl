@@ -22,7 +22,7 @@ my $ref_dbhost;
 my $ref_dbport;
 my $ref_dbuser;
 my $ref_dbname;
-my $allowed_seqs;
+my $allowed_seqs = "GT-AG";
 my $outfile;
 
 &GetOptions(
@@ -160,8 +160,9 @@ print OUT "#".join("\t", "transcript_ID",
 #Loop through transcripts
 foreach my $tid (uniq @selected_ids){
   my $transcript_has_valid_support = 0;
-  my $passed = 1;
+  my $passed = 0;
   my @splice_site_seqs;
+  my $failed_splice_sites = 0;
   if ($intron_coords_by_tid{$tid}{'starts'}){
     for (my $i=0; $i < scalar(@{$intron_coords_by_tid{$tid}{'starts'}}); $i++){
       my $seq;
@@ -177,23 +178,17 @@ foreach my $tid (uniq @selected_ids){
       }
       push(@splice_site_seqs, $seq);
 
-      if (scalar @allowed_splice_site_seqs){
-        if (grep {$_ eq $seq} @allowed_splice_site_seqs){
-          $passed = 1;
+      unless (grep {$_ eq $seq} @allowed_splice_site_seqs){
+        if ($ref_introns{$coords}){ #ignore unallowed sequence if intron in the reference annotation
+          $splice_site_seqs[-1] .= "(a)";
         }
-        else{
-          if ($ref_introns{$coords}){ #ignore sequence if intron was in the reference annotation
-            $passed = 1;
-            $splice_site_seqs[-1] .= "(a)";
-          }
-          else{ 
-            $passed = 0;
-          }
+        else{ 
+          $failed_splice_sites++;
         }
       }
-      else{
-        $passed = 1;
-      }
+    }
+    if ($failed_splice_sites == 0){
+      $passed = 1;
     }
     print OUT join("\t", $tid, ($passed ? "yes" : "no"), scalar(@{$intron_coords_by_tid{$tid}{'starts'}}), join(",", @splice_site_seqs), $intron_coords_by_tid{$tid}{'strand'})."\n";
   }
