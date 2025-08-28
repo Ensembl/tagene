@@ -29,6 +29,7 @@ my $dbname;
 my $analysis_name;
 my $biotype;
 my $only_chr;
+my $fasta_dir;
 
 &GetOptions(
             'tids=s'     => \$tlist,
@@ -41,6 +42,7 @@ my $only_chr;
             'analysis=s' => \$analysis_name,
             'biotype=s'  => \$biotype,
             'chr=s'      => \$only_chr,
+            'fasta=s'    => \$fasta_dir,
            );
 
 my $host = `hostname`;
@@ -61,9 +63,9 @@ my $sa = $db->get_SliceAdaptor;
 
 #Connect to the loutre database
 my $l_db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-    -host   => 'mysql-ens-havana-prod-1',
-    -port   => 4581,
-    -user   => 'ensro',
+    -host   => $dbhost,
+    -port   => $dbport,
+    -user   => $dbuser,
     -pass   => undef,
     -dbname => 'loutre_human',
     -driver => 'mysql',
@@ -74,9 +76,9 @@ $db->dnadb($l_db) if $dbname =~ /loutre/;
 
 #Connect to the database that stores the long read transcripts
 my $lr_db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-    -host   => 'mysql-ens-havana-prod-1',
-    -port   => 4581,
-    -user   => 'ensro',
+    -host   => $dbhost,
+    -port   => $dbport,
+    -user   => $dbuser,
     -pass   => undef,
     -dbname => 'gencode_long_read_pipeline',
     -driver => 'mysql',
@@ -86,9 +88,9 @@ my $lr_sa = $lr_db->get_SliceAdaptor;
 
 #Connect to the Ensembl core database
 my $e_db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-    -host   => 'mysql-ens-havana-prod-1',
-    -port   => 4581,
-    -user   => 'ensro',
+    -host   => $dbhost,
+    -port   => $dbport,
+    -user   => $dbuser,
     -pass   => undef,
     -dbname => 'homo_sapiens_core_97_38',
     -driver => 'mysql',
@@ -98,9 +100,9 @@ my $e_sa = $e_db->get_SliceAdaptor;
 
 #Connect to the Otter pipeline database
 my $p_db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-    -host   => 'mysql-ens-havana-prod-1',
-    -port   => 4581,
-    -user   => 'ensro',
+    -host   => $dbhost,
+    -port   => $dbport,
+    -user   => $dbuser,
     -pass   => undef,
     -dbname => 'pipe_human',
     -driver => 'mysql',
@@ -110,9 +112,9 @@ my $p_sa = $p_db->get_SliceAdaptor;
 
 #Connect to the Intropolis database
 my $i_db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-    -host   => 'mysql-ens-havana-prod-1',
-    -port   => 4581,
-    -user   => 'ensro',
+    -host   => $dbhost,
+    -port   => $dbport,
+    -user   => $dbuser,
     -pass   => undef,
     -dbname => 'gencode_sf5_human_introns',
     -driver => 'mysql',
@@ -593,8 +595,8 @@ sub get_exonerate_alignment_support {
       #my $cmd = "exonerate -q query.fa -t target.fa -m est2genome --refine region --geneseed 250 -n 1 > z_ex_out";
       #my $cmd = "exonerate -q query.fa -t target.fa -m est2genome --geneseed 250 -n 1 --forcegtag yes > z_ex_out";
   
-  my $exonerate = $host eq "havana-06" ? "exonerate" : "/nfs/ensembl/deprecated/bin/exonerate-2.2.0/exonerate";
-  my $pssm_dir = "/homes/jmgonzalez/work/long_read_pipeline/annotation_exercise_results/third_round/exonerate";
+  my $exonerate = "exonerate";
+  my $pssm_dir = $ENV{HOME}."/work/long_read_pipeline/annotation_exercise_results/third_round/exonerate";
   my $dir = $only_chr ? $only_chr : ".";
   if (`wc -l $dir/query.fa | cut -d' ' -f1` < 2){
     return "NA";
@@ -623,7 +625,6 @@ sub get_exonerate_alignment_support {
 
 sub get_read_sequences {
   my $read_names = shift;
-  my $fasta_dir = $host eq "havana-06" ? "/ebi/teams/ensembl/jmgonzalez/lrp" : "/nfs/production/panda/ensembl/havana/lrp";
   my %db = ('SLRseq'  => Bio::DB::Fasta->new("$fasta_dir/SLRseq_merged.fasta"),
             'CLS'     => Bio::DB::Fasta->new("$fasta_dir/Captureseq_merged.fasta"),
             'RACEseq' => Bio::DB::Fasta->new("$fasta_dir/RACEseq_merged.fasta"));

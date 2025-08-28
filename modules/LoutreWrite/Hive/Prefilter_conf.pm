@@ -1,4 +1,4 @@
-package LoutreWrite::Hive::Prefilter3_conf;
+package LoutreWrite::Hive::Prefilter_conf;
 
 use strict;
 use warnings;
@@ -27,23 +27,23 @@ sub default_options {
   return {
     %{$self->SUPER::default_options()},
 
-    user_r => 'ensro',
-    user => 'ensadmin',
+    user_r => $ENV{EHIVE_RO_USER},
+    user => $ENV{EHIVE_USER},
     password => $ENV{EHIVE_PASS},
-    pipe_db_host => 'mysql-ens-havana-prod-2',
-    pipe_db_port => 4682,    
+    pipe_db_host => $ENV{EHIVE_HOST},
+    pipe_db_port => $ENV{EHIVE_PORT},    
     pipeline_name => join('_', 'prefilter', $self->o('dataset'), $date, $self->o('db_prefix')),
     email => $ENV{'USER'}.'@ebi.ac.uk',
     hive_capacity => 0, # 0 means unlimited
 
     species => 'homo_sapiens',
-    dataset => 'human_tagene_test_6',
+    dataset => 'human_tagene',
     db_prefix => 1,
     input_file => $self->o('input_file'),
 
     ref_db_name => '',
-    ref_db_host => 'mysql-ens-havana-prod-2',
-    ref_db_port => 4682,
+    ref_db_host => $ENV{EHIVE_HOST},
+    ref_db_port => $ENV{EHIVE_PORT},
     ref_db_user => $self->o('user'),
     ref_db_driver => $self->o('hive_driver'),
     ref_db => {

@@ -1,6 +1,6 @@
 -- MySQL dump 10.14  Distrib 5.5.52-MariaDB, for Linux (x86_64)
 --
--- Host: mysql-ens-havana-prod-1    Database: havana_human
+-- Host: mysql-prod-1    Database: havana_human
 -- ------------------------------------------------------
 -- Server version	5.6.33
 

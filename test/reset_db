@@ -1,6 +1,6 @@
-HOST=mysql-ens-havana-prod-1
-PORT=4581
-USER=ottcron
+HOST=...
+PORT=...
+USER=...
 DBNAME=tagene_test
 
 mysql -h$HOST -P$PORT -u$USER -p$PASS -e "DROP DATABASE $DBNAME"

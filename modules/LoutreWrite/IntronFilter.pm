@@ -74,64 +74,6 @@ sub exonerate_support {
 }
 
 
-
-# #Connect to the loutre database
-# sub get_loutre_db_adaptor {
-# #   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-# #     -host   => 'mysql-ens-havana-prod-1',
-# #     -port   => 4581,
-# #     -user   => 'ensro',
-# #     -pass   => undef,
-# #     -dbname => 'loutre_human_tagene_test_6', #this should point to the database being modified - CHANGE THIS!
-# #     -driver => 'mysql',
-# #   );
-#   my $db = $DBA{'otter'};
-#   $db->dbc->disconnect_when_inactive(1);
-#   return $db;
-# }
-# 
-# # my $l_db = get_loutre_db_adaptor();
-# # my $l_sa = $l_db->get_SliceAdaptor;
-# 
-# 
-# 
-# #Connect to the Otter pipeline database
-# sub get_pipe_db_adaptor { 
-#   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-#     -host   => 'mysql-ens-havana-prod-1',
-#     -port   => 4581,
-#     -user   => 'ensro',
-#     -pass   => undef,
-#     -dbname => 'pipe_human',
-#     -driver => 'mysql',
-#   );
-#   $db->dbc->disconnect_when_inactive(1);
-#   return $db;
-# }
-# 
-# my $p_db = get_pipe_db_adaptor();
-# my $p_sa = $p_db->get_SliceAdaptor;
-# 
-# 
-# #Connect to the Intropolis database
-# sub get_intropolis_db_adaptor { 
-#   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-#     -host   => 'mysql-ens-havana-prod-1',
-#     -port   => 4581,
-#     -user   => 'ensro',
-#     -pass   => undef,
-#     -dbname => 'gencode_sf5_human_introns',
-#     -driver => 'mysql',
-#   );
-#   $db->dbc->disconnect_when_inactive(1);
-#   return $db;
-# }
-# 
-# my $i_db = get_intropolis_db_adaptor();
-# my $i_sa = $i_db->get_SliceAdaptor;
-
-
-
 sub is_novel {
   my $intron = shift;
   my $chr = $intron->seq_region_name;
@@ -347,7 +289,7 @@ sub get_exonerate_alignment_support {
       #my $cmd = "exonerate -q query.fa -t target.fa -m est2genome --geneseed 250 -n 1 --forcegtag yes > z_ex_out";
   
   my $exonerate = "exonerate";
-  my $pssm_dir = "/nfs/production/flicek/ensembl/havana/jmgonzalez/TAGENE/pssm";
+  my $pssm_dir = "";
   my $dir = $ENV{SCRATCH}."/TAGENE";
   if (`wc -l $dir/$filename.query.fa | cut -d' ' -f1` < 2){
     return "NA";
@@ -378,7 +320,6 @@ sub get_exonerate_alignment_support {
 sub get_read_sequences {
   my $read_names = shift;
   my $fasta_dir = $READSEQDIR;
-   #eq "havana-06" ? "/ebi/teams/ensembl/jmgonzalez/lrp" : "/nfs/production/panda/ensembl/havana/lrp";
   my %db;
   if ($SPECIES eq "human"){
     %db = ('SLRseq'   => Bio::DB::Fasta->new("$fasta_dir/SLRseq_merged.fasta"),

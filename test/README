@@ -58,7 +58,7 @@ bsub -M2000 -R"select[mem>2000] rusage[mem=2000]" -oo f.test.out \
 
 
 
-mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript where is_current;
+mysql-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript where is_current;
 +-----------------+-------------------------+---------------------+---------------------+
 | stable_id       | biotype                 | created_date        | modified_date       |
 +-----------------+-------------------------+---------------------+---------------------+
@@ -98,7 +98,7 @@ bsub -M2000 -R"select[mem>2000] rusage[mem=2000]" -oo f.test.out \
 
 
 
-mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript where is_current;
+mysql-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript where is_current;
 +-----------------+-------------------------+---------------------+---------------------+
 | stable_id       | biotype                 | created_date        | modified_date       |
 +-----------------+-------------------------+---------------------+---------------------+
@@ -144,7 +144,7 @@ mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_d
 38 rows in set (0.00 sec)
 
 
-mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript t, transcript_attrib ta where t.transcript_id=ta.transcript_id and t.is_current and ta.value="not for VEGA";
+mysql-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript t, transcript_attrib ta where t.transcript_id=ta.transcript_id and t.is_current and ta.value="not for VEGA";
 +-----------------+-----------+---------------------+---------------------+
 | stable_id       | biotype   | created_date        | modified_date       |
 +-----------------+-----------+---------------------+---------------------+
@@ -198,7 +198,7 @@ bsub -M2000 -R"select[mem>2000] rusage[mem=2000]" -oo f.test.2.out \
 
 
 
-mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript where is_current;
+mysql-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript where is_current;
 +-----------------+-------------------------+---------------------+---------------------+
 | stable_id       | biotype                 | created_date        | modified_date       |
 +-----------------+-------------------------+---------------------+---------------------+
@@ -245,7 +245,7 @@ mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_d
 
 
 
-mysql-ens-havana-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript t, transcript_attrib ta where t.transcript_id=ta.transcript_id and t.is_current and ta.value="not for VEGA";
+mysql-prod-1:tagene_test[mysql]> select stable_id, biotype, created_date, modified_date from transcript t, transcript_attrib ta where t.transcript_id=ta.transcript_id and t.is_current and ta.value="not for VEGA";
 +-----------------+-------------------------+---------------------+---------------------+
 | stable_id       | biotype                 | created_date        | modified_date       |
 +-----------------+-------------------------+---------------------+---------------------+

@@ -15,7 +15,7 @@ use Cwd;
 
 my $host;
 my $port;
-my $user = 'ensro';
+my $user;
 my $dbname;
 my $gene_list;
 my $outfile;

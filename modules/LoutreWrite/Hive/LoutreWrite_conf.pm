@@ -29,24 +29,24 @@ sub default_options {
   return {
     %{$self->SUPER::default_options()},
 
-    user_r => 'ensro',
-    user => 'ensadmin',
+    user_r => $ENV{EHIVE_RO_USER},
+    user => $ENV{EHIVE_USER},
     password => $ENV{EHIVE_PASS},
-    pipe_db_host => 'mysql-ens-havana-prod-2',
-    pipe_db_port => 4682,    
+    pipe_db_host => $ENV{EHIVE_HOST},
+    pipe_db_port => $ENV{EHIVE_PORT},
     pipeline_name => join('_', 'loutre_write', $self->o('dataset'), $date, $self->o('db_prefix')),
     email => $ENV{'USER'}.'@ebi.ac.uk',
     hive_capacity => 0, # 0 means unlimited
 
     species => 'homo_sapiens',
-    dataset => 'human_tagene_test_6',
+    dataset => 'human_tagene',
     db_prefix => 1,
     input_file => $self->o('input_file'),
 
     reset_target_db => 0,
     source_db_name => '',
-    source_db_host => 'mysql-ens-havana-prod-2',
-    source_db_port => 4682,
+    source_db_host => $ENV{EHIVE_HOST},
+    source_db_port => $ENV{EHIVE_PORT},
     source_db_user => $self->o('user_r'),
     source_db_driver => $self->o('hive_driver'),
     source_db => {
@@ -57,8 +57,8 @@ sub default_options {
       -driver => $self->o('source_db_driver'),
     },
     target_db_name => '',
-    target_db_host => 'mysql-ens-havana-prod-2',
-    target_db_port => 4682,
+    target_db_host => $ENV{EHIVE_HOST},
+    target_db_port => $ENV{EHIVE_PORT},
     target_db_user => $self->o('user'),
     target_db_password => $self->o('password'),
     target_db_driver => $self->o('hive_driver'),

@@ -16,18 +16,28 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 my $gene_list;
 my $gtf_infile;
 my $outfile;
+my $dbhost;
+my $dbport;
+my $dbuser;
+my $dbpass;
+my $dbname;
 
 &GetOptions(
             'list=s'     => \$gene_list,
             'infile=s'   => \$gtf_infile,
-            'outfile=s'  => \$outfile,           
+            'host=s'     => \$dbhost,
+            'port=s'     => \$dbport,
+            'user=s'     => \$dbuser,
+            'pass=s'     => \$dbpass,
+            'dbname=s'   => \$dbname,
+            'outfile=s'  => \$outfile,
             );            
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-                                           -host    => 'mysql-ens-havana-prod-1',
-                                           -user    => 'ensro',
-                                           -port    => 4581,
-                                           -dbname  => 'havana_human',
+                                           -host    => $dbhost,
+                                           -user    => $dbuser,
+                                           -port    => $dbport,
+                                           -dbname  => $dbname,
                                            ) or die "Can't connect to database";
 my $ga = $db->get_GeneAdaptor();
 

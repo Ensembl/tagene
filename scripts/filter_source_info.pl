@@ -23,9 +23,9 @@ use File::Basename;
 
 
 my $infile;
-my $host = "mysql-ens-havana-prod-1";
-my $port = 4581;
-my $user = "ensro";
+my $host;
+my $port;
+my $user;
 my $dbname;
 my $analysis;
 my $read_bed_path;

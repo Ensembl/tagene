@@ -49,13 +49,13 @@ sub get_db_adaptors{
 
 #Connect to the havana database (the live/production one, not necessarily the otter database that is being edited)
 sub get_havana_db_adaptor {
-  my $host = 'mysql-ens-havana-prod-1';
-  my $port = 4581;
-  my $user = 'ensro';
+  my $host = '';
+  my $port = '';
+  my $user = '';
   my $dbname = "havana_".$SPECIES;
   if ($SPECIES eq "human"){
-    $host = 'mysql-ens-havana-prod-2';
-    $port = 4682;
+    $host = '';
+    $port = '';
     $dbname = "havana_".$SPECIES."_backup";
     #$dbname = "havana_".$SPECIES."_tagene_test_1"; #temporarily to avoid failures when the backup database is being updated
   }
@@ -77,9 +77,9 @@ sub get_havana_db_adaptor {
 
 #Connect to the Ensembl core database
 sub get_core_db_adaptor {
-  my $host = 'mysql-ens-havana-prod-2';
-  my $port = 4682;
-  my $user = 'ensro';
+  my $host = '';
+  my $port = '';
+  my $user = '';
   my $dbname;
   if ($SPECIES eq "human"){
     $dbname = "homo_sapiens_core_112_38";
@@ -88,9 +88,9 @@ sub get_core_db_adaptor {
     $dbname = "mus_musculus_core_112_39";
   }
   elsif ($SPECIES eq "rat"){
-    $host = 'mysql-ens-mirror-1';
-    $port = 4240;
-    $user = 'ensro';
+    $host = '';
+    $port = '';
+    $user = '';
     $dbname = "rattus_norvegicus_core_111_72";
   } 
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
@@ -117,9 +117,9 @@ sub get_core_db_adaptor {
 
 #Connect to the intron database
 sub get_intron_db_adaptor {
-  my $host = 'mysql-ens-havana-prod-2';
-  my $port = 4682;
-  my $user = 'ensro';
+  my $host = '';
+  my $port = '';
+  my $user = '';
   my $dbname;
   if ($SPECIES eq "human"){
     $dbname = "gencode_snaptron";
@@ -128,9 +128,9 @@ sub get_intron_db_adaptor {
     $dbname = "gencode_mouse_recount3";
   }
   elsif ($SPECIES eq "rat"){
-    $host = 'mysql-ens-mirror-1';
-    $port = 4240;
-    $user = 'ensro';
+    $host = '';
+    $port = '';
+    $user = '';
     $dbname = "rattus_norvegicus_core_111_72";
   } 
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
@@ -148,9 +148,9 @@ sub get_intron_db_adaptor {
 
 #Connect to the (Merck) polyA-seq database
 sub get_polyAseq_db_adaptor {
-  my $host = 'mysql-ens-havana-prod-2';
-  my $port = 4682;
-  my $user = 'ensro';
+  my $host = '';
+  my $port = '';
+  my $user = '';
   my $dbname;
   if ($SPECIES eq "human"){
     $dbname = "gencode_polyAseq";
@@ -159,9 +159,9 @@ sub get_polyAseq_db_adaptor {
     $dbname = "gencode_mouse_polyAseq_mm9_assembly_schema_73";
   }
   elsif ($SPECIES eq "rat"){
-    $host = 'mysql-ens-mirror-1';
-    $port = 4240;
-    $user = 'ensro';
+    $host = '';
+    $port = '';
+    $user = '';
     $dbname = "rattus_norvegicus_core_111_72";
   } 
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
@@ -175,9 +175,6 @@ sub get_polyAseq_db_adaptor {
   $db->dbc->reconnect_when_lost(1);
   return $db;
 }
-
-
-
 
 
 1;

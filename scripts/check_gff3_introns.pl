@@ -6,21 +6,25 @@
 
 use strict;
 use Getopt::Long;
-use Gencode::Default;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
 
 $|=1;
 
 my $infile;
 my $outfile;
-my $species = "human";
-my $assembly;
+my $host;
+my $port;
+my $user;
+my $dbname;
 
 &GetOptions(
-	    'in=s'      => \$infile,
-	    'out=s'     => \$outfile,
-            'species=s' => \$species,
-            'asv=s'     => \$assembly,
+	          'in=s'      => \$infile,
+	          'out=s'     => \$outfile,
+            'host=s'    => \$host,
+            'port=i'    => \$port,
+            'user=s'    => \$user,
+            'dbname=s'  => \$dbname,
            );
 
 
@@ -28,25 +32,12 @@ my $assembly;
 die "Please provide assembly version\n" unless $assembly;
 
 #Database to provide sequence
-my $db;
-if ($species eq "human"){
-  #$assembly = "GRCh38" unless $assembly;
-  if ($assembly eq "GRCh37"){
-    $db = Gencode::Default->dbconnect("ensdb-archive", 5304, "homo_sapiens_core_75_37", "ensro", undef);
-  }
-  elsif ($assembly eq "GRCh38"){
-    $db = Gencode::Default->dbconnect("ensdb-archive", 5304, "homo_sapiens_core_80_38", "ensro", undef);
-  }
-}
-elsif ($species eq "mouse"){
-  $assembly = "GRCm38" unless $assembly;
-  if ($assembly eq "GRCm38"){
-    $db = Gencode::Default->dbconnect("ensdb-archive", 5304, "mus_musculus_core_80_38", "ensro", undef);
-  }
-}
-
-print "\nUsing $species $assembly genome assembly version.\n\n";
-
+my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+            -host => $host,
+            -port => $port,    
+            -user => $user,
+            -dbname => $dbname,
+);
 my $sa = $db->get_SliceAdaptor;
 
 open (OUT, ">$outfile") or die "Can't open $outfile\n";
